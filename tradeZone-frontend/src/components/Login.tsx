@@ -6,8 +6,8 @@ import type { AppDispatch, RootState } from '../redux/store';
 import ConnectionTest from './ConnectionTest';
 
 const Login: React.FC = () => {
-  const [email, setEmail] = useState('test@gmail.com');
-  const [password, setPassword] = useState('test@123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
   const dispatch = useDispatch<AppDispatch>();
@@ -46,13 +46,13 @@ const Login: React.FC = () => {
   };
 
   const handleDemoLogin = async () => {
-    setEmail('test@gmail.com');
-    setPassword('test@123');
+    setEmail('vivekkolhe@gmail.com');
+    setPassword('Vivek@123');
     
     try {
       const resultAction = await dispatch(loginUser({ 
-        email: 'test@gmail.com', 
-        password: 'test@123' 
+        email: 'vivekkolhe@gmail.com', 
+        password: 'Vivek@123' 
       }));
       if (loginUser.fulfilled.match(resultAction)) {
         console.log('✅ Demo login successful!', resultAction.payload);
