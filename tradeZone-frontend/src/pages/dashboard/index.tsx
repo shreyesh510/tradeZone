@@ -367,7 +367,7 @@ const Dashboard = memo(function Dashboard() {
       </div>
 
       {/* Main Content - Chart and Chat */}
-      <div className="flex-1 flex">
+      <div className="flex-1 flex" style={{height: "100%"}}>
         {/* Chart Section - 70% */}
         <div className="w-[70%]">
           <LiveChart key="live-chart" />

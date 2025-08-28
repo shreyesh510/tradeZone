@@ -228,7 +228,7 @@ const Chat: React.FC = () => {
   }, [user]);
 
   return (
-    <div className="h-screen bg-gray-900 flex">
+    <div className="bg-gray-900 flex" style={{ height: '500px', maxHeight: '100vh' }}>
       {/* Chat Summaries Sidebar */}
       <div className="w-1/4 bg-gray-800 border-r border-gray-700 flex flex-col">
         {/* Header */}
@@ -259,7 +259,7 @@ const Chat: React.FC = () => {
         </div>
 
         {/* Chat List */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-2">
+        <div className="flex-1 overflow-scroll p-4 space-y-2">
           {currentView === 'global' ? (
             <div
               onClick={() => setSelectedUser(null)}
@@ -325,8 +325,8 @@ const Chat: React.FC = () => {
         </div>
       </div>
 
-      {/* Chat Area */}
-      <div className="flex-1 flex flex-col">
+  {/* Chat Area */}
+  <div className="flex-1 flex flex-col h-full">
         {/* Chat Header */}
         <div className="bg-gray-800 border-b border-gray-700 p-4">
           <h1 className="text-xl font-bold text-white">
@@ -344,8 +344,8 @@ const Chat: React.FC = () => {
           )}
         </div>
 
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+  {/* Messages */}
+  <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
           {messages.map((message, index) => {
             const showDate = index === 0 || 
               new Date(message.createdAt).toDateString() !== 
