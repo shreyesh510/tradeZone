@@ -45,6 +45,7 @@ lerna-debug.log*
 # Firebase credentials
 *-firebase-adminsdk-*.json
 firebase-adminsdk-*.json
+myservice.json
 
 # temp directory
 .temp
