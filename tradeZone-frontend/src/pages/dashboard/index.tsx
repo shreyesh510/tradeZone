@@ -34,7 +34,7 @@ const Dashboard = memo(function Dashboard() {
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('connecting');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-
+  console.log('messages', messages);
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const user = useAppSelector((state) => state.auth.user);
@@ -235,7 +235,6 @@ const Dashboard = memo(function Dashboard() {
       messageType: 'text',
     };
     
-    setMessages(prev => [...prev, tempMessage]);
     
     // Set timeout to remove temp message if not confirmed within 5 seconds
     setTimeout(() => {
