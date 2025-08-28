@@ -57,7 +57,53 @@ $ npm run test:e2e
 $ npm run test:cov
 ```
 
+## Environment Variables
+
+Create a `.env` file in the root directory with the following variables:
+
+```env
+# Server Configuration
+PORT=3000
+
+# JWT Configuration
+JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+
+# Firebase Configuration
+# For production (Render), set FIREBASE_SERVICE_ACCOUNT_KEY to the entire JSON content of your service account key
+FIREBASE_SERVICE_ACCOUNT_KEY={"type":"service_account","project_id":"your-project-id","private_key_id":"...","private_key":"-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n","client_email":"...","client_id":"...","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","auth_provider_x509_cert_url":"https://www.googleapis.com/oauth2/v1/certs","client_x509_cert_url":"..."}
+FIREBASE_PROJECT_ID=tradeinzone-1a8b1
+FIREBASE_DATABASE_URL=https://tradeinzone-1a8b1-default-rtdb.firebaseio.com
+```
+
 ## Deployment
+
+### Render Deployment
+
+To deploy on Render, follow these steps:
+
+1. **Set Environment Variables in Render Dashboard:**
+   - Go to your service dashboard on Render
+   - Navigate to "Environment" tab
+   - Add the following environment variables:
+     - `FIREBASE_SERVICE_ACCOUNT_KEY`: Copy the entire content of your Firebase service account JSON file
+     - `FIREBASE_PROJECT_ID`: Your Firebase project ID (e.g., `tradeinzone-1a8b1`)
+     - `FIREBASE_DATABASE_URL`: Your Firebase Realtime Database URL
+     - `JWT_SECRET`: A secure random string for JWT signing
+     - `PORT`: The port your app should run on (Render will set this automatically)
+
+2. **Build Command:** `npm install && npm run build`
+
+3. **Start Command:** `npm run start:prod`
+
+### Firebase Service Account Setup
+
+1. Go to your Firebase Console
+2. Navigate to Project Settings > Service Accounts
+3. Click "Generate new private key"
+4. Download the JSON file
+5. Copy the entire JSON content and paste it as the value for `FIREBASE_SERVICE_ACCOUNT_KEY` environment variable
+
+**Important:** Never commit your Firebase service account JSON files to version control. They are already in `.gitignore` for security.
 
 When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
 

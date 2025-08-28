@@ -1,6 +1,5 @@
 import * as admin from 'firebase-admin';
 import { Injectable, OnModuleInit } from '@nestjs/common';
-import * as path from 'path';
 
 @Injectable()
 export class FirebaseConfig implements OnModuleInit {
@@ -20,17 +19,29 @@ export class FirebaseConfig implements OnModuleInit {
         return;
       }
 
-      // Path to your new service account key file
-      const serviceAccountPath = path.join(
-        process.cwd(),
-        'tradeinzone-1a8b1-firebase-adminsdk- fbsvc-ad8db35560.json'
-      );
+      let credential: admin.credential.Credential;
+
+      // Check if we're in production (Render) and use environment variables
+      if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+        // Parse the service account key from environment variable
+        const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+        credential = admin.credential.cert(serviceAccount);
+        console.log('🔥 Using Firebase credentials from environment variables');
+      } else {
+        // Fallback to local file for development
+        const serviceAccountPath = require('path').join(
+          process.cwd(),
+          'tradeinzone-1a8b1-firebase-adminsdk-fbsvc-ad8db35560.json'
+        );
+        credential = admin.credential.cert(serviceAccountPath);
+        console.log('🔥 Using Firebase credentials from local file');
+      }
 
       // Initialize Firebase Admin SDK
       this.firebaseApp = admin.initializeApp({
-        credential: admin.credential.cert(serviceAccountPath),
-        projectId: 'tradeinzone-1a8b1',
-        databaseURL: 'https://tradeinzone-1a8b1-default-rtdb.firebaseio.com',
+        credential,
+        projectId: process.env.FIREBASE_PROJECT_ID || 'tradeinzone-1a8b1',
+        databaseURL: process.env.FIREBASE_DATABASE_URL || 'https://tradeinzone-1a8b1-default-rtdb.firebaseio.com',
       });
 
       console.log('🔥 Firebase Admin SDK initialized successfully');
