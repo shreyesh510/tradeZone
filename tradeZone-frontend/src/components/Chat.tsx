@@ -345,7 +345,7 @@ const Chat: React.FC = () => {
         </div>
 
   {/* Messages */}
-  <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
+  <div className="flex-1 overflow-y-scroll p-4 space-y-4 min-h-0">
           {messages.map((message, index) => {
             const showDate = index === 0 || 
               new Date(message.createdAt).toDateString() !== 
