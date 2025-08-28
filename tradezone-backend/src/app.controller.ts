@@ -12,11 +12,15 @@ export class AppController {
 
   @Get('health')
   getHealth() {
-    return {
+    console.log('🏥 Health check requested');
+    const response = {
       status: 'ok',
       timestamp: new Date().toISOString(),
       message: 'Backend is running successfully!',
-      version: '1.0.0'
+      version: '1.0.0',
+      cors: 'enabled'
     };
+    console.log('✅ Health check response:', response);
+    return response;
   }
 }
