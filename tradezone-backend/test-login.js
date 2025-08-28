@@ -13,11 +13,11 @@ try {
   console.log('Parsed users:', users);
   
   // Test finding user
-  const testUser = users.find(user => user.email === 'test@gmail.com');
+  const testUser = users.find(user => user.email === 'vivekkolhe@gmail.com');
   console.log('Test user found:', testUser);
   
   if (testUser) {
-    console.log('Password check:', 'test@123' === testUser.password);
+    console.log('Password check:', 'Vivek@123' === testUser.password);
   }
 } catch (error) {
   console.error('Error:', error);

@@ -240,13 +240,6 @@ export class FirebaseDatabaseService {
             password: 'shreyash@123',
             createdAt: new Date(),
             updatedAt: new Date()
-          },
-          {
-            name: 'testuser',
-            email: 'test@gmail.com',
-            password: 'test@123',
-            createdAt: new Date(),
-            updatedAt: new Date()
           }
         ];
 

@@ -38,24 +38,24 @@ try {
         });
       }
 
-      // Check specifically for test@gmail.com
-      console.log('\n🔍 Looking for test@gmail.com specifically...');
+      // Check specifically for vivekkolhe@gmail.com
+      console.log('\n🔍 Looking for vivekkolhe@gmail.com specifically...');
       const testUserSnapshot = await db.collection('users')
-        .where('email', '==', 'test@gmail.com')
+        .where('email', '==', 'vivekkolhe@gmail.com')
         .limit(1)
         .get();
 
       if (testUserSnapshot.empty) {
-        console.log('❌ User test@gmail.com not found in database');
+        console.log('❌ User vivekkolhe@gmail.com not found in database');
         console.log('💡 You need to register this user first or use different credentials');
       } else {
         const testUser = testUserSnapshot.docs[0].data();
-        console.log('✅ Found test@gmail.com user:');
+        console.log('✅ Found vivekkolhe@gmail.com user:');
         console.log(`   Name: ${testUser.name}`);
         console.log(`   Email: ${testUser.email}`);
         console.log(`   Password: ${testUser.password}`);
-        console.log(`   Expected password: test@123`);
-        console.log(`   Password match: ${testUser.password === 'test@123'}`);
+        console.log(`   Expected password: Vivek@123`);
+        console.log(`   Password match: ${testUser.password === 'Vivek@123'}`);
       }
       
       console.log('\n✅ Debug completed successfully');

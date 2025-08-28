@@ -14,13 +14,5 @@
     "password": "shreyash@123",
     "createdAt": "2024-01-01T00:00:00.000Z",
     "updatedAt": "2024-01-01T00:00:00.000Z"
-  },
-  {
-    "id": "3",
-    "name": "testuser",
-    "email": "test@gmail.com",
-    "password": "test@123",
-    "createdAt": "2024-01-01T00:00:00.000Z",
-    "updatedAt": "2024-01-01T00:00:00.000Z"
   }
 ]
