@@ -11,7 +11,7 @@ const TradingViewChart = memo(function TradingViewChart({ isDarkMode }: TradingV
       <AdvancedChart
         widgetProps={{
           symbol: "DOGEUSD",
-          interval: "1",
+                     interval: "5",
           timezone: "Etc/UTC",
           theme: isDarkMode ? "dark" : "light",
           style: "1",

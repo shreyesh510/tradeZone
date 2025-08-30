@@ -175,4 +175,29 @@ export class ChatService {
       msg.createdAt <= endTime
     ).sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
   }
+
+  async deleteOldMessages(): Promise<void> {
+    console.log('🧹 Starting cleanup of old messages...');
+    
+    try {
+      const allMessages = await this.getAllMessages();
+      const oneMinuteAgo = new Date(Date.now() - 60 * 1000); // 1 minute ago
+      
+      const messagesToDelete = allMessages.filter(message => {
+        const messageTime = new Date(message.createdAt);
+        return messageTime < oneMinuteAgo;
+      });
+
+      console.log(`🗑️ Found ${messagesToDelete.length} messages to delete (older than 1 minute)`);
+
+      for (const message of messagesToDelete) {
+        await this.deleteMessage(message.id);
+        console.log(`🗑️ Deleted message: ${message.id} (sent at: ${message.createdAt})`);
+      }
+
+      console.log(`✅ Cleanup completed. Deleted ${messagesToDelete.length} old messages.`);
+    } catch (error) {
+      console.error('❌ Error during message cleanup:', error);
+    }
+  }
 }
