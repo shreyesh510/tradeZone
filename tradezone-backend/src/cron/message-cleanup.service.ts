@@ -8,9 +8,9 @@ export class MessageCleanupService {
 
   constructor(private readonly chatService: ChatService) {}
 
-  @Cron('0 */10 * * * *') // Every 10 minutes
+  @Cron('0 0 0 * * *') // Every 24 hours at midnight
   async handleMessageCleanup() {
-    this.logger.log('🕐 Running message cleanup cron job (every 10 minutes)...');
+    this.logger.log('🕐 Running message cleanup cron job (every 24 hours)...');
     
     try {
       await this.chatService.deleteOldMessages();
