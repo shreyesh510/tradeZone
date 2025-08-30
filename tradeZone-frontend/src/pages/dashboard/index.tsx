@@ -11,11 +11,8 @@ interface Message {
   content: string;
   senderId: string;
   senderName: string;
-  receiverId?: string;
-  roomId?: string;
   createdAt: Date;
-  readAt?: Date;
-  messageType?: 'text' | 'image' | 'file' | 'system';
+  messageType?: 'text' | 'system';
 }
 
 interface OnlineUser {
@@ -32,9 +29,11 @@ const Dashboard = memo(function Dashboard() {
   const [isTyping, setIsTyping] = useState(false);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('connecting');
+  const [showEmojiPicker, setShowEmojiPicker] = useState<boolean>(false);
+  const [recentEmojis, setRecentEmojis] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  console.log('messages', messages);
+  const emojiPickerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const user = useAppSelector((state) => state.auth.user);
@@ -48,9 +47,78 @@ const Dashboard = memo(function Dashboard() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
 
+  const toggleEmojiPicker = useCallback(() => {
+    setShowEmojiPicker(prev => !prev);
+  }, []);
+
+  const addToRecentEmojis = useCallback((emoji: string) => {
+    setRecentEmojis(prev => {
+      const newRecent = [emoji, ...prev.filter(e => e !== emoji)].slice(0, 30);
+      localStorage.setItem('recentEmojis', JSON.stringify(newRecent));
+      return newRecent;
+    });
+  }, []);
+
+  const onEmojiClick = useCallback((emoji: string) => {
+    setNewMessage(prev => prev + emoji);
+    addToRecentEmojis(emoji);
+    setShowEmojiPicker(false);
+  }, [addToRecentEmojis]);
+
   useEffect(() => {
     scrollToBottom();
   }, [messages, scrollToBottom]);
+
+  // Load recent emojis from localStorage on component mount
+  useEffect(() => {
+    const savedRecentEmojis = localStorage.getItem('recentEmojis');
+    if (savedRecentEmojis) {
+      try {
+        setRecentEmojis(JSON.parse(savedRecentEmojis));
+      } catch (error) {
+        console.error('Error loading recent emojis:', error);
+      }
+    }
+  }, []);
+
+  // Close emoji picker when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node)) {
+        setShowEmojiPicker(false);
+      }
+    };
+
+    if (showEmojiPicker) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showEmojiPicker]);
+
+  // Emoji data organized by categories
+  const emojiCategories = {
+    recent: recentEmojis,
+    smileys: [
+      '😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇',
+      '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚',
+      '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🤩',
+      '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '☹️', '😣',
+      '😖', '😫', '😩', '🥺', '😢', '😭', '😤', '😠', '😡', '🤬',
+      '🤯', '😳', '🥵', '🥶', '😱', '😨', '😰', '😥', '😓', '🤗'
+    ],
+    gestures: [
+      '👋', '🤚', '🖐️', '✋', '🖖', '👌', '🤌', '🤏', '✌️', '🤞',
+      '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕', '👇', '☝️', '👍',
+      '👎', '👊', '✊', '🤛', '🤜', '👏', '🙌', '👐', '🤲', '🤝'
+    ],
+    hearts: [
+      '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔',
+      '❣️', '💕', '💞', '💓', '💗', '💖', '💘', '💝', '💟', '♥️'
+    ]
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -124,10 +192,7 @@ const Dashboard = memo(function Dashboard() {
         }
       });
       
-      // Mark messages as read if it's a direct message to current user
-      if (message.receiverId === user.id && !message.readAt) {
-        newSocket.emit('markMessagesAsRead', { senderId: message.senderId });
-      }
+
     });
 
     newSocket.on('messageSent', (message: Message) => {
@@ -149,13 +214,7 @@ const Dashboard = memo(function Dashboard() {
       });
     });
 
-    newSocket.on('messagesRead', (data: { readerId: string; readerName: string }) => {
-      setMessages(prev => prev.map(msg => 
-        msg.senderId === data.readerId && !msg.readAt 
-          ? { ...msg, readAt: new Date() }
-          : msg
-      ));
-    });
+
 
     newSocket.on('userOnline', (user: OnlineUser) => {
       setOnlineUsers(prev => {
@@ -320,16 +379,7 @@ const Dashboard = memo(function Dashboard() {
     }
   }, []);
 
-  const getMessageStatus = useCallback((message: Message) => {
-    if (message.senderId === user?.id) {
-      if (message.readAt) {
-        return '✓✓ Read';
-      } else if (message.receiverId) {
-        return '✓ Delivered';
-      }
-    }
-    return '';
-  }, [user]);
+
 
   return (
     <div className="h-screen bg-gray-900 flex flex-col">
@@ -456,11 +506,9 @@ const Dashboard = memo(function Dashboard() {
                       <div className="text-sm">{message.content}</div>
                                              <div className="flex items-center justify-between text-xs opacity-75 mt-1">
                          <span>{formatTime(message.createdAt)}</span>
-                         {message.id.startsWith('temp-') ? (
+                         {message.id.startsWith('temp-') && (
                            <span className="ml-2 text-yellow-300">Sending...</span>
-                         ) : getMessageStatus(message) ? (
-                           <span className="ml-2">{getMessageStatus(message)}</span>
-                         ) : null}
+                         )}
                        </div>
                     </div>
                   </div>
@@ -471,8 +519,104 @@ const Dashboard = memo(function Dashboard() {
           </div>
 
           {/* Message Input */}
-          <div className="p-4 border-t border-gray-700">
+          <div className="p-4 border-t border-gray-700 relative">
+            {/* Emoji Picker */}
+            {showEmojiPicker && (
+              <div 
+                ref={emojiPickerRef}
+                className="absolute bottom-full left-4 mb-2 bg-gray-800 border border-gray-600 rounded-lg shadow-lg p-4 w-80 z-50"
+              >
+                <div className="mb-3">
+                  <div className="flex space-x-2 mb-2">
+                    {Object.keys(emojiCategories).map((category) => (
+                      <button
+                        key={category}
+                        className="px-2 py-1 text-xs bg-gray-700 text-gray-300 rounded hover:bg-gray-600 capitalize"
+                      >
+                        {category}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                
+                <div className="max-h-48 overflow-y-auto">
+                  {/* Recent Emojis */}
+                  {recentEmojis.length > 0 && (
+                    <div className="mb-4">
+                      <h4 className="text-xs text-gray-400 mb-2">Recent</h4>
+                      <div className="grid grid-cols-8 gap-1">
+                        {recentEmojis.slice(0, 16).map((emoji, index) => (
+                          <button
+                            key={index}
+                            onClick={() => onEmojiClick(emoji)}
+                            className="p-2 hover:bg-gray-700 rounded text-lg"
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Smileys */}
+                  <div className="mb-4">
+                    <h4 className="text-xs text-gray-400 mb-2">Smileys</h4>
+                    <div className="grid grid-cols-8 gap-1">
+                      {emojiCategories.smileys.map((emoji, index) => (
+                        <button
+                          key={index}
+                          onClick={() => onEmojiClick(emoji)}
+                          className="p-2 hover:bg-gray-700 rounded text-lg"
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  {/* Gestures */}
+                  <div className="mb-4">
+                    <h4 className="text-xs text-gray-400 mb-2">Gestures</h4>
+                    <div className="grid grid-cols-8 gap-1">
+                      {emojiCategories.gestures.map((emoji, index) => (
+                        <button
+                          key={index}
+                          onClick={() => onEmojiClick(emoji)}
+                          className="p-2 hover:bg-gray-700 rounded text-lg"
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  {/* Hearts */}
+                  <div>
+                    <h4 className="text-xs text-gray-400 mb-2">Hearts</h4>
+                    <div className="grid grid-cols-8 gap-1">
+                      {emojiCategories.hearts.map((emoji, index) => (
+                        <button
+                          key={index}
+                          onClick={() => onEmojiClick(emoji)}
+                          className="p-2 hover:bg-gray-700 rounded text-lg"
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
             <div className="flex space-x-2">
+              <button
+                onClick={toggleEmojiPicker}
+                className="text-yellow-400 hover:text-yellow-300 p-2 transition-colors duration-200"
+                title="Add emoji"
+              >
+                😊
+              </button>
               <input
                 type="text"
                 value={newMessage}
