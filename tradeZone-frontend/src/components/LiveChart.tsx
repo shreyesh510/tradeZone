@@ -1,40 +1,12 @@
-import { useState, memo, useEffect } from 'react';
+import { useState, memo } from 'react';
 import { AdvancedChart } from 'react-tradingview-embed';
-import { useAppDispatch, useAppSelector } from '../redux/hooks';
-import { fetchDogecoinPrice } from '../redux/thunks/tradingview/priceThunks';
 
 const LiveChart = memo(function LiveChart() {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
-  
-  const dispatch = useAppDispatch();
-  const { price: currentPrice, change24h: priceChange, loading, error } = useAppSelector(
-    (state) => state.price.dogecoin
-  );
 
   const toggleTheme = () => {
     setIsDarkMode(!isDarkMode);
-  };
-
-     // Fetch price on component mount and set up interval using Redux
-   useEffect(() => {
-     // Fetch immediately on mount
-     dispatch(fetchDogecoinPrice());
-     
-     // Update price every 10 seconds for real-time data
-     const interval = setInterval(() => {
-       dispatch(fetchDogecoinPrice());
-     }, 10000);
-     
-     return () => clearInterval(interval);
-   }, [dispatch]);
-
-  const formatPrice = (price: number) => {
-    return price < 1 ? price.toFixed(6) : price.toFixed(2);
-  };
-
-  const formatPriceChange = (change: number) => {
-    return `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`;
   };
 
   return (
@@ -47,38 +19,6 @@ const LiveChart = memo(function LiveChart() {
         </div>
         
         <div className="flex items-center space-x-4">
-          {/* Live Price Display */}
-          <div className="text-right">
-            {loading ? (
-              <div className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                Loading...
-              </div>
-            ) : error ? (
-              <div className={`text-sm ${isDarkMode ? 'text-red-400' : 'text-red-600'}`}>
-                Price unavailable
-              </div>
-            ) : currentPrice !== null ? (
-              <>
-                <div className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-                  ${formatPrice(currentPrice)}
-                </div>
-                {priceChange !== null && (
-                  <div className={`text-sm font-medium ${
-                    priceChange >= 0 
-                      ? 'text-green-400' 
-                      : 'text-red-400'
-                  }`}>
-                    {formatPriceChange(priceChange)}
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                No data
-              </div>
-
-            )}
-          </div>
           {/* Settings Button */}
           <div className="relative">
             <button
@@ -128,7 +68,7 @@ const LiveChart = memo(function LiveChart() {
         <AdvancedChart
           widgetProps={{
             symbol: "DOGEUSD",
-            interval: "1",
+            interval: "5",
             timezone: "Etc/UTC",
             theme: isDarkMode ? "dark" : "light",
             style: "1",
@@ -136,10 +76,26 @@ const LiveChart = memo(function LiveChart() {
             toolbar_bg: isDarkMode ? "#1e222d" : "#f1f3f6",
             enable_publishing: false,
             allow_symbol_change: true,
-            container_id: "tradingview_chart",
+            container_id: `tradingview_chart_${Date.now()}`,
             autosize: true,
             width: "100%",
             height: "100%",
+            save_image: false,
+            studies_overrides: {},
+            overrides: {
+              "mainSeriesProperties.style": 1,
+            },
+            // Force 5m timeframe
+            time_frames: [
+              { text: "5m", resolution: "5", description: "5 Minutes", title: "5m" },
+              { text: "15m", resolution: "15", description: "15 Minutes", title: "15m" },
+              { text: "30m", resolution: "30", description: "30 Minutes", title: "30m" },
+              { text: "1h", resolution: "60", description: "1 Hour", title: "1h" },
+              { text: "4h", resolution: "240", description: "4 Hours", title: "4h" },
+              { text: "1D", resolution: "1D", description: "1 Day", title: "1D" }
+            ],
+            // Clear any stored preferences
+            load_last_chart: false,
           }}
         />
       </div>
