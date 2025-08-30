@@ -2,7 +2,7 @@ import { useState, memo } from 'react';
 import { AdvancedChart } from 'react-tradingview-embed';
 
 const LiveChart = memo(function LiveChart() {
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
 
   const toggleTheme = () => {
