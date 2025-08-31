@@ -1,25 +1,17 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useAppSelector } from '../redux/hooks';
 import { useToast } from './ToastContext';
+import { messageStorage } from '../services/messageStorage';
+import { type Message } from '../types/message';
 import config from '../config/env';
-
-interface Message {
-  id: string;
-  content: string;
-  senderId: string;
-  senderName: string;
-  receiverId?: string;
-  roomId?: string;
-  createdAt: Date;
-  updatedAt?: Date;
-  messageType: 'text' | 'image' | 'file' | 'system';
-}
 
 interface SocketContextType {
   socket: Socket | null;
   connectionStatus: 'connecting' | 'connected' | 'disconnected' | 'error';
   onlineUsers: OnlineUser[];
+  messages: Message[];
+  addMessage: (message: Message) => void;
 }
 
 interface OnlineUser {
@@ -46,9 +38,36 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('connecting');
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   
   const user = useAppSelector((state) => state.auth.user);
   const { addToast } = useToast();
+
+  // Load messages from localStorage on mount
+  useEffect(() => {
+    if (messageStorage.isStorageAvailable()) {
+      const storedMessages = messageStorage.loadMessages();
+      if (storedMessages.length > 0) {
+        setMessages(storedMessages);
+        console.log(`📥 Loaded ${storedMessages.length} messages from localStorage`);
+      }
+    }
+  }, []);
+
+  // Save messages to localStorage whenever messages change
+  useEffect(() => {
+    if (messages.length > 0 && messageStorage.isStorageAvailable()) {
+      messageStorage.updateMessages(messages);
+    }
+  }, [messages]);
+
+  const addMessage = (message: Message) => {
+    setMessages(prev => {
+      const updatedMessages = [...prev, message];
+      // Keep only last 100 messages
+      return updatedMessages.slice(-100);
+    });
+  };
 
   useEffect(() => {
     if (!user) {
@@ -60,8 +79,10 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
 
     const newSocket = io(config.API_BASE_URL, {
       auth: {
-        userId: user.id,
-        userName: user.name || user.email,
+        user: {
+          userId: user.id,
+          userName: user.name || user.email,
+        }
       },
       transports: ['websocket', 'polling'],
       timeout: 10000,
@@ -106,6 +127,9 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     newSocket.on('newMessage', (message: Message) => {
       console.log('💬 New message received globally:', message);
       
+      // Add message to global storage
+      addMessage(message);
+      
       // Show toast notification for messages from other users
       if (message.senderId !== user.id && message.senderId !== 'ai-assistant') {
         addToast({
@@ -128,7 +152,9 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   const value: SocketContextType = {
     socket,
     connectionStatus,
-    onlineUsers
+    onlineUsers,
+    messages,
+    addMessage
   };
 
   return (

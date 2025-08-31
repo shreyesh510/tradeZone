@@ -4,6 +4,7 @@ import Header from '../../layouts/Header';
 import Chat from '../dashboard/components/Chat';
 import Sidebar from '../../components/Sidebar';
 import FloatingNav, { type MobileTab } from '../../layouts/FloatingNav';
+import ResizablePane from '../../components/ResizablePane';
 import Settings from '../settings';
 import { useSettings } from '../../contexts/SettingsContext';
 
@@ -48,9 +49,8 @@ const Zone = memo(function Zone() {
         <div 
           className={`${isDarkMode ? 'bg-gray-900' : 'bg-gray-100'} flex flex-col`}
           style={{ 
-            height: '100vh', // Standard viewport height - works on all devices
             height: '100svh', // Small viewport height for mobile browsers
-            minHeight: '100vh',
+            minHeight: '100vh', // Fallback for older browsers
             maxHeight: '100vh',
             paddingBottom: '0px',
             margin: '0px'
@@ -82,15 +82,16 @@ const Zone = memo(function Zone() {
       {/* Sidebar */}
       <Sidebar isOpen={sidebarOpen} onToggle={toggleSidebar} />
 
-      {/* Main Content - Chart and Chat - EXACT SAME AS BEFORE */}
-      <div className="flex-1 flex" style={{height: "100%"}}>
-        {/* Chart Section - 70% */}
-        <div className="w-[70%]">
-          <LiveChart key="live-chart" />
-        </div>
-
-        {/* Chat Section - 30% */}
-        <Chat onlineUsers={onlineUsers} setOnlineUsers={setOnlineUsers} />
+      {/* Main Content - Resizable Chart and Chat */}
+      <div className="flex-1" style={{height: "100%"}}>
+        <ResizablePane
+          leftPane={<LiveChart key="live-chart" />}
+          rightPane={<Chat onlineUsers={onlineUsers} setOnlineUsers={setOnlineUsers} />}
+          initialLeftWidth={70}
+          minLeftWidth={30}
+          maxLeftWidth={80}
+          isDarkMode={isDarkMode}
+        />
       </div>
     </div>
   );

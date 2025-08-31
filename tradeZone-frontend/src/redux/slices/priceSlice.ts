@@ -1,10 +1,10 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
-import type { PriceData } from '../../api/priceApi';
 import { 
   fetchDogecoinPrice, 
   fetchMultiplePrices, 
   fetchBitcoinPrice, 
-  fetchEthereumPrice 
+  fetchEthereumPrice,
+  type PriceData
 } from '../thunks/tradingview/priceThunks';
 
 interface CoinState {

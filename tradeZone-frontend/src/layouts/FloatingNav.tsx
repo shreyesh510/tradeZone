@@ -73,7 +73,10 @@ const FloatingNav = memo(function FloatingNav({ activeTab, onTabChange }: Floati
                 key={tab.id}
                 className="flex items-center justify-end"
                 style={{
-                  animation: `slideUp 0.2s ease-out ${index * 0.05}s both`
+                  animation: `slideUp 0.2s ease-out ${index * 0.05}s both`,
+                  opacity: 0,
+                  transform: 'translateY(20px)',
+                  animationFillMode: 'forwards'
                 }}
               >
                 {/* Label */}
@@ -124,19 +127,7 @@ const FloatingNav = memo(function FloatingNav({ activeTab, onTabChange }: Floati
         </button>
       </div>
 
-      {/* CSS Animation */}
-      <style jsx>{`
-        @keyframes slideUp {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-      `}</style>
+
     </>
   );
 });
