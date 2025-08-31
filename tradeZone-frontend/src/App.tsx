@@ -11,6 +11,10 @@ import Login from './components/Login';
 import Zone from './pages/zone';
 import Settings from './pages/settings';
 import LiveChart from './components/LiveChart';
+import Positions from './pages/investment/positions';
+import InvestmentDashboard from './pages/investment/dashboard';
+import Withdraw from './pages/investment/withdraw';
+import Deposit from './pages/investment/deposit';
 import './index.css';
 
 // Protected Route Component
@@ -98,6 +102,41 @@ function App() {
                   element={
                     <ProtectedRoute>
                       <LiveChart />
+                    </ProtectedRoute>
+                  } 
+                />
+                
+                {/* Investment Routes */}
+                <Route 
+                  path="/investment/positions" 
+                  element={
+                    <ProtectedRoute>
+                      <Positions />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/investment/dashboard" 
+                  element={
+                    <ProtectedRoute>
+                      <InvestmentDashboard />
+                    </ProtectedRoute>
+                  } 
+                />
+
+                <Route 
+                  path="/investment/withdraw" 
+                  element={
+                    <ProtectedRoute>
+                      <Withdraw />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/investment/deposit" 
+                  element={
+                    <ProtectedRoute>
+                      <Deposit />
                     </ProtectedRoute>
                   } 
                 />

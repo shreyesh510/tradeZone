@@ -8,7 +8,7 @@ import {
   MessageBody,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { ChatService } from './chat.service';
+// ChatService dependency removed - all operations now in-memory
 import { CreateMessageDto } from './dto/create-message.dto';
 import { UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -31,7 +31,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private memoryMessages: any[] = []; // In-memory message storage
   private readonly MAX_MESSAGES = 100; // Keep only last 100 messages
 
-  constructor(private readonly chatService: ChatService) {}
+  constructor() {
+    // Constructor simplified - no database dependencies needed
+  }
 
   async handleConnection(client: Socket) {
     console.log(`🔌 Client connected: ${client.id}`);
@@ -194,7 +196,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     try {
-      await this.chatService.markMessagesAsRead(userInfo.userId, data.senderId);
+      // In-memory chat doesn't need persistent read status
       
       // Notify the sender that their messages have been read
       this.server.to(`user_${data.senderId}`).emit('messagesRead', {
@@ -204,7 +206,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       return { success: true };
     } catch (error) {
-      console.error('Error marking messages as read:', error);
+      console.error('Error in markMessagesAsRead handler:', error);
       return { error: 'Failed to mark messages as read' };
     }
   }
@@ -217,7 +219,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
 
     try {
-      const chatSummary = await this.chatService.getUserChatSummary(userInfo.userId);
+      // In-memory chat doesn't provide persistent chat summaries
+      const chatSummary = [];
       
       // Update online status for users in the summary
       const onlineUserIds = Array.from(this.connectedUsers.values()).map(u => u.userId);
@@ -272,11 +275,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     try {
       const startTime = new Date(data.startTime);
       const endTime = new Date(data.endTime);
-      const messages = await this.chatService.getMessagesWithTimeRange(
-        userInfo.userId,
-        startTime,
-        endTime
-      );
+      // In-memory chat: filter messages by time range
+      const messages = this.memoryMessages.filter(msg => {
+        const msgTime = new Date(msg.createdAt);
+        return msgTime >= startTime && msgTime <= endTime &&
+               (msg.senderId === userInfo.userId || msg.receiverId === userInfo.userId);
+      });
 
       client.emit('messagesWithTimeRange', messages);
       return messages;
