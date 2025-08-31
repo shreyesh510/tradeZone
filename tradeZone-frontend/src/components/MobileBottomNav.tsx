@@ -57,23 +57,22 @@ const MobileBottomNav = memo(function MobileBottomNav({ activeTab, onTabChange }
     <div className={`fixed bottom-0 left-0 right-0 z-50 ${
       isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
     } border-t`}>
-      <div className="flex justify-around items-center py-2">
+      <div className="flex justify-around items-center py-3">
         {tabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => onTabChange(tab.id)}
-            className={`flex flex-col items-center py-2 px-4 rounded-lg transition-colors ${
+            className={`flex items-center justify-center p-3 rounded-lg transition-colors ${
               activeTab === tab.id
                 ? isDarkMode
                   ? 'text-blue-400 bg-gray-700'
                   : 'text-blue-600 bg-blue-50'
                 : isDarkMode
                   ? 'text-gray-400 hover:text-white'
-                  : 'text-gray-600 hover:text-gray-900'
+                  : 'text-gray-400 hover:text-gray-600'
             }`}
           >
             {tab.icon}
-            <span className="text-xs mt-1">{tab.label}</span>
           </button>
         ))}
       </div>
