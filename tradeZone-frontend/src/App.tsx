@@ -4,6 +4,9 @@ import { useDispatch, useSelector } from 'react-redux';
 import { initializeAuth } from './redux/slices/authSlice';
 import type { AppDispatch, RootState } from './redux/store';
 import { SettingsProvider } from './contexts/SettingsContext';
+import { ToastProvider } from './contexts/ToastContext';
+import { SocketProvider } from './contexts/SocketContext';
+import ToastContainer from './components/ToastContainer';
 import Login from './components/Login';
 import Zone from './pages/zone';
 import Settings from './pages/settings';
@@ -63,49 +66,56 @@ function App() {
 
   return (
     <SettingsProvider>
-      <Router>
-        <div className="App">
-          <Routes>
-            <Route 
-              path="/login" 
-              element={
-                isAuthenticated ? <Navigate to="/zone" replace /> : <Login />
-              } 
-            />
-            <Route 
-              path="/zone" 
-              element={
-                <ProtectedRoute>
-                  <Zone />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/settings" 
-              element={
-                <ProtectedRoute>
-                  <Settings />
-                </ProtectedRoute>
-              } 
-            />
-            <Route 
-              path="/chart" 
-              element={
-                <ProtectedRoute>
-                  <LiveChart />
-                </ProtectedRoute>
-              } 
-            />
+      <ToastProvider>
+        <SocketProvider>
+          <Router>
+            <div className="App">
+              <Routes>
+                <Route 
+                  path="/login" 
+                  element={
+                    isAuthenticated ? <Navigate to="/zone" replace /> : <Login />
+                  } 
+                />
+                <Route 
+                  path="/zone" 
+                  element={
+                    <ProtectedRoute>
+                      <Zone />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/settings" 
+                  element={
+                    <ProtectedRoute>
+                      <Settings />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/chart" 
+                  element={
+                    <ProtectedRoute>
+                      <LiveChart />
+                    </ProtectedRoute>
+                  } 
+                />
 
-            <Route 
-              path="/" 
-              element={
-                isAuthenticated ? <Navigate to="/zone" replace /> : <Navigate to="/login" replace />
-              } 
-            />
-          </Routes>
-        </div>
-      </Router>
+                <Route 
+                  path="/" 
+                  element={
+                    isAuthenticated ? <Navigate to="/zone" replace /> : <Navigate to="/login" replace />
+                  } 
+                />
+              </Routes>
+              
+              {/* Global Toast Container */}
+              <ToastContainer />
+            </div>
+          </Router>
+        </SocketProvider>
+      </ToastProvider>
     </SettingsProvider>
   );
 }
