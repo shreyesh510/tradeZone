@@ -178,17 +178,16 @@ export class ChatService {
 
   async deleteOldMessages(): Promise<void> {
     console.log('🧹 Starting cleanup of old messages...');
-    
     try {
       const allMessages = await this.getAllMessages();
-      const oneMinuteAgo = new Date(Date.now() - 60 * 1000); // 1 minute ago
-      
+      const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000); // 10 minutes ago
+
       const messagesToDelete = allMessages.filter(message => {
         const messageTime = new Date(message.createdAt);
-        return messageTime < oneMinuteAgo;
+        return messageTime < tenMinutesAgo;
       });
 
-      console.log(`🗑️ Found ${messagesToDelete.length} messages to delete (older than 1 minute)`);
+      console.log(`🗑️ Found ${messagesToDelete.length} messages to delete (older than 10 minutes)`);
 
       for (const message of messagesToDelete) {
         await this.deleteMessage(message.id);

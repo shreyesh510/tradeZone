@@ -9,6 +9,7 @@ export interface User {
   password: string;
   createdAt: Date;
   updatedAt: Date;
+  isAiFeatureEnabled?: boolean;
 }
 
 export interface ChatMessage {

@@ -1,20 +1,25 @@
-import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Patch, Param } from '@nestjs/common';
+import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { AuthService } from './auth.service';
-import { LoginDto } from './dto/login.dto';
-import { RegisterDto } from './dto/register.dto';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  @Post('login')
+  async login(@Body() loginDto: any) {
+    return this.authService.login(loginDto);
+  }
+
   @Post('register')
-  async register(@Body() registerDto: RegisterDto) {
+  async register(@Body() registerDto: any) {
     return this.authService.register(registerDto);
   }
 
-  @Post('login')
-  @HttpCode(HttpStatus.OK)
-  async login(@Body() loginDto: LoginDto) {
-    return this.authService.login(loginDto);
+  // Admin endpoint to toggle AI feature for a user
+  @Patch('toggle-ai/:email')
+  @UseGuards(JwtAuthGuard)
+  async toggleAiFeature(@Param('email') email: string, @Body('enabled') enabled: boolean) {
+    return this.authService.toggleUserAiFeature(email, enabled);
   }
 }

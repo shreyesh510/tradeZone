@@ -34,6 +34,7 @@ export class AuthService {
       password: password, // Store plain text password for now
       createdAt: new Date(),
       updatedAt: new Date(),
+      isAiFeatureEnabled: true, // Default to true for new users
     });
 
     // Generate JWT token
@@ -48,6 +49,7 @@ export class AuthService {
       password: newUser.password,
       createdAt: newUser.createdAt,
       updatedAt: newUser.updatedAt,
+      isAiFeatureEnabled: newUser.isAiFeatureEnabled,
     });
 
     return {
@@ -56,6 +58,7 @@ export class AuthService {
         id: newUser.id,
         name: newUser.name,
         email: newUser.email,
+        isAiFeatureEnabled: newUser.isAiFeatureEnabled ?? true,
       },
       token,
       testToken, // For localStorage storage
@@ -109,6 +112,7 @@ export class AuthService {
         password: user.password,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
+        isAiFeatureEnabled: user.isAiFeatureEnabled ?? false, // Default to false if not set
       });
 
       return {
@@ -117,6 +121,7 @@ export class AuthService {
           id: user.id,
           name: user.name,
           email: user.email,
+          isAiFeatureEnabled: user.isAiFeatureEnabled ?? false,
         },
         token,
         testToken, // For localStorage storage
@@ -136,7 +141,7 @@ export class AuthService {
     return await this.databaseService.findUserById(userId);
   }
 
-  private generateTestToken(user: User): string {
+  private generateTestToken(user: any): string {
     // Create a simple test token for localStorage
     const testTokenData = {
       userId: user.id,
@@ -144,9 +149,39 @@ export class AuthService {
       name: user.name,
       type: 'test-token',
       createdAt: new Date().toISOString(),
+      isAiFeatureEnabled: user.isAiFeatureEnabled,
     };
     
     // Encode as base64 for localStorage storage
     return Buffer.from(JSON.stringify(testTokenData)).toString('base64');
+  }
+
+  async toggleUserAiFeature(email: string, enabled: boolean) {
+    try {
+      console.log(`🤖 Toggling AI feature for ${email} to ${enabled}`);
+      
+      const user = await this.firebaseDatabaseService.findUserByEmail(email);
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      // Update user in Firebase
+      await this.firebaseDatabaseService.updateUser(user.id, {
+        isAiFeatureEnabled: enabled,
+        updatedAt: new Date(),
+      });
+
+      return {
+        message: `AI feature ${enabled ? 'enabled' : 'disabled'} for ${email}`,
+        user: {
+          id: user.id,
+          email: user.email,
+          isAiFeatureEnabled: enabled,
+        },
+      };
+    } catch (error) {
+      console.error('❌ Error toggling AI feature:', error);
+      throw error;
+    }
   }
 }

@@ -28,6 +28,9 @@ const openAIService = {
   async generateResponse(request: OpenAIRequest): Promise<OpenAIResponse> {
     const apiKey = config.OPENAI_API_KEY;
     
+    console.log('🔑 Debug - API Key from config:', apiKey ? 'KEY_FOUND' : 'NO_KEY');
+    console.log('🔑 Debug - Raw env var:', import.meta.env.VITE_OPENAI_API_KEY ? 'ENV_FOUND' : 'NO_ENV');
+    
     if (!apiKey) {
       throw new Error('OpenAI API key not found. Please add VITE_OPENAI_API_KEY to your .env file');
     }

@@ -1,7 +1,8 @@
 import { useCallback, useState, useEffect, useRef } from 'react';
-import { useAppSelector } from '../../../redux/hooks';
+import { useAppSelector, useAppDispatch } from '../../../redux/hooks';
 import { io, Socket } from 'socket.io-client';
 import config from '../../../config/env';
+import { generateOpenAIResponse } from '../../../redux/thunks/openai/openAI';
 
 interface Message {
   id: string;
@@ -32,10 +33,14 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('connecting');
   const [showEmojiPicker, setShowEmojiPicker] = useState<boolean>(false);
   const [recentEmojis, setRecentEmojis] = useState<string[]>([]);
+  const [aiMode, setAiMode] = useState<boolean>(false);
+  const [showAiWarning, setShowAiWarning] = useState<boolean>(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const user = useAppSelector((state) => state.auth.user);
+  const dispatch = useAppDispatch();
+  const { loading: aiLoading, error: aiError } = useAppSelector((state) => state.openai);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -52,6 +57,19 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
       return newRecent;
     });
   }, []);
+
+  const handleAiToggle = useCallback(() => {
+    // For backward compatibility: if isAiFeatureEnabled is undefined, allow AI (existing users)
+    const hasAiAccess = user?.isAiFeatureEnabled !== false;
+    
+    if (!hasAiAccess && !aiMode) {
+      // User trying to enable AI but doesn't have permission
+      setShowAiWarning(true);
+      setTimeout(() => setShowAiWarning(false), 3000); // Hide warning after 3 seconds
+      return;
+    }
+    setAiMode(prev => !prev);
+  }, [user?.isAiFeatureEnabled, aiMode]);
 
   const onEmojiClick = useCallback((emoji: string) => {
     setNewMessage(prev => prev + emoji);
@@ -207,8 +225,8 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
     });
 
     newSocket.on('userOnline', (user: OnlineUser) => {
-      setOnlineUsers(prev => {
-        const exists = prev.find(u => u.userId === user.userId);
+      setOnlineUsers((prev: OnlineUser[]) => {
+        const exists = prev.find((u: OnlineUser) => u.userId === user.userId);
         if (!exists) {
           return [...prev, user];
         }
@@ -217,7 +235,7 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
     });
 
     newSocket.on('userOffline', (user: OnlineUser) => {
-      setOnlineUsers(prev => prev.filter(u => u.userId !== user.userId));
+      setOnlineUsers((prev: OnlineUser[]) => prev.filter((u: OnlineUser) => u.userId !== user.userId));
     });
 
     newSocket.on('userTyping', (data: { userId: string; userName: string; isTyping: boolean }) => {
@@ -239,7 +257,79 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
     };
   }, [user, setOnlineUsers]);
 
+  const sendAIMessage = useCallback(async () => {
+    if (!newMessage.trim() || !user) return;
+
+    const userMessage: Message = {
+      id: `ai-user-${Date.now()}`,
+      content: newMessage,
+      senderId: user.id,
+      senderName: user.name,
+      createdAt: new Date(),
+      messageType: 'text',
+    };
+
+    // Add user message to chat immediately
+    setMessages(prev => [...prev, userMessage]);
+    
+    const prompt = newMessage;
+    setNewMessage('');
+    setIsTyping(false);
+
+    try {
+      // Dispatch OpenAI API call
+      const result = await dispatch(generateOpenAIResponse({ 
+        prompt,
+        systemMessage: "You are a helpful AI assistant in a cryptocurrency trading chat. Provide concise, helpful responses about trading, market analysis, or general questions. Keep responses under 150 words."
+      }));
+
+      if (generateOpenAIResponse.fulfilled.match(result)) {
+        // Add AI response message
+        const aiMessage: Message = {
+          id: `ai-response-${Date.now()}`,
+          content: result.payload.message,
+          senderId: 'ai-assistant',
+          senderName: '🤖 AI Assistant',
+          createdAt: new Date(),
+          messageType: 'text',
+        };
+        
+        setMessages(prev => [...prev, aiMessage]);
+      } else if (generateOpenAIResponse.rejected.match(result)) {
+        // Handle error
+        const errorMessage: Message = {
+          id: `ai-error-${Date.now()}`,
+          content: `❌ AI Error: ${result.payload || 'Failed to get AI response'}`,
+          senderId: 'system',
+          senderName: 'System',
+          createdAt: new Date(),
+          messageType: 'system',
+        };
+        
+        setMessages(prev => [...prev, errorMessage]);
+      }
+    } catch (error) {
+      console.error('❌ Error calling OpenAI:', error);
+      const errorMessage: Message = {
+        id: `ai-error-${Date.now()}`,
+        content: '❌ Failed to get AI response. Please try again.',
+        senderId: 'system',
+        senderName: 'System',
+        createdAt: new Date(),
+        messageType: 'system',
+      };
+      
+      setMessages(prev => [...prev, errorMessage]);
+    }
+  }, [newMessage, user, dispatch]);
+
   const sendMessage = useCallback(() => {
+    // If AI mode is on, send to OpenAI instead of chat
+    if (aiMode) {
+      sendAIMessage();
+      return;
+    }
+
     console.log('📤 Send message called with:', { 
       message: newMessage,
       hasSocket: !!socket, 
@@ -319,7 +409,7 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
       // Remove temp message if there's an error
       setMessages(prev => prev.filter(msg => msg.id !== tempMessage.id));
     }
-  }, [newMessage, socket, user]);
+  }, [newMessage, socket, user, aiMode, sendAIMessage]);
 
   const handleTyping = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setNewMessage(e.target.value);
@@ -386,6 +476,33 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
           </div>
         </div>
         
+        {/* AI Mode Toggle */}
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-sm text-gray-300">AI Mode</span>
+          <div className="relative">
+            <button
+              onClick={handleAiToggle}
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800 ${
+                aiMode ? 'bg-blue-600' : 'bg-gray-600'
+              } ${user?.isAiFeatureEnabled === false ? 'opacity-50' : ''}`}
+            >
+              <span
+                className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform duration-200 ${
+                  aiMode ? 'translate-x-5' : 'translate-x-1'
+                }`}
+              />
+            </button>
+            
+            {/* AI Permission Warning */}
+            {showAiWarning && (
+              <div className="absolute top-6 right-0 z-50 bg-red-600 text-white text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap">
+                AI feature not available for your account
+                <div className="absolute -top-1 right-2 w-0 h-0 border-l-2 border-r-2 border-b-2 border-transparent border-b-red-600"></div>
+              </div>
+            )}
+          </div>
+        </div>
+        
         {/* Online Users */}
         <div className="flex flex-wrap gap-1 mb-2">
           <div className="flex items-center space-x-1">
@@ -439,6 +556,8 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
                   className={`max-w-[85%] px-3 py-2 rounded-lg ${
                     message.messageType === 'system'
                       ? 'bg-yellow-600 text-white mx-auto'
+                      : message.senderId === 'ai-assistant'
+                      ? 'bg-purple-600 text-white border-l-4 border-purple-400'
                       : message.senderId === user?.id
                       ? message.id.startsWith('temp-') 
                         ? 'bg-blue-400 text-white opacity-75' // Temporary message styling
@@ -568,15 +687,23 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
             value={newMessage}
             onChange={handleTyping}
             onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-            placeholder="Type your message..."
-            className="flex-1 bg-gray-700 text-white rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            placeholder={aiMode ? "Ask AI anything..." : "Type your message..."}
+            className={`flex-1 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 text-sm ${
+              aiMode 
+                ? 'bg-purple-700 text-white focus:ring-purple-500 border border-purple-600' 
+                : 'bg-gray-700 text-white focus:ring-blue-500'
+            }`}
           />
           <button
             onClick={sendMessage}
-            disabled={!newMessage.trim()}
-            className="bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+            disabled={!newMessage.trim() || (aiMode && aiLoading)}
+            className={`px-3 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm ${
+              aiMode
+                ? 'bg-purple-600 text-white hover:bg-purple-700'
+                : 'bg-blue-600 text-white hover:bg-blue-700'
+            }`}
           >
-            Send
+            {aiMode ? (aiLoading ? '🤖' : 'Ask AI') : 'Send'}
           </button>
         </div>
       </div>
