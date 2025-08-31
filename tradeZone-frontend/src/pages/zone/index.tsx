@@ -3,7 +3,7 @@ import LiveChart from '../../components/LiveChart';
 import Header from '../../layouts/Header';
 import Chat from '../dashboard/components/Chat';
 import Sidebar from '../../components/Sidebar';
-import MobileBottomNav, { type MobileTab } from '../../layouts/MobileBottomNav';
+import FloatingNav, { type MobileTab } from '../../layouts/FloatingNav';
 import Settings from '../settings';
 import { useSettings } from '../../contexts/SettingsContext';
 
@@ -48,26 +48,19 @@ const Zone = memo(function Zone() {
         <div 
           className={`${isDarkMode ? 'bg-gray-900' : 'bg-gray-100'} flex flex-col`}
           style={{ 
-            height: '100vh',
             height: '100dvh', // Dynamic viewport height for mobile browsers
-            maxHeight: '100vh',
             maxHeight: '100dvh'
           }}
         >
-          {/* Content - with proper spacing for bottom nav */}
-          <div 
-            className="flex-1 overflow-hidden"
-            style={{ 
-              paddingBottom: 'calc(60px + env(safe-area-inset-bottom, 0px))'
-            }}
-          >
+          {/* Content - full screen */}
+          <div className="flex-1 overflow-hidden">
             {activeTab === 'chart' && <LiveChart key="live-chart" />}
             {activeTab === 'chat' && <Chat onlineUsers={onlineUsers} setOnlineUsers={setOnlineUsers} />}
             {activeTab === 'settings' && <Settings />}
           </div>
 
-          {/* Mobile Bottom Navigation */}
-          <MobileBottomNav activeTab={activeTab} onTabChange={handleTabChange} />
+          {/* Floating Navigation */}
+          <FloatingNav activeTab={activeTab} onTabChange={handleTabChange} />
         </div>
       );
     }
