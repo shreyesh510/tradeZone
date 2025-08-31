@@ -4,7 +4,7 @@
  */
 
 import { tradingViewService, type MarketData } from './tradingViewService';
-import { chartCaptureService } from './chartCapture';
+import { chartContextService } from './chartCapture';
 
 export interface ChatMarketContext {
   currentSymbol: string;
@@ -41,20 +41,13 @@ class MarketContextService {
    */
   private detectCurrentChart(): { symbol: string; timeframe: string } {
     try {
-      // Try to get from chart capture service
-      const chartContext = chartCaptureService.getCurrentChartContext();
+      // Get chart context from the context service
+      const chartContext = chartContextService.getCurrentChartContext();
       
-      // Also try to get from settings if available
-      const settingsData = localStorage.getItem('tradeZone_settings');
-      if (settingsData) {
-        const settings = JSON.parse(settingsData);
-        return {
-          symbol: chartContext.symbol || settings.defaultCrypto || 'DOGEUSD',
-          timeframe: chartContext.timeframe || settings.defaultTimeframe || '5',
-        };
-      }
-      
-      return chartContext;
+      return {
+        symbol: chartContext.symbol,
+        timeframe: chartContext.timeframe
+      };
     } catch (error) {
       console.warn('⚠️ Could not detect current chart, using defaults:', error);
       return { symbol: 'DOGEUSD', timeframe: '5' };
