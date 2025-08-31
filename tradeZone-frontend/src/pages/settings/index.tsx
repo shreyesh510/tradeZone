@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAppDispatch } from '../../redux/hooks';
+import { logoutUser } from '../../redux/slices/authSlice';
 import { 
   useSettings, 
   cryptoOptions, 
@@ -9,6 +11,7 @@ import {
 
 const Settings: React.FC = () => {
   const navigate = useNavigate();
+  const dispatch = useAppDispatch();
   const { settings, updateSettings, resetSettings, saveSettings } = useSettings();
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
@@ -28,6 +31,11 @@ const Settings: React.FC = () => {
 
   const goBack = () => {
     navigate('/zone');
+  };
+
+  const handleLogout = () => {
+    dispatch(logoutUser());
+    navigate('/');
   };
 
   return (
@@ -282,6 +290,21 @@ const Settings: React.FC = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
                 <span>Reset to Defaults</span>
+              </button>
+
+              {/* Logout Button */}
+              <button
+                onClick={handleLogout}
+                className={`w-full px-4 py-3 rounded-lg transition-colors flex items-center justify-center space-x-2 ${
+                  settings.theme === 'dark'
+                    ? 'bg-gray-700 text-red-400 hover:bg-gray-600 border border-red-400'
+                    : 'bg-gray-100 text-red-600 hover:bg-gray-200 border border-red-300'
+                }`}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                </svg>
+                <span>Logout</span>
               </button>
             </div>
           </div>

@@ -64,7 +64,7 @@ const FloatingNav = memo(function FloatingNav({ activeTab, onTabChange }: Floati
       )}
 
       {/* Floating Navigation */}
-      <div className="fixed right-4 z-50" style={{ bottom: '20%' }}>
+      <div className="fixed right-4 z-50" style={{ bottom: '10%' }}>
         {/* Navigation Options - shown when expanded */}
         {isExpanded && (
           <div className="mb-3 space-y-2">
