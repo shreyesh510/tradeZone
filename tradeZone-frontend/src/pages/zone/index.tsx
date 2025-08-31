@@ -3,7 +3,7 @@ import LiveChart from '../../components/LiveChart';
 import Header from '../../layouts/Header';
 import Chat from '../dashboard/components/Chat';
 import Sidebar from '../../components/Sidebar';
-import MobileBottomNav, { type MobileTab } from '../../components/MobileBottomNav';
+import MobileBottomNav, { type MobileTab } from '../../layouts/MobileBottomNav';
 import Settings from '../settings';
 import { useSettings } from '../../contexts/SettingsContext';
 
@@ -18,7 +18,7 @@ const Zone = memo(function Zone() {
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
   const [isMobile, setIsMobile] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<MobileTab>('zone');
+  const [activeTab, setActiveTab] = useState<MobileTab>('chart');
 
   // Check if mobile
   useEffect(() => {
@@ -42,43 +42,35 @@ const Zone = memo(function Zone() {
   // Use settings for theme
   const isDarkMode = settings.theme === 'dark';
 
-  // Mobile view - single section based on active tab
-  if (isMobile) {
-    return (
-      <div className={`h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-100'} flex flex-col`}>
-        {/* Header - only show on zone tab */}
-        {activeTab === 'zone' && (
-          <Header 
-            onlineUsers={onlineUsers} 
-            sidebarOpen={false} 
-            onSidebarToggle={() => {}} 
-          />
-        )}
+      // Mobile view - single section based on active tab
+    if (isMobile) {
+      return (
+        <div 
+          className={`${isDarkMode ? 'bg-gray-900' : 'bg-gray-100'} flex flex-col`}
+          style={{ 
+            height: '100vh',
+            height: '100dvh', // Dynamic viewport height for mobile browsers
+            maxHeight: '100vh',
+            maxHeight: '100dvh'
+          }}
+        >
+          {/* Content - with proper spacing for bottom nav */}
+          <div 
+            className="flex-1 overflow-hidden"
+            style={{ 
+              paddingBottom: 'calc(60px + env(safe-area-inset-bottom, 0px))'
+            }}
+          >
+            {activeTab === 'chart' && <LiveChart key="live-chart" />}
+            {activeTab === 'chat' && <Chat onlineUsers={onlineUsers} setOnlineUsers={setOnlineUsers} />}
+            {activeTab === 'settings' && <Settings />}
+          </div>
 
-        {/* Content */}
-        <div className="flex-1 pb-16">
-          {activeTab === 'chart' && <LiveChart key="live-chart" />}
-          {activeTab === 'chat' && <Chat onlineUsers={onlineUsers} setOnlineUsers={setOnlineUsers} />}
-          {activeTab === 'zone' && (
-            <div className="flex-1 flex flex-col h-full">
-              {/* Chart Section - 50% on mobile */}
-              <div className="flex-1">
-                <LiveChart key="live-chart" />
-              </div>
-              {/* Chat Section - 50% on mobile */}
-              <div className="flex-1">
-                <Chat onlineUsers={onlineUsers} setOnlineUsers={setOnlineUsers} />
-              </div>
-            </div>
-          )}
-          {activeTab === 'settings' && <Settings />}
+          {/* Mobile Bottom Navigation */}
+          <MobileBottomNav activeTab={activeTab} onTabChange={handleTabChange} />
         </div>
-
-        {/* Mobile Bottom Navigation */}
-        <MobileBottomNav activeTab={activeTab} onTabChange={handleTabChange} />
-      </div>
-    );
-  }
+      );
+    }
 
   // Desktop view - original layout (unchanged)
   return (

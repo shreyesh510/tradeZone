@@ -31,7 +31,7 @@ const Settings: React.FC = () => {
   };
 
   return (
-    <div className={`min-h-screen ${settings.theme === 'dark' ? 'bg-gray-900' : 'bg-gray-100'}`}>
+    <div className={`h-screen flex flex-col overflow-hidden ${settings.theme === 'dark' ? 'bg-gray-900' : 'bg-gray-100'}`}>
       {/* Header */}
       <div className={`${settings.theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-b`}>
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
@@ -78,7 +78,9 @@ const Settings: React.FC = () => {
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-4 py-8">
+      {/* Scrollable Content */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-4xl mx-auto px-4 py-8 pb-24">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           
           {/* Appearance Settings */}
@@ -267,17 +269,6 @@ const Settings: React.FC = () => {
             </h2>
             
             <div className="space-y-4">
-              {/* Save Button - Always visible */}
-              <button
-                onClick={handleSave}
-                className="w-full bg-blue-600 text-white px-4 py-3 rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center space-x-2"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3-3m0 0l-3 3m3-3v12" />
-                </svg>
-                <span>Save Settings</span>
-              </button>
-
               {/* Reset Button */}
               <button
                 onClick={() => setShowResetConfirm(true)}
@@ -294,6 +285,7 @@ const Settings: React.FC = () => {
               </button>
             </div>
           </div>
+        </div>
         </div>
       </div>
 
