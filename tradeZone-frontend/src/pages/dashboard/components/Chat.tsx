@@ -481,12 +481,12 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
     }
   }, []);
 
-  return (
-    <div className={`w-full flex flex-col h-full ${
-      isDarkMode 
-        ? 'bg-gray-800 border-l border-gray-700' 
-        : 'bg-white border-l border-gray-200'
-    }`}>
+     return (
+     <div className={`w-full flex flex-col h-full max-h-full overflow-hidden ${
+       isDarkMode 
+         ? 'bg-gray-800 border-l border-gray-700' 
+         : 'bg-white border-l border-gray-200'
+     }`}>
              {/* Chat Header with Label and Settings */}
        <div className={`p-3 border-b ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
          <div className="flex justify-between items-center">

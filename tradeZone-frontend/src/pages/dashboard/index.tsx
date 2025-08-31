@@ -19,56 +19,34 @@ const Dashboard = memo(function Dashboard() {
   };
 
   return (
-    <div className="h-screen bg-gray-900 flex flex-col">
+    <div className="h-screen mobile-full-height max-h-screen bg-gray-900 flex flex-col overflow-hidden fixed inset-0">
       {/* Top Header with Logout */}
-      <Header 
-        onlineUsers={onlineUsers} 
-        sidebarOpen={sidebarOpen} 
-        onSidebarToggle={toggleSidebar} 
-      />
+      <div className="flex-shrink-0 relative z-10">
+        <Header 
+          onlineUsers={onlineUsers} 
+          sidebarOpen={sidebarOpen} 
+          onSidebarToggle={toggleSidebar} 
+        />
+      </div>
 
       {/* Sidebar */}
       <Sidebar isOpen={sidebarOpen} onToggle={toggleSidebar} />
 
       {/* Main Content - Chart and Chat */}
-      <div className="flex-1 flex" style={{height: "100%"}}>
-        {/* Chart Section - 70% */}
-        <div className="w-[70%]">
+      <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-hidden">
+        {/* Chart Section - Top 60% on mobile, 70% width on desktop */}
+        <div className="w-full md:w-[70%] h-[60%] md:h-full flex-shrink-0 overflow-hidden relative">
           <LiveChart key="live-chart" />
         </div>
 
-        {/* Chat Section - 30% */}
-        <Chat onlineUsers={onlineUsers} setOnlineUsers={setOnlineUsers} />
+        {/* Chat Section - Bottom 40% on mobile, 30% width on desktop */}
+        <div className="w-full md:w-[30%] h-[40%] md:h-full flex-shrink-0 overflow-hidden">
+          <Chat onlineUsers={onlineUsers} setOnlineUsers={setOnlineUsers} />
+        </div>
       </div>
     </div>
   );
 });
-
-export default Dashboard;
-
-
-        {/* Chart Section - 70% */}
-
-        <div className="w-[70%]">
-
-          <LiveChart key="live-chart" />
-
-        </div>
-
-
-
-        {/* Chat Section - 30% */}
-
-        <Chat onlineUsers={onlineUsers} setOnlineUsers={setOnlineUsers} />
-      </div>
-
-    </div>
-
-  );
-
-});
-
-
 
 export default Dashboard;
 
