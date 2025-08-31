@@ -33,10 +33,10 @@ const Header = ({ onlineUsers, sidebarOpen, onSidebarToggle }: HeaderProps) => {
   return (
     <div className={`${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-b p-4 flex justify-between items-center`}>
       <div className="flex items-center space-x-4">
-        {/* Menu Toggle Button - Far Left */}
+        {/* Menu Toggle Button - Hidden on mobile */}
         <button
           onClick={onSidebarToggle}
-          className={`p-1 rounded-lg transition-colors duration-200 mr-2 ${
+          className={`p-1 rounded-lg transition-colors duration-200 mr-2 hidden md:block ${
             isDarkMode 
               ? 'text-gray-400 hover:text-white hover:bg-gray-700'
               : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'

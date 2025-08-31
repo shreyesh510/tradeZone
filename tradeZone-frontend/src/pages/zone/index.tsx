@@ -1,8 +1,10 @@
-import { memo, useState } from 'react';
+import { memo, useState, useEffect } from 'react';
 import LiveChart from '../../components/LiveChart';
 import Header from '../../layouts/Header';
 import Chat from '../dashboard/components/Chat';
 import Sidebar from '../../components/Sidebar';
+import MobileBottomNav, { type MobileTab } from '../../components/MobileBottomNav';
+import Settings from '../settings';
 import { useSettings } from '../../contexts/SettingsContext';
 
 interface OnlineUser {
@@ -15,14 +17,70 @@ const Zone = memo(function Zone() {
   const { settings } = useSettings();
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
+  const [isMobile, setIsMobile] = useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState<MobileTab>('zone');
+
+  // Check if mobile
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
   };
 
+  const handleTabChange = (tab: MobileTab) => {
+    setActiveTab(tab);
+  };
+
   // Use settings for theme
   const isDarkMode = settings.theme === 'dark';
 
+  // Mobile view - single section based on active tab
+  if (isMobile) {
+    return (
+      <div className={`h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-100'} flex flex-col`}>
+        {/* Header - only show on zone tab */}
+        {activeTab === 'zone' && (
+          <Header 
+            onlineUsers={onlineUsers} 
+            sidebarOpen={false} 
+            onSidebarToggle={() => {}} 
+          />
+        )}
+
+        {/* Content */}
+        <div className="flex-1 pb-16">
+          {activeTab === 'chart' && <LiveChart key="live-chart" />}
+          {activeTab === 'chat' && <Chat onlineUsers={onlineUsers} setOnlineUsers={setOnlineUsers} />}
+          {activeTab === 'zone' && (
+            <div className="flex-1 flex flex-col h-full">
+              {/* Chart Section - 50% on mobile */}
+              <div className="flex-1">
+                <LiveChart key="live-chart" />
+              </div>
+              {/* Chat Section - 50% on mobile */}
+              <div className="flex-1">
+                <Chat onlineUsers={onlineUsers} setOnlineUsers={setOnlineUsers} />
+              </div>
+            </div>
+          )}
+          {activeTab === 'settings' && <Settings />}
+        </div>
+
+        {/* Mobile Bottom Navigation */}
+        <MobileBottomNav activeTab={activeTab} onTabChange={handleTabChange} />
+      </div>
+    );
+  }
+
+  // Desktop view - original layout (unchanged)
   return (
     <div className={`h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-100'} flex flex-col`}>
       {/* Top Header with Logout */}
@@ -35,7 +93,7 @@ const Zone = memo(function Zone() {
       {/* Sidebar */}
       <Sidebar isOpen={sidebarOpen} onToggle={toggleSidebar} />
 
-      {/* Main Content - Chart and Chat */}
+      {/* Main Content - Chart and Chat - EXACT SAME AS BEFORE */}
       <div className="flex-1 flex" style={{height: "100%"}}>
         {/* Chart Section - 70% */}
         <div className="w-[70%]">
