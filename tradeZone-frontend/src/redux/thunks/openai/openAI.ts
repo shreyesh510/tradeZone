@@ -1,4 +1,4 @@
-import { createAsyncThunk } from '@reduxjs/toolkit';
+ruimport { createAsyncThunk } from '@reduxjs/toolkit';
 import { config } from '../../../config/env';
 
 // Types for OpenAI API
