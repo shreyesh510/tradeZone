@@ -454,10 +454,10 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
   }, []);
 
   return (
-    <div className={`w-[30%] flex flex-col ${
+    <div className={`w-full md:w-[30%] flex flex-col h-full ${
       isDarkMode 
-        ? 'bg-gray-800 border-l border-gray-700' 
-        : 'bg-white border-l border-gray-200'
+        ? 'bg-gray-800 md:border-l border-gray-700' 
+        : 'bg-white md:border-l border-gray-200'
     }`}>
       {/* Chat Header */}
       <div className={`p-4 border-b ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
@@ -544,7 +544,7 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
             new Date(messages[index - 1]?.createdAt).toDateString();
 
           return (
-            <div key={message.id}>
+            <div key={`${message.id}-${index}`}>
               {showDate && (
                 <div className="text-center text-xs text-gray-500 my-2">
                   {formatDate(message.createdAt)}
