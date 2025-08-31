@@ -2,12 +2,15 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import type { PayloadAction } from '@reduxjs/toolkit';
 import { authApi } from '../../services/authApi';
 import type { LoginData, RegisterData, AuthResponse } from '../../services/authApi';
+import type { UserPermissions } from '../../types/permissions';
+import { DEFAULT_USER_PERMISSIONS } from '../../types/permissions';
 
 interface User {
   id: string;
   name: string;
   email: string;
-  isAiFeatureEnabled?: boolean;
+  isAiFeatureEnabled?: boolean; // Deprecated: kept for backward compatibility
+  permissions: UserPermissions; // Primary source of truth for permissions
 }
 
 interface AuthState {
@@ -35,9 +38,12 @@ export const loginUser = createAsyncThunk(
     try {
       const response = await authApi.login(credentials);
       
-      // Store tokens in localStorage
+      // Store tokens and permissions in localStorage
       localStorage.setItem('testToken', response.testToken);
       localStorage.setItem('user', JSON.stringify(response.user));
+      if (response.user.permissions) {
+        localStorage.setItem('permissions', JSON.stringify(response.user.permissions));
+      }
       
       return response;
     } catch (error: any) {
@@ -52,9 +58,12 @@ export const registerUser = createAsyncThunk(
     try {
       const response = await authApi.register(userData);
       
-      // Store tokens in localStorage
+      // Store tokens and permissions in localStorage
       localStorage.setItem('testToken', response.testToken);
       localStorage.setItem('user', JSON.stringify(response.user));
+      if (response.user.permissions) {
+        localStorage.setItem('permissions', JSON.stringify(response.user.permissions));
+      }
       
       return response;
     } catch (error: any) {
@@ -66,6 +75,10 @@ export const registerUser = createAsyncThunk(
 export const logoutUser = createAsyncThunk(
   'auth/logout',
   async () => {
+    // Clear all stored data
+    localStorage.removeItem('testToken');
+    localStorage.removeItem('user');
+    localStorage.removeItem('permissions');
     authApi.logout();
   }
 );
@@ -80,13 +93,27 @@ const authSlice = createSlice({
     initializeAuth: (state) => {
       const testToken = localStorage.getItem('testToken');
       const user = localStorage.getItem('user');
+      const permissions = localStorage.getItem('permissions');
       
-      console.log('🔄 Initializing auth from localStorage:', { testToken: !!testToken, user: !!user });
+      console.log('🔄 Initializing auth from localStorage:', { 
+        testToken: !!testToken, 
+        user: !!user, 
+        permissions: !!permissions 
+      });
       
       if (testToken && user) {
         try {
           state.testToken = testToken;
-          state.user = JSON.parse(user);
+          const userData = JSON.parse(user);
+          
+          // Add permissions to user data if available, otherwise use defaults
+          if (permissions) {
+            userData.permissions = JSON.parse(permissions);
+          } else {
+            userData.permissions = DEFAULT_USER_PERMISSIONS;
+          }
+          
+          state.user = userData;
           state.isAuthenticated = true;
           console.log('✅ Auth initialized successfully:', state.user);
         } catch (error) {
@@ -94,6 +121,7 @@ const authSlice = createSlice({
           // Clear invalid data
           localStorage.removeItem('testToken');
           localStorage.removeItem('user');
+          localStorage.removeItem('permissions');
         }
       } else {
         console.log('❌ No valid credentials found in localStorage');

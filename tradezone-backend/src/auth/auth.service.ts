@@ -41,6 +41,16 @@ export class AuthService {
     const payload = { sub: newUser.id, email: newUser.email };
     const token = this.jwtService.sign(payload);
 
+    // Create default permissions for new user
+    let userPermissions = { AiChat: false, investment: false };
+    try {
+      const permissions = await this.firebaseDatabaseService.createUserPermissions(newUser.id);
+      userPermissions = permissions.permissions;
+      console.log('📋 Default permissions created for new user:', userPermissions);
+    } catch (error) {
+      console.warn('⚠️ Could not create permissions for new user:', error);
+    }
+
     // Generate test token for localStorage
     const testToken = this.generateTestToken({
       id: newUser.id,
@@ -50,19 +60,20 @@ export class AuthService {
       createdAt: newUser.createdAt,
       updatedAt: newUser.updatedAt,
       isAiFeatureEnabled: newUser.isAiFeatureEnabled,
+      permissions: userPermissions, // Add permissions to test token
     });
 
-    return {
-      message: 'User registered successfully',
-      user: {
-        id: newUser.id,
-        name: newUser.name,
-        email: newUser.email,
-        isAiFeatureEnabled: newUser.isAiFeatureEnabled ?? true,
-      },
-      token,
-      testToken, // For localStorage storage
-    };
+          return {
+        message: 'User registered successfully',
+        user: {
+          id: newUser.id,
+          name: newUser.name,
+          email: newUser.email,
+          permissions: userPermissions, // Use permissions instead of isAiFeatureEnabled
+        },
+        token,
+        testToken, // For localStorage storage
+      };
   }
 
   async login(loginDto: LoginDto) {
@@ -104,6 +115,17 @@ export class AuthService {
       const payload = { sub: user.id, email: user.email };
       const token = this.jwtService.sign(payload);
 
+      // Fetch user permissions
+      let userPermissions: { AiChat: boolean; investment: boolean } = { AiChat: false, investment: false };
+      try {
+        const permissions = await this.firebaseDatabaseService.getUserPermissions(user.id);
+        userPermissions = permissions ? permissions.permissions : { AiChat: false, investment: false };
+        console.log('📋 User permissions fetched:', userPermissions);
+      } catch (error) {
+        console.warn('⚠️ Could not fetch permissions, using defaults:', error);
+        userPermissions = { AiChat: false, investment: false };
+      }
+
       // Generate test token for localStorage
       const testToken = this.generateTestToken({
         id: user.id,
@@ -113,6 +135,7 @@ export class AuthService {
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
         isAiFeatureEnabled: user.isAiFeatureEnabled ?? false, // Default to false if not set
+        permissions: userPermissions, // Add permissions to test token
       });
 
       return {
@@ -121,7 +144,7 @@ export class AuthService {
           id: user.id,
           name: user.name,
           email: user.email,
-          isAiFeatureEnabled: user.isAiFeatureEnabled ?? false,
+          permissions: userPermissions, // Use permissions instead of isAiFeatureEnabled
         },
         token,
         testToken, // For localStorage storage

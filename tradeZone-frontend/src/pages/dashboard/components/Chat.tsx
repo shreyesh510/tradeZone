@@ -7,6 +7,7 @@ import { useSocket } from '../../../contexts/SocketContext';
 import { messageStorage } from '../../../services/messageStorage';
 import { type Message } from '../../../types/message';
 import { marketContextService } from '../../../services/marketContext';
+import { usePermissions } from '../../../hooks/usePermissions';
 
 interface OnlineUser {
   userId: string;
@@ -51,6 +52,9 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
 
   // Global toast functions
   const { addToast } = useToast();
+  
+  // Permissions
+  const { permissions, canAccessAiChat } = usePermissions();
 
   // Sync global messages with local state
   useEffect(() => {
@@ -115,17 +119,22 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
   }, []);
 
   const handleAiToggle = useCallback(() => {
-    // For backward compatibility: if isAiFeatureEnabled is undefined, allow AI (existing users)
-    const hasAiAccess = user?.isAiFeatureEnabled !== false;
+    // Check permissions using new permissions system
+    const hasAiAccess = canAccessAiChat();
     
     if (!hasAiAccess && !aiMode) {
       // User trying to enable AI but doesn't have permission
+      addToast({
+        type: 'error',
+        message: 'You do not have permission to access AI Chat. Please contact an administrator.',
+        senderName: 'System',
+      });
       setShowAiWarning(true);
       setTimeout(() => setShowAiWarning(false), 3000); // Hide warning after 3 seconds
       return;
     }
     setAiMode(prev => !prev);
-  }, [user?.isAiFeatureEnabled, aiMode]);
+  }, [aiMode, canAccessAiChat, addToast]);
 
   const handleSymbolChange = useCallback((symbol: string) => {
     console.log(`📊 Switching symbol to: ${symbol}`);
@@ -645,7 +654,7 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
                       onClick={handleAiToggle}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800 ${
                         aiMode ? 'bg-blue-600' : 'bg-gray-600'
-                      } ${user?.isAiFeatureEnabled === false ? 'opacity-50' : ''}`}
+                      } ${!canAccessAiChat() ? 'opacity-50' : ''}`}
                     >
                       <span
                         className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${

@@ -1,6 +1,7 @@
 import { useState, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSettings } from '../contexts/SettingsContext';
+import { usePermissions } from '../hooks/usePermissions';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -10,12 +11,13 @@ interface SidebarProps {
 const Sidebar = memo(function Sidebar({ isOpen, onToggle }: SidebarProps) {
   const navigate = useNavigate();
   const { settings } = useSettings();
-  const [activeTab, setActiveTab] = useState<'settings' | null>(null);
+  const { canAccessInvestment } = usePermissions();
+  const [activeTab, setActiveTab] = useState<'settings' | 'investment' | null>(null);
 
   // Use settings for theme
   const isDarkMode = settings.theme === 'dark';
 
-  const handleTabClick = (tab: 'settings') => {
+  const handleTabClick = (tab: 'settings' | 'investment') => {
     if (activeTab === tab) {
       setActiveTab(null);
     } else {
@@ -30,6 +32,29 @@ const Sidebar = memo(function Sidebar({ isOpen, onToggle }: SidebarProps) {
 
   const goToSettings = () => {
     navigate('/settings');
+    onToggle(); // Close sidebar after navigation
+  };
+
+  // Investment submenu navigation functions
+  const goToInvestmentDashboard = () => {
+    navigate('/investment/dashboard');
+    onToggle(); // Close sidebar after navigation
+  };
+
+  const goToPositions = () => {
+    navigate('/investment/positions');
+    onToggle(); // Close sidebar after navigation
+  };
+
+
+
+  const goToWithdraw = () => {
+    navigate('/investment/withdraw');
+    onToggle(); // Close sidebar after navigation
+  };
+
+  const goToDeposit = () => {
+    navigate('/investment/deposit');
     onToggle(); // Close sidebar after navigation
   };
 
@@ -99,6 +124,114 @@ const Sidebar = memo(function Sidebar({ isOpen, onToggle }: SidebarProps) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </button>
+
+          {/* Investment Option - Only show if user has permission */}
+          {canAccessInvestment() && (
+            <>
+              <button
+                onClick={() => handleTabClick('investment')}
+                className={`flex items-center justify-between px-4 py-4 text-left transition-all duration-200 w-full ${
+                  isDarkMode 
+                    ? 'bg-transparent hover:bg-gray-700' 
+                    : 'bg-transparent hover:bg-gray-100'
+                }`}
+              >
+                <div className="flex items-center space-x-3">
+                  <svg className="w-5 h-5 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                  </svg>
+                  <span className={isDarkMode ? 'text-white' : 'text-gray-900'}>Investment</span>
+                </div>
+                <svg 
+                  className={`w-4 h-4 transition-transform duration-200 ${
+                    activeTab === 'investment' ? 'rotate-90' : ''
+                  } ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`} 
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+
+              {/* Investment Submenus */}
+              {activeTab === 'investment' && (
+                <div className={`${isDarkMode ? 'bg-gray-750' : 'bg-gray-50'} border-t border-b ${
+                  isDarkMode ? 'border-gray-700' : 'border-gray-200'
+                }`}>
+                  {/* Dashboard Submenu */}
+                  <button
+                    onClick={goToInvestmentDashboard}
+                    className={`flex items-center px-8 py-3 text-left transition-all duration-200 w-full ${
+                      isDarkMode 
+                        ? 'bg-transparent hover:bg-gray-700' 
+                        : 'bg-transparent hover:bg-gray-100'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                      </svg>
+                      <span className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Dashboard</span>
+                    </div>
+                  </button>
+
+                  {/* Positions Submenu */}
+                  <button
+                    onClick={goToPositions}
+                    className={`flex items-center px-8 py-3 text-left transition-all duration-200 w-full ${
+                      isDarkMode 
+                        ? 'bg-transparent hover:bg-gray-700' 
+                        : 'bg-transparent hover:bg-gray-100'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      <span className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Positions</span>
+                    </div>
+                  </button>
+
+                  
+
+                  {/* Withdraw Submenu */}
+                  <button
+                    onClick={goToWithdraw}
+                    className={`flex items-center px-8 py-3 text-left transition-all duration-200 w-full ${
+                      isDarkMode 
+                        ? 'bg-transparent hover:bg-gray-700' 
+                        : 'bg-transparent hover:bg-gray-100'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <svg className="w-4 h-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16l-4-4m0 0l4-4m-4 4h18" />
+                      </svg>
+                      <span className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Withdraw</span>
+                    </div>
+                  </button>
+
+                  {/* Deposit Submenu */}
+                  <button
+                    onClick={goToDeposit}
+                    className={`flex items-center px-8 py-3 text-left transition-all duration-200 w-full ${
+                      isDarkMode 
+                        ? 'bg-transparent hover:bg-gray-700' 
+                        : 'bg-transparent hover:bg-gray-100'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                      </svg>
+                      <span className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Deposit</span>
+                    </div>
+                  </button>
+                </div>
+              )}
+            </>
+          )}
 
           {/* Settings Option */}
           <button

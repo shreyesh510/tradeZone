@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { FirebaseConfig } from '../config/firebase.config';
 import * as admin from 'firebase-admin';
+import { Permission, UserPermissions, DEFAULT_USER_PERMISSIONS } from '../auth/entities/permission.entity';
 
 export interface User {
   id: string;
@@ -12,24 +13,13 @@ export interface User {
   isAiFeatureEnabled?: boolean;
 }
 
-export interface ChatMessage {
-  id: string;
-  content: string;
-  senderId: string;
-  senderName: string;
-  receiverId?: string;
-  roomId?: string;
-  createdAt: Date;
-  updatedAt: Date;
-  readAt?: Date;
-  messageType?: 'text' | 'image' | 'file' | 'system';
-}
+// ChatMessage interface removed - using in-memory chat via WebSocket
 
 @Injectable()
 export class FirebaseDatabaseService {
   private firestore: admin.firestore.Firestore;
   private usersCollection = 'users';
-  private chatsCollection = 'chats';
+  private permissionsCollection = 'permissions';
 
   constructor(private firebaseConfig: FirebaseConfig) {
     // Firestore will be initialized in onModuleInit
@@ -123,101 +113,7 @@ export class FirebaseDatabaseService {
     }
   }
 
-  // Chat operations
-  async getChats(): Promise<ChatMessage[]> {
-    console.log('🔥 Getting chats from Firebase collection:', this.chatsCollection);
-    try {
-      const snapshot = await this.getFirestore().collection(this.chatsCollection).get();
-      console.log('🔥 Firebase snapshot size:', snapshot.size);
-      const chats = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as ChatMessage[];
-      console.log('🔥 Retrieved chats:', chats);
-      return chats;
-    } catch (error) {
-      console.error('❌ Error getting chats from Firebase:', error);
-      return [];
-    }
-  }
-
-  async addChat(chatData: Omit<ChatMessage, 'id'>): Promise<ChatMessage> {
-    console.log('🔥 Adding chat to Firebase:', chatData);
-    try {
-      // Filter out undefined values to avoid Firestore errors
-      const cleanData = Object.fromEntries(
-        Object.entries(chatData).filter(([_, value]) => value !== undefined)
-      );
-
-      const docRef = await this.getFirestore().collection(this.chatsCollection).add({
-        ...cleanData,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      });
-
-      const savedChat = {
-        id: docRef.id,
-        ...chatData,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-
-      console.log('✅ Chat added to Firebase with ID:', docRef.id);
-      return savedChat;
-    } catch (error) {
-      console.error('❌ Error adding chat to Firebase:', error);
-      throw error;
-    }
-  }
-
-  async findChatsByUserId(userId: string): Promise<ChatMessage[]> {
-    try {
-      const snapshot = await this.getFirestore()
-        .collection(this.chatsCollection)
-        .where('senderId', '==', userId)
-        .get();
-
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as ChatMessage[];
-    } catch (error) {
-      console.error('Error finding chats by user ID:', error);
-      return [];
-    }
-  }
-
-  async deleteChat(chatId: string): Promise<void> {
-    try {
-      await this.getFirestore()
-        .collection(this.chatsCollection)
-        .doc(chatId)
-        .delete();
-    } catch (error) {
-      console.error('Error deleting chat:', error);
-      throw error;
-    }
-  }
-
-  async updateChat(chatId: string, updateData: Partial<ChatMessage>): Promise<void> {
-    try {
-      // Filter out undefined values to avoid Firestore errors
-      const cleanData = Object.fromEntries(
-        Object.entries(updateData).filter(([_, value]) => value !== undefined)
-      );
-
-      await this.getFirestore()
-        .collection(this.chatsCollection)
-        .doc(chatId)
-        .update({
-          ...cleanData,
-          updatedAt: new Date()
-        });
-    } catch (error) {
-      console.error('Error updating chat:', error);
-      throw error;
-    }
-  }
+  // Chat operations removed - using in-memory chat via WebSocket
 
   // Initialize with sample data
   async initializeSampleData(): Promise<void> {
@@ -252,6 +148,126 @@ export class FirebaseDatabaseService {
       }
     } catch (error) {
       console.error('Error initializing sample data:', error);
+    }
+  }
+
+  // Permission operations
+  async createUserPermissions(userId: string, permissions: UserPermissions = DEFAULT_USER_PERMISSIONS): Promise<Permission> {
+    try {
+      const permissionData = {
+        userId,
+        permissions,
+      };
+
+      const docRef = await this.getFirestore().collection(this.permissionsCollection).add(permissionData);
+      
+      const permission: Permission = {
+        _id: docRef.id,
+        ...permissionData,
+      };
+
+      console.log(`✅ Created permissions for user ${userId}`);
+      return permission;
+    } catch (error) {
+      console.error('Error creating user permissions:', error);
+      throw error;
+    }
+  }
+
+  async getUserPermissions(userId: string): Promise<Permission | null> {
+    try {
+      const snapshot = await this.getFirestore()
+        .collection(this.permissionsCollection)
+        .where('userId', '==', userId)
+        .limit(1)
+        .get();
+
+      if (snapshot.empty) {
+        console.log(`No permissions found for user ${userId}, creating default permissions`);
+        return await this.createUserPermissions(userId);
+      }
+
+      const doc = snapshot.docs[0];
+      return {
+        _id: doc.id,
+        ...doc.data()
+      } as Permission;
+    } catch (error) {
+      console.error('Error getting user permissions:', error);
+      throw error;
+    }
+  }
+
+  async updateUserPermissions(userId: string, permissions: Partial<UserPermissions>): Promise<Permission> {
+    try {
+      // Get existing permissions
+      const existingPermission = await this.getUserPermissions(userId);
+      
+      if (!existingPermission) {
+        throw new Error(`No permissions found for user ${userId}`);
+      }
+
+      // Merge with existing permissions
+      const updatedPermissions = {
+        ...existingPermission.permissions,
+        ...permissions
+      };
+
+      const updateData = {
+        permissions: updatedPermissions,
+      };
+
+      if (!existingPermission._id) {
+        throw new Error('Permission document ID is missing');
+      }
+
+      await this.getFirestore()
+        .collection(this.permissionsCollection)
+        .doc(existingPermission._id)
+        .update(updateData);
+
+      console.log(`✅ Updated permissions for user ${userId}`);
+      
+      return {
+        ...existingPermission,
+        ...updateData,
+      };
+    } catch (error) {
+      console.error('Error updating user permissions:', error);
+      throw error;
+    }
+  }
+
+  async deleteUserPermissions(userId: string): Promise<void> {
+    try {
+      const snapshot = await this.getFirestore()
+        .collection(this.permissionsCollection)
+        .where('userId', '==', userId)
+        .get();
+
+      const batch = this.getFirestore().batch();
+      snapshot.docs.forEach(doc => {
+        batch.delete(doc.ref);
+      });
+
+      await batch.commit();
+      console.log(`✅ Deleted permissions for user ${userId}`);
+    } catch (error) {
+      console.error('Error deleting user permissions:', error);
+      throw error;
+    }
+  }
+
+  async getAllUserPermissions(): Promise<Permission[]> {
+    try {
+      const snapshot = await this.getFirestore().collection(this.permissionsCollection).get();
+      return snapshot.docs.map(doc => ({
+        _id: doc.id,
+        ...doc.data()
+      })) as Permission[];
+    } catch (error) {
+      console.error('Error getting all permissions:', error);
+      throw error;
     }
   }
 }

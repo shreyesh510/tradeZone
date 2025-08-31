@@ -5,7 +5,6 @@ import * as path from 'path';
 @Injectable()
 export class DatabaseService {
   private readonly usersPath = path.join(__dirname, 'users.json');
-  private readonly chatsPath = path.join(__dirname, 'chats.json');
 
   // Users operations
   async getUsers(): Promise<any[]> {
@@ -56,49 +55,5 @@ export class DatabaseService {
     }
   }
 
-  // Chats operations
-  async getChats(): Promise<any[]> {
-    try {
-      const data = await fs.promises.readFile(this.chatsPath, 'utf8');
-      return JSON.parse(data);
-    } catch (error) {
-      // If file doesn't exist or is empty, return empty array
-      return [];
-    }
-  }
-
-  async saveChats(chats: any[]): Promise<void> {
-    await fs.promises.writeFile(this.chatsPath, JSON.stringify(chats, null, 2));
-  }
-
-  async addChat(chat: any): Promise<void> {
-    const chats = await this.getChats();
-    chats.push(chat);
-    await this.saveChats(chats);
-  }
-
-  async findChatById(id: string): Promise<any | null> {
-    const chats = await this.getChats();
-    return chats.find(chat => chat.id === id) || null;
-  }
-
-  async findChatsByUserId(userId: string): Promise<any[]> {
-    const chats = await this.getChats();
-    return chats.filter(chat => chat.userId === userId);
-  }
-
-  async updateChat(id: string, updates: any): Promise<void> {
-    const chats = await this.getChats();
-    const chatIndex = chats.findIndex(chat => chat.id === id);
-    if (chatIndex !== -1) {
-      chats[chatIndex] = { ...chats[chatIndex], ...updates };
-      await this.saveChats(chats);
-    }
-  }
-
-  async deleteChat(id: string): Promise<void> {
-    const chats = await this.getChats();
-    const filteredChats = chats.filter(chat => chat.id !== id);
-    await this.saveChats(filteredChats);
-  }
+  // Chat operations removed - using in-memory chat via WebSocket
 }

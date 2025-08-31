@@ -1,4 +1,5 @@
 import api from './api';
+import type { UserPermissions } from '../types/permissions';
 
 export interface LoginData {
   email: string;
@@ -17,6 +18,8 @@ export interface AuthResponse {
     id: string;
     name: string;
     email: string;
+    isAiFeatureEnabled?: boolean; // Deprecated: kept for backward compatibility
+    permissions: UserPermissions; // Primary source of truth for permissions
   };
   token: string;
   testToken: string;
@@ -36,5 +39,6 @@ export const authApi = {
   logout: () => {
     localStorage.removeItem('testToken');
     localStorage.removeItem('user');
+    localStorage.removeItem('permissions');
   },
 };
