@@ -3,6 +3,7 @@ import { useAppSelector, useAppDispatch } from '../../../redux/hooks';
 import { io, Socket } from 'socket.io-client';
 import config from '../../../config/env';
 import { generateOpenAIResponse } from '../../../redux/thunks/openai/openAI';
+import { useSettings } from '../../../contexts/SettingsContext';
 
 interface Message {
   id: string;
@@ -25,6 +26,7 @@ interface ChatProps {
 }
 
 const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
+  const { settings } = useSettings();
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [socket, setSocket] = useState<Socket | null>(null);
@@ -41,6 +43,9 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
   const user = useAppSelector((state) => state.auth.user);
   const dispatch = useAppDispatch();
   const { loading: aiLoading, error: aiError } = useAppSelector((state) => state.openai);
+
+  // Use settings for theme
+  const isDarkMode = settings.theme === 'dark';
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -449,18 +454,22 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
   }, []);
 
   return (
-    <div className="w-[30%] bg-gray-800 border-l border-gray-700 flex flex-col">
+    <div className={`w-[30%] flex flex-col ${
+      isDarkMode 
+        ? 'bg-gray-800 border-l border-gray-700' 
+        : 'bg-white border-l border-gray-200'
+    }`}>
       {/* Chat Header */}
-      <div className="p-4 border-b border-gray-700">
+      <div className={`p-4 border-b ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
         <div className="flex justify-between items-center mb-2">
-          <h2 className="text-lg font-bold text-white">Global Chat</h2>
+          <h2 className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Global Chat</h2>
           <div className="flex items-center space-x-2">
             <div className={`w-2 h-2 rounded-full ${
               connectionStatus === 'connected' ? 'bg-green-400' :
               connectionStatus === 'connecting' ? 'bg-yellow-400' :
               connectionStatus === 'error' ? 'bg-red-400' : 'bg-gray-400'
             }`}></div>
-            <div className="text-sm text-green-400">
+            <div className={`text-sm ${isDarkMode ? 'text-green-400' : 'text-green-600'}`}>
               {onlineUsers.length + 1} online
             </div>
           </div>
@@ -468,7 +477,7 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
         
         {/* AI Mode Toggle */}
         <div className="flex items-center justify-between mb-2">
-          <span className="text-sm text-gray-300">AI Mode</span>
+          <span className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>AI Mode</span>
           <div className="relative">
             <button
               onClick={handleAiToggle}
@@ -508,7 +517,7 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
         </div>
         
         {typingUsers.length > 0 && (
-          <p className="text-sm text-gray-400">
+          <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
             {typingUsers.join(', ')} {typingUsers.length === 1 ? 'is' : 'are'} typing...
           </p>
         )}
@@ -552,7 +561,9 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
                       ? message.id.startsWith('temp-') 
                         ? 'bg-blue-400 text-white opacity-75' // Temporary message styling
                         : 'bg-blue-600 text-white'
-                      : 'bg-gray-700 text-gray-300'
+                      : isDarkMode
+                        ? 'bg-gray-700 text-gray-300'
+                        : 'bg-gray-200 text-gray-800'
                   }`}
                 >
                  {message.messageType !== 'system' && (
@@ -574,12 +585,16 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
       </div>
 
       {/* Message Input */}
-      <div className="p-4 border-t border-gray-700 relative">
+      <div className={`p-4 border-t relative ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
         {/* Emoji Picker */}
         {showEmojiPicker && (
           <div 
             ref={emojiPickerRef}
-            className="absolute bottom-full left-4 mb-2 bg-gray-800 border border-gray-600 rounded-lg shadow-lg p-4 w-80 z-50"
+            className={`absolute bottom-full left-4 mb-2 rounded-lg shadow-lg p-4 w-80 z-50 ${
+              isDarkMode 
+                ? 'bg-gray-800 border border-gray-600' 
+                : 'bg-white border border-gray-300'
+            }`}
           >
             <div className="mb-3">
               <div className="flex space-x-2 mb-2">
@@ -598,7 +613,7 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
               {/* Recent Emojis */}
               {recentEmojis.length > 0 && (
                 <div className="mb-4">
-                  <h4 className="text-xs text-gray-400 mb-2">Recent</h4>
+                  <h4 className={`text-xs mb-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Recent</h4>
                   <div className="grid grid-cols-8 gap-1">
                     {recentEmojis.slice(0, 16).map((emoji, index) => (
                       <button
@@ -615,7 +630,7 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
               
               {/* Smileys */}
               <div className="mb-4">
-                <h4 className="text-xs text-gray-400 mb-2">Smileys</h4>
+                <h4 className={`text-xs mb-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Smileys</h4>
                 <div className="grid grid-cols-8 gap-1">
                   {emojiCategories.smileys.map((emoji, index) => (
                     <button
@@ -631,7 +646,7 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
               
               {/* Gestures */}
               <div className="mb-4">
-                <h4 className="text-xs text-gray-400 mb-2">Gestures</h4>
+                <h4 className={`text-xs mb-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Gestures</h4>
                 <div className="grid grid-cols-8 gap-1">
                   {emojiCategories.gestures.map((emoji, index) => (
                     <button
@@ -647,7 +662,7 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
               
               {/* Hearts */}
               <div>
-                <h4 className="text-xs text-gray-400 mb-2">Hearts</h4>
+                <h4 className={`text-xs mb-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Hearts</h4>
                 <div className="grid grid-cols-8 gap-1">
                   {emojiCategories.hearts.map((emoji, index) => (
                     <button
@@ -680,8 +695,10 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
             placeholder={aiMode ? "Ask AI anything..." : "Type your message..."}
             className={`flex-1 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 text-sm ${
               aiMode 
-                ? 'bg-purple-700 text-white focus:ring-purple-500 border border-purple-600' 
-                : 'bg-gray-700 text-white focus:ring-blue-500'
+                ? `bg-purple-700 text-white focus:ring-purple-500 border border-purple-600` 
+                : isDarkMode
+                  ? 'bg-gray-700 text-white focus:ring-blue-500'
+                  : 'bg-gray-100 text-gray-900 focus:ring-blue-500 border border-gray-300'
             }`}
           />
           <button

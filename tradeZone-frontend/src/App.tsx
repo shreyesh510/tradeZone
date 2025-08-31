@@ -3,8 +3,10 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { useDispatch, useSelector } from 'react-redux';
 import { initializeAuth } from './redux/slices/authSlice';
 import type { AppDispatch, RootState } from './redux/store';
+import { SettingsProvider } from './contexts/SettingsContext';
 import Login from './components/Login';
-import Dashboard from './pages/dashboard';
+import Zone from './pages/zone';
+import Settings from './pages/settings';
 import LiveChart from './components/LiveChart';
 import './index.css';
 
@@ -60,41 +62,51 @@ function App() {
   }
 
   return (
-    <Router>
-      <div className="App">
-        <Routes>
-          <Route 
-            path="/login" 
-            element={
-              isAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />
-            } 
-          />
-          <Route 
-            path="/dashboard" 
-            element={
-              <ProtectedRoute>
-                <Dashboard />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/chart" 
-            element={
-              <ProtectedRoute>
-                <LiveChart />
-              </ProtectedRoute>
-            } 
-          />
+    <SettingsProvider>
+      <Router>
+        <div className="App">
+          <Routes>
+            <Route 
+              path="/login" 
+              element={
+                isAuthenticated ? <Navigate to="/zone" replace /> : <Login />
+              } 
+            />
+            <Route 
+              path="/zone" 
+              element={
+                <ProtectedRoute>
+                  <Zone />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/settings" 
+              element={
+                <ProtectedRoute>
+                  <Settings />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/chart" 
+              element={
+                <ProtectedRoute>
+                  <LiveChart />
+                </ProtectedRoute>
+              } 
+            />
 
-          <Route 
-            path="/" 
-            element={
-              isAuthenticated ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />
-            } 
-          />
-        </Routes>
-      </div>
-    </Router>
+            <Route 
+              path="/" 
+              element={
+                isAuthenticated ? <Navigate to="/zone" replace /> : <Navigate to="/login" replace />
+              } 
+            />
+          </Routes>
+        </div>
+      </Router>
+    </SettingsProvider>
   );
 }
 

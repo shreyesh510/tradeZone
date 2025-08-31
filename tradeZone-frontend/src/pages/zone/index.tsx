@@ -1,8 +1,9 @@
 import { memo, useState } from 'react';
 import LiveChart from '../../components/LiveChart';
 import Header from '../../layouts/Header';
-import Chat from './components/Chat';
+import Chat from '../dashboard/components/Chat';
 import Sidebar from '../../components/Sidebar';
+import { useSettings } from '../../contexts/SettingsContext';
 
 interface OnlineUser {
   userId: string;
@@ -10,7 +11,8 @@ interface OnlineUser {
   socketId: string;
 }
 
-const Dashboard = memo(function Dashboard() {
+const Zone = memo(function Zone() {
+  const { settings } = useSettings();
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
 
@@ -18,8 +20,11 @@ const Dashboard = memo(function Dashboard() {
     setSidebarOpen(!sidebarOpen);
   };
 
+  // Use settings for theme
+  const isDarkMode = settings.theme === 'dark';
+
   return (
-    <div className="h-screen bg-gray-900 flex flex-col">
+    <div className={`h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-100'} flex flex-col`}>
       {/* Top Header with Logout */}
       <Header 
         onlineUsers={onlineUsers} 
@@ -44,32 +49,4 @@ const Dashboard = memo(function Dashboard() {
   );
 });
 
-export default Dashboard;
-
-
-        {/* Chart Section - 70% */}
-
-        <div className="w-[70%]">
-
-          <LiveChart key="live-chart" />
-
-        </div>
-
-
-
-        {/* Chat Section - 30% */}
-
-        <Chat onlineUsers={onlineUsers} setOnlineUsers={setOnlineUsers} />
-      </div>
-
-    </div>
-
-  );
-
-});
-
-
-
-export default Dashboard;
-
-
+export default Zone;
