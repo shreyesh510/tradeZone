@@ -1,19 +1,11 @@
 import { useCallback, useState, useEffect, useRef } from 'react';
 import { useAppSelector, useAppDispatch } from '../../../redux/hooks';
-import { io, Socket } from 'socket.io-client';
-import config from '../../../config/env';
 import { generateOpenAIResponse } from '../../../redux/thunks/openai/openAI';
 import { useSettings } from '../../../contexts/SettingsContext';
 import { useToast } from '../../../contexts/ToastContext';
-
-interface Message {
-  id: string;
-  content: string;
-  senderId: string;
-  senderName: string;
-  createdAt: Date;
-  messageType?: 'text' | 'system';
-}
+import { useSocket } from '../../../contexts/SocketContext';
+import { messageStorage } from '../../../services/messageStorage';
+import { type Message } from '../../../types/message';
 
 interface OnlineUser {
   userId: string;
@@ -28,9 +20,9 @@ interface ChatProps {
 
 const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
   const { settings } = useSettings();
+  const { socket: globalSocket, messages: globalMessages, addMessage } = useSocket();
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
-  const [socket, setSocket] = useState<Socket | null>(null);
   const [isTyping, setIsTyping] = useState(false);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [connectionStatus, setConnectionStatus] = useState<'connecting' | 'connected' | 'disconnected' | 'error'>('connecting');
@@ -50,6 +42,11 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
 
   // Global toast functions
   const { addToast } = useToast();
+
+  // Sync global messages with local state
+  useEffect(() => {
+    setMessages(globalMessages);
+  }, [globalMessages]);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -141,129 +138,16 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
     ]
   };
 
+  // Use global socket data and update local state accordingly
+  const { connectionStatus: globalConnectionStatus, onlineUsers: globalOnlineUsers } = useSocket();
+
   useEffect(() => {
-    if (!user) return;
+    setConnectionStatus(globalConnectionStatus);
+  }, [globalConnectionStatus]);
 
-    console.log('🔌 Attempting to connect to chat server...');
-    const newSocket = io(config.API_BASE_URL, {
-      auth: {
-        user: {
-          userId: user.id,
-          userName: user.name,
-        },
-      },
-      transports: ['websocket', 'polling'],
-      timeout: 10000,
-      withCredentials: true,
-      forceNew: true,
-    });
-
-    newSocket.on('connect', () => {
-      console.log('✅ Connected to chat server');
-      setConnectionStatus('connected');
-      newSocket.emit('getOnlineUsers');
-      
-      // Request previous in-memory messages from server
-      newSocket.emit('getMessages');
-    });
-
-    newSocket.on('disconnect', () => {
-      console.log('❌ Disconnected from chat server');
-      setConnectionStatus('disconnected');
-    });
-
-    newSocket.on('connect_error', (error) => {
-      console.log('❌ Connection error:', error);
-      setConnectionStatus('error');
-    });
-
-    newSocket.on('onlineUsers', (users: OnlineUser[]) => {
-      console.log('👥 Online users received:', users);
-      setOnlineUsers(users.filter(u => u.userId !== user.id));
-    });
-
-    newSocket.on('newMessage', (message: Message) => {
-      console.log('💬 New message received:', message);
-      setMessages(prev => {
-        // Check if this is a response to our own message (replace temp message)
-        const tempMessageIndex = prev.findIndex(msg => 
-          msg.id.startsWith('temp-') && 
-          msg.content === message.content && 
-          msg.senderId === message.senderId
-        );
-        
-        if (tempMessageIndex !== -1) {
-          // Replace temp message with real message
-          const newMessages = [...prev];
-          newMessages[tempMessageIndex] = message;
-          return newMessages;
-        } else {
-          // Add new message from other users and show toast notification
-          // Only show toast if the message is not from the current user and not AI
-          if (message.senderId !== user?.id && message.senderId !== 'ai-assistant') {
-            addToast({
-              message: message.content,
-              senderName: message.senderName || 'Unknown User',
-              type: 'message',
-              duration: 4000
-            });
-          }
-          return [...prev, message];
-        }
-      });
-    });
-
-    newSocket.on('messageSent', (message: Message) => {
-      console.log('✅ Message sent confirmation:', message);
-      // Replace temp message with confirmed message
-      setMessages(prev => {
-        const tempMessageIndex = prev.findIndex(msg => 
-          msg.id.startsWith('temp-') && 
-          msg.content === message.content && 
-          msg.senderId === message.senderId
-        );
-        
-        if (tempMessageIndex !== -1) {
-          const newMessages = [...prev];
-          newMessages[tempMessageIndex] = message;
-          return newMessages;
-        }
-        return prev;
-      });
-    });
-
-    newSocket.on('userOnline', (user: OnlineUser) => {
-      setOnlineUsers((prev: OnlineUser[]) => {
-        const exists = prev.find((u: OnlineUser) => u.userId === user.userId);
-        if (!exists) {
-          return [...prev, user];
-        }
-        return prev;
-      });
-    });
-
-    newSocket.on('userOffline', (user: OnlineUser) => {
-      setOnlineUsers((prev: OnlineUser[]) => prev.filter((u: OnlineUser) => u.userId !== user.userId));
-    });
-
-    newSocket.on('userTyping', (data: { userId: string; userName: string; isTyping: boolean }) => {
-      if (data.isTyping) {
-        setTypingUsers(prev => [...prev, data.userName]);
-      } else {
-        setTypingUsers(prev => prev.filter(name => name !== data.userName));
-      }
-    });
-
-    newSocket.on('systemMessage', (message: Message) => {
-      setMessages(prev => [...prev, message]);
-    });
-
-    setSocket(newSocket);
-
-    return () => {
-      newSocket.close();
-    };
-  }, [user, setOnlineUsers]);
+  useEffect(() => {
+    setOnlineUsers(globalOnlineUsers);
+  }, [globalOnlineUsers, setOnlineUsers]);
 
   const sendAIMessage = useCallback(async () => {
     if (!newMessage.trim() || !user) return;
@@ -340,9 +224,9 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
 
     console.log('📤 Send message called with:', { 
       message: newMessage,
-      hasSocket: !!socket, 
+      hasSocket: !!globalSocket, 
       hasUser: !!user,
-      socketConnected: socket?.connected
+      socketConnected: globalSocket?.connected
     });
 
     if (!newMessage.trim()) {
@@ -350,7 +234,7 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
       return;
     }
 
-    if (!socket) {
+    if (!globalSocket) {
       console.log('❌ Socket not available');
       return;
     }
@@ -360,7 +244,7 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
       return;
     }
 
-    if (!socket.connected) {
+    if (!globalSocket?.connected) {
       console.log('❌ Socket not connected');
       return;
     }
@@ -400,7 +284,7 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
     }, 5000);
     
     try {
-      socket.emit('sendMessage', messageData, (response: any) => {
+      globalSocket.emit('sendMessage', messageData, (response: any) => {
         console.log('📤 Message send response:', response);
         if (response?.error) {
           console.error('❌ Error sending message:', response.error);
@@ -417,16 +301,16 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
       // Remove temp message if there's an error
       setMessages(prev => prev.filter(msg => msg.id !== tempMessage.id));
     }
-  }, [newMessage, socket, user, aiMode, sendAIMessage]);
+  }, [newMessage, globalSocket, user, aiMode, sendAIMessage]);
 
   const handleTyping = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setNewMessage(e.target.value);
     
-    if (!socket) return;
+    if (!globalSocket) return;
 
     if (!isTyping) {
       setIsTyping(true);
-      socket.emit('typing', { isTyping: true });
+      globalSocket?.emit('typing', { isTyping: true });
     }
 
     // Clear existing timeout
@@ -437,9 +321,9 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
     // Set new timeout
     typingTimeoutRef.current = setTimeout(() => {
       setIsTyping(false);
-      socket.emit('typing', { isTyping: false });
+      globalSocket?.emit('typing', { isTyping: false });
     }, 1000);
-  }, [socket, isTyping]);
+  }, [globalSocket, isTyping]);
 
   const formatTime = useCallback((date: Date) => {
     return new Date(date).toLocaleTimeString([], { 
@@ -537,7 +421,7 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
         
         {/* Debug Info */}
         <div className="text-xs text-gray-500 mt-1">
-          Status: {connectionStatus} | Socket: {socket?.connected ? 'Connected' : 'Disconnected'} | ID: {socket?.id || 'None'}
+          Status: {connectionStatus} | Socket: {globalSocket?.connected ? 'Connected' : 'Disconnected'} | ID: {globalSocket?.id || 'None'}
           {connectionStatus === 'error' && (
             <button 
               onClick={() => window.location.reload()}
