@@ -220,7 +220,15 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     try {
       // In-memory chat doesn't provide persistent chat summaries
-      const chatSummary = [];
+      interface ChatSummary {
+        userId: string;
+        userName: string;
+        lastMessage?: string;
+        timestamp?: string;
+        isOnline?: boolean;
+      }
+      
+      const chatSummary: ChatSummary[] = [];
       
       // Update online status for users in the summary
       const onlineUserIds = Array.from(this.connectedUsers.values()).map(u => u.userId);
