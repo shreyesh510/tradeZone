@@ -8,16 +8,11 @@ export class MessageCleanupService {
 
   constructor(private readonly chatService: ChatService) {}
 
-  @Cron('0 0 0 * * *') // Every 24 hours at midnight
+  // DISABLED: Using in-memory chat, no database cleanup needed
+  // @Cron('0 0 0 * * *') // Every 24 hours at midnight
   async handleMessageCleanup() {
-    this.logger.log('🕐 Running message cleanup cron job (every 24 hours)...');
-    
-    try {
-      await this.chatService.deleteOldMessages();
-      this.logger.log('✅ Message cleanup completed successfully');
-    } catch (error) {
-      this.logger.error('❌ Message cleanup failed:', error);
-    }
+    this.logger.log('🕐 Message cleanup disabled - using in-memory chat');
+    // No database cleanup needed for in-memory messages
   }
 
   // Optional: Manual cleanup trigger for testing

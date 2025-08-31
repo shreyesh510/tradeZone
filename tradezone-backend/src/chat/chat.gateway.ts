@@ -28,6 +28,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   server: Server;
 
   private connectedUsers = new Map<string, { userId: string; socketId: string; userName: string }>();
+  private memoryMessages: any[] = []; // In-memory message storage
+  private readonly MAX_MESSAGES = 100; // Keep only last 100 messages
 
   constructor(private readonly chatService: ChatService) {}
 
@@ -49,6 +51,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // Join user to their personal room
       await client.join(`user_${user.userId}`);
       
+      // Send in-memory messages to the newly connected client
+      console.log(`📚 Sending ${this.memoryMessages.length} in-memory messages to client ${client.id}`);
+      client.emit('previousMessages', this.memoryMessages);
+
       // Broadcast user online status
       this.server.emit('userOnline', {
         userId: user.userId,
@@ -92,19 +98,28 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     console.log('👤 User info:', userInfo);
 
     try {
-      console.log('📝 Calling chatService.createMessage with:', {
-        ...createMessageDto,
+      // Create message in memory instead of database
+      const message = {
+        id: Date.now().toString(),
+        content: createMessageDto.content,
         senderId: userInfo.userId,
         senderName: userInfo.userName,
-      });
-
-      const message = await this.chatService.createMessage({
-        ...createMessageDto,
-        senderId: userInfo.userId,
-        senderName: userInfo.userName,
-      });
-
-      console.log('✅ Message created and saved to Firebase:', message);
+        receiverId: createMessageDto.receiverId,
+        roomId: createMessageDto.roomId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        messageType: createMessageDto.messageType || 'text',
+      };
+      
+      // Add to memory storage
+      this.memoryMessages.push(message);
+      
+      // Keep only last MAX_MESSAGES
+      if (this.memoryMessages.length > this.MAX_MESSAGES) {
+        this.memoryMessages = this.memoryMessages.slice(-this.MAX_MESSAGES);
+      }
+      
+      console.log('✅ Message created in memory:', message);
 
       // Emit message to sender
       client.emit('messageSent', message);
@@ -288,5 +303,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   // Check if user is online
   isUserOnline(userId: string): boolean {
     return Array.from(this.connectedUsers.values()).some(user => user.userId === userId);
+  }
+
+  @SubscribeMessage('getMessages')
+  handleGetMessages(@ConnectedSocket() client: Socket) {
+    console.log('📚 Client requesting in-memory messages:', client.id);
+    client.emit('previousMessages', this.memoryMessages);
+    return this.memoryMessages;
   }
 }
