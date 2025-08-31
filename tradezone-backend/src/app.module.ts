@@ -6,11 +6,11 @@ import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { ChatModule } from './chat/chat.module';
 import { DatabaseModule } from './database/database.module';
-import { CronModule } from './cron/cron.module';
+
 import { FirebaseDatabaseService } from './database/firebase-database.service';
 
 @Module({
-  imports: [AuthModule, ChatModule, DatabaseModule, CronModule],
+  imports: [AuthModule, ChatModule, DatabaseModule],
   controllers: [AppController],
   providers: [
     AppService,
