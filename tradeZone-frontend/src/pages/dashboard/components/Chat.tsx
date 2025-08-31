@@ -4,6 +4,7 @@ import { io, Socket } from 'socket.io-client';
 import config from '../../../config/env';
 import { generateOpenAIResponse } from '../../../redux/thunks/openai/openAI';
 import { useSettings } from '../../../contexts/SettingsContext';
+import { useToast } from '../../../contexts/ToastContext';
 
 interface Message {
   id: string;
@@ -46,6 +47,9 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
 
   // Use settings for theme
   const isDarkMode = settings.theme === 'dark';
+
+  // Global toast functions
+  const { addToast } = useToast();
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -194,7 +198,16 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
           newMessages[tempMessageIndex] = message;
           return newMessages;
         } else {
-          // Add new message from other users
+          // Add new message from other users and show toast notification
+          // Only show toast if the message is not from the current user and not AI
+          if (message.senderId !== user?.id && message.senderId !== 'ai-assistant') {
+            addToast({
+              message: message.content,
+              senderName: message.senderName || 'Unknown User',
+              type: 'message',
+              duration: 4000
+            });
+          }
           return [...prev, message];
         }
       });
