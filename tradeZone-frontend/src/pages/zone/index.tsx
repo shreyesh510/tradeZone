@@ -48,12 +48,16 @@ const Zone = memo(function Zone() {
         <div 
           className={`${isDarkMode ? 'bg-gray-900' : 'bg-gray-100'} flex flex-col`}
           style={{ 
-            height: '100dvh', // Dynamic viewport height for mobile browsers
-            maxHeight: '100dvh'
+            height: '100vh', // Standard viewport height - works on all devices
+            height: '100svh', // Small viewport height for mobile browsers
+            minHeight: '100vh',
+            maxHeight: '100vh',
+            paddingBottom: '0px',
+            margin: '0px'
           }}
         >
           {/* Content - full screen */}
-          <div className="flex-1 overflow-hidden">
+          <div className="flex-1 overflow-hidden h-full">
             {activeTab === 'chart' && <LiveChart key="live-chart" />}
             {activeTab === 'chat' && <Chat onlineUsers={onlineUsers} setOnlineUsers={setOnlineUsers} />}
             {activeTab === 'settings' && <Settings />}
