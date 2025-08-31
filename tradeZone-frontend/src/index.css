@@ -2,6 +2,32 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Mobile viewport fixes for Android and iPhone */
+@supports (height: 100svh) {
+  .mobile-full-height {
+    height: 100svh !important;
+  }
+}
+
+/* Prevent scrolling issues on mobile */
+html, body {
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Fix Android Chrome address bar issues */
+@media screen and (max-width: 768px) {
+  html {
+    height: 100%;
+    height: -webkit-fill-available;
+  }
+  
+  body {
+    height: 100%;
+    height: -webkit-fill-available;
+  }
+}
+
 :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
