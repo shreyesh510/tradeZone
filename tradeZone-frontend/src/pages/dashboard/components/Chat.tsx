@@ -36,6 +36,7 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
   const [selectedTimeframe, setSelectedTimeframe] = useState<string>(settings.defaultTimeframe);
   const [showSymbolDropdown, setShowSymbolDropdown] = useState<boolean>(false);
   const [showTimeframeDropdown, setShowTimeframeDropdown] = useState<boolean>(false);
+  const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
@@ -162,6 +163,14 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
   const toggleTimeframeDropdown = useCallback(() => {
     setShowTimeframeDropdown(prev => !prev);
     setShowSymbolDropdown(false); // Close symbol dropdown when opening timeframe
+  }, []);
+
+  const toggleSettingsModal = useCallback(() => {
+    setShowSettingsModal(prev => !prev);
+    // Close any open dropdowns when opening modal
+    setShowSymbolDropdown(false);
+    setShowTimeframeDropdown(false);
+    setShowEmojiPicker(false);
   }, []);
 
   const onEmojiClick = useCallback((emoji: string) => {
@@ -472,203 +481,72 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
     }
   }, []);
 
-  return (
-    <div className={`w-full flex flex-col h-full ${
-      isDarkMode 
-        ? 'bg-gray-800 border-l border-gray-700' 
-        : 'bg-white border-l border-gray-200'
-    }`}>
-      {/* Chat Header */}
-      <div className={`p-4 border-b ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-        <div className="flex justify-between items-center mb-2">
-          <h2 className={`text-lg font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Global Chat</h2>
-          <div className="flex items-center space-x-2">
-            <div className={`w-2 h-2 rounded-full ${
-              connectionStatus === 'connected' ? 'bg-green-400' :
-              connectionStatus === 'connecting' ? 'bg-yellow-400' :
-              connectionStatus === 'error' ? 'bg-red-400' : 'bg-gray-400'
-            }`}></div>
-            <div className={`text-sm ${isDarkMode ? 'text-green-400' : 'text-green-600'}`}>
-              {onlineUsers.length + 1} online
-            </div>
-          </div>
-        </div>
-        
-        {/* AI Mode Toggle */}
-        <div className="flex items-center justify-between mb-2">
-          <span className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>AI Mode</span>
-          <div className="relative">
-            <button
-              onClick={handleAiToggle}
-              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800 ${
-                aiMode ? 'bg-blue-600' : 'bg-gray-600'
-              } ${user?.isAiFeatureEnabled === false ? 'opacity-50' : ''}`}
-            >
-              <span
-                className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform duration-200 ${
-                  aiMode ? 'translate-x-5' : 'translate-x-1'
-                }`}
-              />
-            </button>
-            
-            {/* AI Permission Warning */}
-            {showAiWarning && (
-              <div className="absolute top-6 right-0 z-50 bg-red-600 text-white text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap">
-                AI feature not available for your account
-                <div className="absolute -top-1 right-2 w-0 h-0 border-l-2 border-r-2 border-b-2 border-transparent border-b-red-600"></div>
-              </div>
-            )}
-          </div>
-        </div>
+     return (
+     <div className={`w-full flex flex-col h-full max-h-full overflow-hidden ${
+       isDarkMode 
+         ? 'bg-gray-800 border-l border-gray-700' 
+         : 'bg-white border-l border-gray-200'
+     }`}>
+             {/* Chat Header with Label and Settings */}
+       <div className={`p-3 border-b ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+         <div className="flex justify-between items-center">
+           {/* Chat Label with Status */}
+           <div className="flex items-center space-x-2">
+             <h3 className={`text-sm font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+               {aiMode ? '🤖 AI Trading Chat' : '💬 Global Chat'}
+             </h3>
+             <div className="flex items-center space-x-1">
+               <div className={`w-1.5 h-1.5 rounded-full ${
+                 connectionStatus === 'connected' ? 'bg-green-400' :
+                 connectionStatus === 'connecting' ? 'bg-yellow-400' :
+                 connectionStatus === 'error' ? 'bg-red-400' : 'bg-gray-400'
+               }`}></div>
+               <span className={`text-xs ${
+                 connectionStatus === 'connected' ? 'text-green-400' : 
+                 connectionStatus === 'connecting' ? 'text-yellow-400' :
+                 'text-red-400'
+               }`}>
+                 {onlineUsers.length + 1}
+               </span>
+             </div>
+           </div>
+           
+           {/* Settings Icon */}
+           <button
+             onClick={toggleSettingsModal}
+             className={`p-1.5 rounded-lg transition-colors ${
+               isDarkMode 
+                 ? 'text-gray-400 hover:text-white hover:bg-gray-700' 
+                 : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+             }`}
+             title="Chat Settings"
+           >
+             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+             </svg>
+           </button>
+         </div>
 
-        {/* Symbol and Timeframe Selection Dropdowns - Only show when AI mode is enabled */}
-        {aiMode && (
-          <div className="space-y-2 mb-2">
-            {/* Symbol Selection Dropdown */}
-            <div className="flex items-center justify-between">
-              <span className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Trading Pair</span>
-              <div className="relative" ref={symbolDropdownRef}>
-                <button
-                  onClick={toggleSymbolDropdown}
-                  className={`flex items-center space-x-1 px-2 py-1 rounded text-xs border transition-colors ${
-                    isDarkMode 
-                      ? 'bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600' 
-                      : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
-                  }`}
-                >
-                  <span>{cryptoOptions.find(opt => opt.value === selectedSymbol)?.symbol || 'DOGE'}</span>
-                  <span className={`transition-transform duration-200 ${showSymbolDropdown ? 'rotate-180' : ''}`}>▼</span>
-                </button>
-                
-                {/* Dropdown Menu */}
-                {showSymbolDropdown && (
-                  <div className={`absolute top-full right-0 mt-1 w-40 rounded-lg shadow-lg border z-50 ${
-                    isDarkMode 
-                      ? 'bg-gray-800 border-gray-600' 
-                      : 'bg-white border-gray-300'
-                  }`}>
-                    <div className="py-1">
-                      {cryptoOptions.map((option) => (
-                        <button
-                          key={option.value}
-                          onClick={() => handleSymbolChange(option.value)}
-                          className={`w-full text-left px-3 py-2 text-xs transition-colors ${
-                            selectedSymbol === option.value
-                              ? isDarkMode
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-blue-100 text-blue-700'
-                              : isDarkMode
-                                ? 'text-gray-300 hover:bg-gray-700'
-                                : 'text-gray-700 hover:bg-gray-100'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="font-medium">{option.symbol}</span>
-                            <span className="text-xs opacity-75">{option.label.split(' / ')[1]}</span>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
+         {/* AI Market Context Summary */}
+         {aiMode && marketContextSummary && (
+           <div className={`mt-2 px-2 py-1 rounded text-xs ${
+             isDarkMode ? 'bg-purple-900/20 text-purple-300' : 'bg-purple-50 text-purple-700'
+           }`}>
+             <div className="flex items-center space-x-1">
+               <span>📊</span>
+               <div className="truncate flex-1">{marketContextSummary}</div>
+             </div>
+           </div>
+         )}
 
-            {/* Timeframe Selection Dropdown */}
-            <div className="flex items-center justify-between">
-              <span className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Timeframe</span>
-              <div className="relative" ref={timeframeDropdownRef}>
-                <button
-                  onClick={toggleTimeframeDropdown}
-                  className={`flex items-center space-x-1 px-2 py-1 rounded text-xs border transition-colors ${
-                    isDarkMode 
-                      ? 'bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600' 
-                      : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
-                  }`}
-                >
-                  <span>{timeframeOptions.find(opt => opt.value === selectedTimeframe)?.label || '5 Minutes'}</span>
-                  <span className={`transition-transform duration-200 ${showTimeframeDropdown ? 'rotate-180' : ''}`}>▼</span>
-                </button>
-                
-                {/* Dropdown Menu */}
-                {showTimeframeDropdown && (
-                  <div className={`absolute top-full right-0 mt-1 w-32 rounded-lg shadow-lg border z-50 ${
-                    isDarkMode 
-                      ? 'bg-gray-800 border-gray-600' 
-                      : 'bg-white border-gray-300'
-                  }`}>
-                    <div className="py-1">
-                      {timeframeOptions.map((option) => (
-                        <button
-                          key={option.value}
-                          onClick={() => handleTimeframeChange(option.value)}
-                          className={`w-full text-left px-3 py-2 text-xs transition-colors ${
-                            selectedTimeframe === option.value
-                              ? isDarkMode
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-blue-100 text-blue-700'
-                              : isDarkMode
-                                ? 'text-gray-300 hover:bg-gray-700'
-                                : 'text-gray-700 hover:bg-gray-100'
-                          }`}
-                        >
-                          {option.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Market Context Indicator */}
-        {aiMode && marketContextSummary && (
-          <div className={`mb-2 p-2 rounded text-xs ${
-            isDarkMode ? 'bg-purple-900/30 border border-purple-700 text-purple-300' : 'bg-purple-100 border border-purple-300 text-purple-700'
-          }`}>
-            <div className="flex items-center space-x-1 mb-1">
-              <span>📊</span>
-              <span className="font-medium">AI Context:</span>
-            </div>
-            <div className="truncate">{marketContextSummary}</div>
-          </div>
-        )}
-        
-        {/* Online Users */}
-        <div className="flex flex-wrap gap-1 mb-2">
-          <div className="flex items-center space-x-1">
-            <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-            <span className="text-xs text-gray-300">You</span>
-          </div>
-          {onlineUsers.map((onlineUser) => (
-            <div key={onlineUser.userId} className="flex items-center space-x-1">
-              <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-              <span className="text-xs text-gray-300">{onlineUser.userName}</span>
-            </div>
-          ))}
-        </div>
-        
-        {typingUsers.length > 0 && (
-          <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-            {typingUsers.join(', ')} {typingUsers.length === 1 ? 'is' : 'are'} typing...
-          </p>
-        )}
-        
-        {/* Debug Info */}
-        <div className="text-xs text-gray-500 mt-1">
-          Status: {connectionStatus} | Socket: {globalSocket?.connected ? 'Connected' : 'Disconnected'} | ID: {globalSocket?.id || 'None'}
-          {connectionStatus === 'error' && (
-            <button 
-              onClick={() => window.location.reload()}
-              className="ml-2 text-blue-400 hover:text-blue-300"
-            >
-              Reconnect
-            </button>
-          )}
-        </div>
-      </div>
+         {/* Typing Indicator */}
+         {typingUsers.length > 0 && (
+           <div className={`mt-1 text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+             {typingUsers.join(', ')} {typingUsers.length === 1 ? 'is' : 'are'} typing...
+           </div>
+         )}
+       </div>
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -717,6 +595,254 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
         })}
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Settings Modal */}
+      {showSettingsModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className={`w-full max-w-md rounded-lg shadow-xl ${
+            isDarkMode ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-300'
+          }`}>
+            {/* Modal Header */}
+            <div className={`flex items-center justify-between p-4 border-b ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+              <h3 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                Chat Settings
+              </h3>
+              <button
+                onClick={toggleSettingsModal}
+                className={`p-1 rounded-lg transition-colors ${
+                  isDarkMode 
+                    ? 'text-gray-400 hover:text-white hover:bg-gray-700' 
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                }`}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-4 space-y-4">
+              {/* AI Mode Toggle */}
+              <div className={`p-3 rounded-lg ${isDarkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className={`text-sm font-medium ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                      AI Mode
+                    </h4>
+                    <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                      Enable AI-powered trading assistance
+                    </p>
+                  </div>
+                  <div className="relative">
+                    <button
+                      onClick={handleAiToggle}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800 ${
+                        aiMode ? 'bg-blue-600' : 'bg-gray-600'
+                      } ${user?.isAiFeatureEnabled === false ? 'opacity-50' : ''}`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${
+                          aiMode ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                    
+                    {/* AI Permission Warning */}
+                    {showAiWarning && (
+                      <div className="absolute top-8 right-0 z-50 bg-red-600 text-white text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap">
+                        AI feature not available for your account
+                        <div className="absolute -top-1 right-2 w-0 h-0 border-l-2 border-r-2 border-b-2 border-transparent border-b-red-600"></div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Connection Status */}
+              <div className={`p-3 rounded-lg ${isDarkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                <h4 className={`text-sm font-medium mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                  Connection Status
+                </h4>
+                <div className="space-y-1 text-xs">
+                  <div className="flex justify-between">
+                    <span className={isDarkMode ? 'text-gray-300' : 'text-gray-600'}>Status:</span>
+                    <span className={connectionStatus === 'connected' ? 'text-green-400' : 'text-red-400'}>
+                      {connectionStatus}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className={isDarkMode ? 'text-gray-300' : 'text-gray-600'}>Socket:</span>
+                    <span className={globalSocket?.connected ? 'text-green-400' : 'text-red-400'}>
+                      {globalSocket?.connected ? 'Connected' : 'Disconnected'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className={isDarkMode ? 'text-gray-300' : 'text-gray-600'}>ID:</span>
+                    <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>
+                      {globalSocket?.id || 'None'}
+                    </span>
+                  </div>
+                  {connectionStatus === 'error' && (
+                    <button 
+                      onClick={() => window.location.reload()}
+                      className="mt-2 px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition-colors"
+                    >
+                      Reconnect
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Online Users */}
+              <div className={`p-3 rounded-lg ${isDarkMode ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                <h4 className={`text-sm font-medium mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                  Online Users ({onlineUsers.length + 1})
+                </h4>
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                    <span className={`text-xs font-medium ${isDarkMode ? 'text-green-400' : 'text-green-600'}`}>
+                      You
+                    </span>
+                  </div>
+                  {onlineUsers.map((onlineUser) => (
+                    <div key={onlineUser.userId} className="flex items-center space-x-2">
+                      <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                      <span className={`text-xs ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+                        {onlineUser.userName}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* AI Settings - Only show when AI mode is enabled */}
+              {aiMode && (
+                <div className={`p-3 rounded-lg ${isDarkMode ? 'bg-purple-900/30 border border-purple-700' : 'bg-purple-50 border border-purple-200'}`}>
+                  <h4 className={`text-sm font-medium mb-3 ${isDarkMode ? 'text-purple-300' : 'text-purple-700'}`}>
+                    AI Configuration
+                  </h4>
+                  
+                  {/* Trading Pair Selection */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Trading Pair</span>
+                      <div className="relative" ref={symbolDropdownRef}>
+                        <button
+                          onClick={toggleSymbolDropdown}
+                          className={`flex items-center space-x-1 px-2 py-1 rounded text-xs border transition-colors ${
+                            isDarkMode 
+                              ? 'bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600' 
+                              : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                          }`}
+                        >
+                          <span>{cryptoOptions.find(opt => opt.value === selectedSymbol)?.symbol || 'DOGE'}</span>
+                          <span className={`transition-transform duration-200 ${showSymbolDropdown ? 'rotate-180' : ''}`}>▼</span>
+                        </button>
+                        
+                        {/* Dropdown Menu */}
+                        {showSymbolDropdown && (
+                          <div className={`absolute top-full right-0 mt-1 w-40 rounded-lg shadow-lg border z-50 ${
+                            isDarkMode 
+                              ? 'bg-gray-800 border-gray-600' 
+                              : 'bg-white border-gray-300'
+                          }`}>
+                            <div className="py-1">
+                              {cryptoOptions.map((option) => (
+                                <button
+                                  key={option.value}
+                                  onClick={() => handleSymbolChange(option.value)}
+                                  className={`w-full text-left px-3 py-2 text-xs transition-colors ${
+                                    selectedSymbol === option.value
+                                      ? isDarkMode
+                                        ? 'bg-blue-600 text-white'
+                                        : 'bg-blue-100 text-blue-700'
+                                      : isDarkMode
+                                        ? 'text-gray-300 hover:bg-gray-700'
+                                        : 'text-gray-700 hover:bg-gray-100'
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-medium">{option.symbol}</span>
+                                    <span className="text-xs opacity-75">{option.label.split(' / ')[1]}</span>
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Timeframe Selection */}
+                    <div className="flex items-center justify-between">
+                      <span className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Timeframe</span>
+                      <div className="relative" ref={timeframeDropdownRef}>
+                        <button
+                          onClick={toggleTimeframeDropdown}
+                          className={`flex items-center space-x-1 px-2 py-1 rounded text-xs border transition-colors ${
+                            isDarkMode 
+                              ? 'bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600' 
+                              : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                          }`}
+                        >
+                          <span>{timeframeOptions.find(opt => opt.value === selectedTimeframe)?.label || '5 Minutes'}</span>
+                          <span className={`transition-transform duration-200 ${showTimeframeDropdown ? 'rotate-180' : ''}`}>▼</span>
+                        </button>
+                        
+                        {/* Dropdown Menu */}
+                        {showTimeframeDropdown && (
+                          <div className={`absolute top-full right-0 mt-1 w-32 rounded-lg shadow-lg border z-50 ${
+                            isDarkMode 
+                              ? 'bg-gray-800 border-gray-600' 
+                              : 'bg-white border-gray-300'
+                          }`}>
+                            <div className="py-1">
+                              {timeframeOptions.map((option) => (
+                                <button
+                                  key={option.value}
+                                  onClick={() => handleTimeframeChange(option.value)}
+                                  className={`w-full text-left px-3 py-2 text-xs transition-colors ${
+                                    selectedTimeframe === option.value
+                                      ? isDarkMode
+                                        ? 'bg-blue-600 text-white'
+                                        : 'bg-blue-100 text-blue-700'
+                                      : isDarkMode
+                                        ? 'text-gray-300 hover:bg-gray-700'
+                                        : 'text-gray-700 hover:bg-gray-100'
+                                  }`}
+                                >
+                                  {option.label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Market Context Display */}
+                    {marketContextSummary && (
+                      <div className={`mt-3 p-2 rounded text-xs ${
+                        isDarkMode ? 'bg-gray-800 border border-gray-600' : 'bg-white border border-gray-300'
+                      }`}>
+                        <div className="flex items-center space-x-1 mb-1">
+                          <span>📊</span>
+                          <span className="font-medium">Current Context:</span>
+                        </div>
+                        <div className={isDarkMode ? 'text-gray-300' : 'text-gray-600'}>
+                          {marketContextSummary}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Message Input */}
       <div className={`p-4 border-t relative ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
