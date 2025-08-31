@@ -1,11 +1,12 @@
 import { useCallback, useState, useEffect, useRef } from 'react';
 import { useAppSelector, useAppDispatch } from '../../../redux/hooks';
 import { generateOpenAIResponse } from '../../../redux/thunks/openai/openAI';
-import { useSettings } from '../../../contexts/SettingsContext';
+import { useSettings, cryptoOptions, timeframeOptions } from '../../../contexts/SettingsContext';
 import { useToast } from '../../../contexts/ToastContext';
 import { useSocket } from '../../../contexts/SocketContext';
 import { messageStorage } from '../../../services/messageStorage';
 import { type Message } from '../../../types/message';
+import { marketContextService } from '../../../services/marketContext';
 
 interface OnlineUser {
   userId: string;
@@ -19,7 +20,7 @@ interface ChatProps {
 }
 
 const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
-  const { settings } = useSettings();
+  const { settings, updateSettings } = useSettings();
   const { socket: globalSocket, messages: globalMessages, addMessage } = useSocket();
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -30,9 +31,16 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
   const [recentEmojis, setRecentEmojis] = useState<string[]>([]);
   const [aiMode, setAiMode] = useState<boolean>(false);
   const [showAiWarning, setShowAiWarning] = useState<boolean>(false);
+  const [marketContextSummary, setMarketContextSummary] = useState<string>('');
+  const [selectedSymbol, setSelectedSymbol] = useState<string>(settings.defaultCrypto);
+  const [selectedTimeframe, setSelectedTimeframe] = useState<string>(settings.defaultTimeframe);
+  const [showSymbolDropdown, setShowSymbolDropdown] = useState<boolean>(false);
+  const [showTimeframeDropdown, setShowTimeframeDropdown] = useState<boolean>(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
+  const symbolDropdownRef = useRef<HTMLDivElement>(null);
+  const timeframeDropdownRef = useRef<HTMLDivElement>(null);
   const user = useAppSelector((state) => state.auth.user);
   const dispatch = useAppDispatch();
   const { loading: aiLoading, error: aiError } = useAppSelector((state) => state.openai);
@@ -47,6 +55,47 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
   useEffect(() => {
     setMessages(globalMessages);
   }, [globalMessages]);
+
+  // Initialize market context service when AI mode is enabled
+  useEffect(() => {
+    if (aiMode) {
+      console.log('🤖 AI mode enabled - starting market context service');
+      marketContextService.startAutoUpdate();
+      
+      // Update market summary periodically
+      const updateSummary = () => {
+        const summary = marketContextService.getQuickSummary();
+        setMarketContextSummary(summary);
+      };
+      
+      updateSummary();
+      const summaryInterval = setInterval(updateSummary, 10000); // Update every 10 seconds
+      
+      return () => {
+        clearInterval(summaryInterval);
+      };
+    } else {
+      marketContextService.stopAutoUpdate();
+      setMarketContextSummary('');
+    }
+  }, [aiMode]);
+
+  // Sync selected symbol with settings changes
+  useEffect(() => {
+    setSelectedSymbol(settings.defaultCrypto);
+  }, [settings.defaultCrypto]);
+
+  // Sync selected timeframe with settings changes
+  useEffect(() => {
+    setSelectedTimeframe(settings.defaultTimeframe);
+  }, [settings.defaultTimeframe]);
+
+  // Cleanup market context service on unmount
+  useEffect(() => {
+    return () => {
+      marketContextService.cleanup();
+    };
+  }, []);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -76,6 +125,44 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
     }
     setAiMode(prev => !prev);
   }, [user?.isAiFeatureEnabled, aiMode]);
+
+  const handleSymbolChange = useCallback((symbol: string) => {
+    console.log(`📊 Switching symbol to: ${symbol}`);
+    setSelectedSymbol(symbol);
+    setShowSymbolDropdown(false);
+    
+    // Update settings to sync with the chart
+    updateSettings({ defaultCrypto: symbol });
+    
+    // Force market context update with new symbol
+    if (aiMode) {
+      marketContextService.forceUpdate();
+    }
+  }, [updateSettings, aiMode]);
+
+  const toggleSymbolDropdown = useCallback(() => {
+    setShowSymbolDropdown(prev => !prev);
+    setShowTimeframeDropdown(false); // Close timeframe dropdown when opening symbol
+  }, []);
+
+  const handleTimeframeChange = useCallback((timeframe: string) => {
+    console.log(`📊 Switching timeframe to: ${timeframe}`);
+    setSelectedTimeframe(timeframe);
+    setShowTimeframeDropdown(false);
+    
+    // Update settings to sync with the chart
+    updateSettings({ defaultTimeframe: timeframe });
+    
+    // Force market context update with new timeframe
+    if (aiMode) {
+      marketContextService.forceUpdate();
+    }
+  }, [updateSettings, aiMode]);
+
+  const toggleTimeframeDropdown = useCallback(() => {
+    setShowTimeframeDropdown(prev => !prev);
+    setShowSymbolDropdown(false); // Close symbol dropdown when opening timeframe
+  }, []);
 
   const onEmojiClick = useCallback((emoji: string) => {
     setNewMessage(prev => prev + emoji);
@@ -115,6 +202,40 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [showEmojiPicker]);
+
+  // Close symbol dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (symbolDropdownRef.current && !symbolDropdownRef.current.contains(event.target as Node)) {
+        setShowSymbolDropdown(false);
+      }
+    };
+
+    if (showSymbolDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showSymbolDropdown]);
+
+  // Close timeframe dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (timeframeDropdownRef.current && !timeframeDropdownRef.current.contains(event.target as Node)) {
+        setShowTimeframeDropdown(false);
+      }
+    };
+
+    if (showTimeframeDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showTimeframeDropdown]);
 
   // Emoji data organized by categories
   const emojiCategories = {
@@ -169,10 +290,11 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
     setIsTyping(false);
 
     try {
-      // Dispatch OpenAI API call
+      // Dispatch OpenAI API call with market context
       const result = await dispatch(generateOpenAIResponse({ 
         prompt,
-        systemMessage: "You are a helpful AI assistant in a cryptocurrency trading chat. Provide concise, helpful responses about trading, market analysis, or general questions. Keep responses under 150 words."
+        systemMessage: "You are a helpful AI assistant in a cryptocurrency trading chat. Provide concise, helpful responses about trading, market analysis, or general questions. Keep responses under 150 words.",
+        includeMarketContext: true // Include current chart context
       }));
 
       if (generateOpenAIResponse.fulfilled.match(result)) {
@@ -398,6 +520,121 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
             )}
           </div>
         </div>
+
+        {/* Symbol and Timeframe Selection Dropdowns - Only show when AI mode is enabled */}
+        {aiMode && (
+          <div className="space-y-2 mb-2">
+            {/* Symbol Selection Dropdown */}
+            <div className="flex items-center justify-between">
+              <span className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Trading Pair</span>
+              <div className="relative" ref={symbolDropdownRef}>
+                <button
+                  onClick={toggleSymbolDropdown}
+                  className={`flex items-center space-x-1 px-2 py-1 rounded text-xs border transition-colors ${
+                    isDarkMode 
+                      ? 'bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600' 
+                      : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  <span>{cryptoOptions.find(opt => opt.value === selectedSymbol)?.symbol || 'DOGE'}</span>
+                  <span className={`transition-transform duration-200 ${showSymbolDropdown ? 'rotate-180' : ''}`}>▼</span>
+                </button>
+                
+                {/* Dropdown Menu */}
+                {showSymbolDropdown && (
+                  <div className={`absolute top-full right-0 mt-1 w-40 rounded-lg shadow-lg border z-50 ${
+                    isDarkMode 
+                      ? 'bg-gray-800 border-gray-600' 
+                      : 'bg-white border-gray-300'
+                  }`}>
+                    <div className="py-1">
+                      {cryptoOptions.map((option) => (
+                        <button
+                          key={option.value}
+                          onClick={() => handleSymbolChange(option.value)}
+                          className={`w-full text-left px-3 py-2 text-xs transition-colors ${
+                            selectedSymbol === option.value
+                              ? isDarkMode
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-blue-100 text-blue-700'
+                              : isDarkMode
+                                ? 'text-gray-300 hover:bg-gray-700'
+                                : 'text-gray-700 hover:bg-gray-100'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium">{option.symbol}</span>
+                            <span className="text-xs opacity-75">{option.label.split(' / ')[1]}</span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Timeframe Selection Dropdown */}
+            <div className="flex items-center justify-between">
+              <span className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Timeframe</span>
+              <div className="relative" ref={timeframeDropdownRef}>
+                <button
+                  onClick={toggleTimeframeDropdown}
+                  className={`flex items-center space-x-1 px-2 py-1 rounded text-xs border transition-colors ${
+                    isDarkMode 
+                      ? 'bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600' 
+                      : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  <span>{timeframeOptions.find(opt => opt.value === selectedTimeframe)?.label || '5 Minutes'}</span>
+                  <span className={`transition-transform duration-200 ${showTimeframeDropdown ? 'rotate-180' : ''}`}>▼</span>
+                </button>
+                
+                {/* Dropdown Menu */}
+                {showTimeframeDropdown && (
+                  <div className={`absolute top-full right-0 mt-1 w-32 rounded-lg shadow-lg border z-50 ${
+                    isDarkMode 
+                      ? 'bg-gray-800 border-gray-600' 
+                      : 'bg-white border-gray-300'
+                  }`}>
+                    <div className="py-1">
+                      {timeframeOptions.map((option) => (
+                        <button
+                          key={option.value}
+                          onClick={() => handleTimeframeChange(option.value)}
+                          className={`w-full text-left px-3 py-2 text-xs transition-colors ${
+                            selectedTimeframe === option.value
+                              ? isDarkMode
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-blue-100 text-blue-700'
+                              : isDarkMode
+                                ? 'text-gray-300 hover:bg-gray-700'
+                                : 'text-gray-700 hover:bg-gray-100'
+                          }`}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Market Context Indicator */}
+        {aiMode && marketContextSummary && (
+          <div className={`mb-2 p-2 rounded text-xs ${
+            isDarkMode ? 'bg-purple-900/30 border border-purple-700 text-purple-300' : 'bg-purple-100 border border-purple-300 text-purple-700'
+          }`}>
+            <div className="flex items-center space-x-1 mb-1">
+              <span>📊</span>
+              <span className="font-medium">AI Context:</span>
+            </div>
+            <div className="truncate">{marketContextSummary}</div>
+          </div>
+        )}
         
         {/* Online Users */}
         <div className="flex flex-wrap gap-1 mb-2">

@@ -1,5 +1,6 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
 import { config } from '../../../config/env';
+import { marketContextService } from '../../../services/marketContext';
 
 // Types for OpenAI API
 export interface OpenAIMessage {
@@ -12,6 +13,7 @@ export interface OpenAIRequest {
   systemMessage?: string;
   maxTokens?: number;
   temperature?: number;
+  includeMarketContext?: boolean;
 }
 
 export interface OpenAIResponse {
@@ -37,13 +39,32 @@ const openAIService = {
 
     const messages: OpenAIMessage[] = [];
     
-    // Add system message if provided
-    if (request.systemMessage) {
-      messages.push({
-        role: 'system',
-        content: request.systemMessage
-      });
+    // Add system message with market context if enabled
+    let systemMessage = request.systemMessage || 'You are a helpful AI assistant specializing in cryptocurrency trading and market analysis.';
+    
+    if (request.includeMarketContext !== false) { // Default to true
+      try {
+        console.log('📊 Fetching market context for AI...');
+        await marketContextService.updateMarketContext();
+        const marketContext = marketContextService.formatContextForAI();
+        
+        systemMessage = `${systemMessage}
+
+${marketContext}
+
+Provide helpful, accurate responses based on the current market context. When discussing price movements or technical analysis, reference the current chart data provided above.`;
+        
+        console.log('✅ Market context added to AI prompt');
+      } catch (error) {
+        console.warn('⚠️ Could not fetch market context:', error);
+        // Continue without market context
+      }
     }
+    
+    messages.push({
+      role: 'system',
+      content: systemMessage
+    });
     
     // Add user prompt
     messages.push({
@@ -128,7 +149,7 @@ export const generateTradingAnalysis = createAsyncThunk<
   }
 );
 
-// Chart analysis thunk
+// Chart analysis thunk with automatic market context
 export const generateChartAnalysis = createAsyncThunk<
   OpenAIResponse,
   { prompt: string; priceData?: any },
@@ -140,16 +161,17 @@ export const generateChartAnalysis = createAsyncThunk<
       let enhancedPrompt = prompt;
       
       if (priceData) {
-        enhancedPrompt = `Based on the current market data: ${JSON.stringify(priceData, null, 2)}\n\nUser question: ${prompt}`;
+        enhancedPrompt = `Additional market data: ${JSON.stringify(priceData, null, 2)}\n\nUser question: ${prompt}`;
       }
       
-      const systemMessage = `You are a professional technical analyst specializing in cryptocurrency markets. Provide clear, actionable chart analysis and trading insights. Focus on price action, support/resistance levels, and potential entry/exit points.`;
+      const systemMessage = `You are a professional technical analyst specializing in cryptocurrency markets. Provide clear, actionable chart analysis and trading insights. Focus on price action, support/resistance levels, and potential entry/exit points. Use the current chart context to provide specific analysis.`;
       
       return await openAIService.generateResponse({
         prompt: enhancedPrompt,
         systemMessage,
         maxTokens: 400,
         temperature: 0.3, // Very focused analysis
+        includeMarketContext: true, // Always include market context for chart analysis
       });
     } catch (error: any) {
       return rejectWithValue(error.message || 'Failed to generate chart analysis');
