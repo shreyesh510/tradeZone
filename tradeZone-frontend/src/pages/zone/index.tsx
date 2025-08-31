@@ -47,24 +47,32 @@ const Zone = memo(function Zone() {
     if (isMobile) {
       return (
         <div 
-          className={`${isDarkMode ? 'bg-gray-900' : 'bg-gray-100'} flex flex-col`}
+          className={`${isDarkMode ? 'bg-gray-900' : 'bg-gray-100'} flex flex-col fixed inset-0 overflow-hidden`}
           style={{ 
             height: '100svh', // Small viewport height for mobile browsers
             minHeight: '100vh', // Fallback for older browsers
             maxHeight: '100vh',
+            width: '100vw',
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
             paddingBottom: '0px',
             margin: '0px'
           }}
         >
-          {/* Content - full screen */}
-          <div className="flex-1 overflow-hidden h-full">
+          {/* Content - full screen minus nav */}
+          <div className="flex-1 overflow-hidden" style={{ height: 'calc(100vh - 80px)' }}>
             {activeTab === 'chart' && <LiveChart key="live-chart" />}
             {activeTab === 'chat' && <Chat onlineUsers={onlineUsers} setOnlineUsers={setOnlineUsers} />}
             {activeTab === 'settings' && <Settings />}
           </div>
 
-          {/* Floating Navigation */}
-          <FloatingNav activeTab={activeTab} onTabChange={handleTabChange} />
+          {/* Floating Navigation - Fixed at bottom */}
+          <div className="flex-shrink-0" style={{ height: '80px' }}>
+            <FloatingNav activeTab={activeTab} onTabChange={handleTabChange} />
+          </div>
         </div>
       );
     }

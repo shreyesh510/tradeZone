@@ -19,7 +19,7 @@ const Dashboard = memo(function Dashboard() {
   };
 
   return (
-    <div className="h-screen mobile-full-height max-h-screen bg-gray-900 flex flex-col overflow-hidden fixed inset-0">
+    <div className="h-screen mobile-full-height max-h-screen bg-gray-900 flex flex-col overflow-hidden fixed inset-0">image.png
       {/* Top Header with Logout */}
       <div className="flex-shrink-0 relative z-10">
         <Header 

@@ -69,7 +69,7 @@ function App() {
       <ToastProvider>
         <SocketProvider>
           <Router>
-            <div className="App">
+            <div className="App h-full w-full overflow-hidden">
               <Routes>
                 <Route 
                   path="/login" 
