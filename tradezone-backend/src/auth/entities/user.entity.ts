@@ -3,7 +3,6 @@ export class User {
   name: string;
   email: string;
   password: string;
-  isAiFeatureEnabled: boolean;
   createdAt: Date;
   updatedAt: Date;
 

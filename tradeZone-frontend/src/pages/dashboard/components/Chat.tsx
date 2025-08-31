@@ -34,6 +34,7 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
   const [showEmojiPicker, setShowEmojiPicker] = useState<boolean>(false);
   const [recentEmojis, setRecentEmojis] = useState<string[]>([]);
   const [aiMode, setAiMode] = useState<boolean>(false);
+  const [showAiWarning, setShowAiWarning] = useState<boolean>(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
@@ -56,6 +57,19 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
       return newRecent;
     });
   }, []);
+
+  const handleAiToggle = useCallback(() => {
+    // For backward compatibility: if isAiFeatureEnabled is undefined, allow AI (existing users)
+    const hasAiAccess = user?.isAiFeatureEnabled !== false;
+    
+    if (!hasAiAccess && !aiMode) {
+      // User trying to enable AI but doesn't have permission
+      setShowAiWarning(true);
+      setTimeout(() => setShowAiWarning(false), 3000); // Hide warning after 3 seconds
+      return;
+    }
+    setAiMode(prev => !prev);
+  }, [user?.isAiFeatureEnabled, aiMode]);
 
   const onEmojiClick = useCallback((emoji: string) => {
     setNewMessage(prev => prev + emoji);
@@ -465,18 +479,28 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
         {/* AI Mode Toggle */}
         <div className="flex items-center justify-between mb-2">
           <span className="text-sm text-gray-300">AI Mode</span>
-          <button
-            onClick={() => setAiMode(!aiMode)}
-            className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800 ${
-              aiMode ? 'bg-blue-600' : 'bg-gray-600'
-            }`}
-          >
-            <span
-              className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform duration-200 ${
-                aiMode ? 'translate-x-5' : 'translate-x-1'
-              }`}
-            />
-          </button>
+          <div className="relative">
+            <button
+              onClick={handleAiToggle}
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800 ${
+                aiMode ? 'bg-blue-600' : 'bg-gray-600'
+              } ${user?.isAiFeatureEnabled === false ? 'opacity-50' : ''}`}
+            >
+              <span
+                className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform duration-200 ${
+                  aiMode ? 'translate-x-5' : 'translate-x-1'
+                }`}
+              />
+            </button>
+            
+            {/* AI Permission Warning */}
+            {showAiWarning && (
+              <div className="absolute top-6 right-0 z-50 bg-red-600 text-white text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap">
+                AI feature not available for your account
+                <div className="absolute -top-1 right-2 w-0 h-0 border-l-2 border-r-2 border-b-2 border-transparent border-b-red-600"></div>
+              </div>
+            )}
+          </div>
         </div>
         
         {/* Online Users */}
