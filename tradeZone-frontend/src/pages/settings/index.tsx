@@ -80,7 +80,7 @@ const Settings: React.FC = () => {
 
       {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-4xl mx-auto px-4 py-8 pb-24">
+        <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           
           {/* Appearance Settings */}
