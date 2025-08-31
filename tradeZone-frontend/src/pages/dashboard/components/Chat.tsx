@@ -154,18 +154,8 @@ const Chat = ({ onlineUsers, setOnlineUsers }: ChatProps) => {
       setConnectionStatus('connected');
       newSocket.emit('getOnlineUsers');
       
-      // Load previous messages
-      fetch(`${config.API_BASE_URL}/chat/messages`)
-        .then(response => response.json())
-        .then(data => {
-          console.log('📚 Loaded previous messages:', data);
-          if (Array.isArray(data)) {
-            setMessages(data);
-          }
-        })
-        .catch(error => {
-          console.error('❌ Error loading messages:', error);
-        });
+      // Request previous in-memory messages from server
+      newSocket.emit('getMessages');
     });
 
     newSocket.on('disconnect', () => {
