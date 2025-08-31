@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { useSettings } from '../contexts/SettingsContext';
 
-export type MobileTab = 'chart' | 'chat' | 'zone' | 'settings';
+export type MobileTab = 'chart' | 'chat' | 'settings';
 
 interface MobileBottomNavProps {
   activeTab: MobileTab;
@@ -32,16 +32,6 @@ const MobileBottomNav = memo(function MobileBottomNav({ activeTab, onTabChange }
       )
     },
     {
-      id: 'zone' as MobileTab,
-      label: 'Zone',
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-        </svg>
-      )
-    },
-    {
       id: 'settings' as MobileTab,
       label: 'Settings',
       icon: (
@@ -54,9 +44,15 @@ const MobileBottomNav = memo(function MobileBottomNav({ activeTab, onTabChange }
   ];
 
   return (
-    <div className={`fixed bottom-0 left-0 right-0 z-50 ${
-      isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
-    } border-t`}>
+    <div 
+      className={`fixed left-0 right-0 z-50 ${
+        isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+      } border-t`}
+      style={{ 
+        bottom: 'env(safe-area-inset-bottom, 0px)',
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)'
+      }}
+    >
       <div className="flex justify-around items-center py-3">
         {tabs.map((tab) => (
           <button
