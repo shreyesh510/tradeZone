@@ -23,6 +23,11 @@ export class CreatePositionDto {
   @IsPositive()
   investedAmount: number;
 
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  tradingFee?: number;
+
   @IsEnum(['Delta Exchange', 'Groww'])
   platform: 'Delta Exchange' | 'Groww';
 

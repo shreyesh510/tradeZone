@@ -1,15 +1,20 @@
-import { memo, useState, useEffect } from 'react';
+import { memo, useState, useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import Header from '../../../layouts/Header';
 import Sidebar from '../../../components/Sidebar';
 import FloatingNav, { type MobileTab } from '../../../layouts/FloatingNav';
+import ImportConfirmModal from '../../../components/ImportConfirmModal';
 import { useSettings } from '../../../contexts/SettingsContext';
+import { toast } from 'react-toastify';
 import { usePermissions } from '../../../hooks/usePermissions';
 import { useNavigate } from 'react-router-dom';
 import type { RootState, AppDispatch } from '../../../redux/store';
+import Papa from 'papaparse';
+import type { ParseError } from 'papaparse';
 import {
   fetchPositions,
   createPosition,
+  createPositionsBulk,
   updatePosition,
   deletePosition,
 } from '../../../redux/thunks/positions/positionsThunks';
@@ -35,6 +40,7 @@ interface PositionForm {
   side: 'buy' | 'sell';
   platform: 'Delta Exchange' | 'Groww';
   leverage: string;
+  tradingFee?: string;
 }
 
 const Positions = memo(function Positions() {
@@ -47,6 +53,10 @@ const Positions = memo(function Positions() {
   const [isMobile, setIsMobile] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<MobileTab>('chart');
   const [showAddForm, setShowAddForm] = useState<boolean>(false);
+  const [importLoading, setImportLoading] = useState<boolean>(false);
+  const [importedPositions, setImportedPositions] = useState<CreatePositionData[]>([]);
+  const [showImportConfirmModal, setShowImportConfirmModal] = useState<boolean>(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Redux state
   const {
@@ -65,7 +75,8 @@ const Positions = memo(function Positions() {
     entryPrice: '',
     side: 'buy',
     platform: 'Delta Exchange',
-    leverage: '20'
+  leverage: '20',
+  tradingFee: ''
   });
 
   // Leverage options
@@ -129,7 +140,7 @@ const Positions = memo(function Positions() {
     e.preventDefault();
     
     if (!positionForm.symbol || !positionForm.lots || !positionForm.entryPrice) {
-      alert('Please fill all required fields');
+      toast.warning('Please fill all required fields');
       return;
     }
 
@@ -140,6 +151,7 @@ const Positions = memo(function Positions() {
       currentPrice: parseFloat(positionForm.entryPrice), // Start with entry price
       lots: parseInt(positionForm.lots),
       investedAmount: parseFloat(positionForm.entryPrice) * parseInt(positionForm.lots),
+  tradingFee: positionForm.tradingFee ? parseFloat(positionForm.tradingFee) : 0,
       platform: positionForm.platform,
       leverage: parseInt(positionForm.leverage),
       timestamp: new Date().toLocaleString()
@@ -156,10 +168,10 @@ const Positions = memo(function Positions() {
         leverage: '20'
       });
       setShowAddForm(false);
-      alert('Position added successfully!');
+      toast.success('Position added successfully!');
     } catch (error) {
       console.error('Failed to create position:', error);
-      alert('Failed to add position. Please try again.');
+      toast.error('Failed to add position. Please try again.');
     }
   };
 
@@ -171,10 +183,152 @@ const Positions = memo(function Positions() {
 
   const availableSymbols = symbolOptions[positionForm.platform];
 
+  // Function to handle file import
+  const handleFileImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    
+    const file = e.target.files[0];
+    setImportLoading(true);
+    
+    // Always use Delta Exchange as the platform for imports
+    const reader = new FileReader();
+    
+    reader.onload = function(e) {
+      const csvData = e.target?.result;
+      if (!csvData) {
+        setImportLoading(false);
+        toast.error('Failed to read file');
+        return;
+      }
+      
+      // Parse the CSV
+      const results = Papa.parse(csvData.toString(), {
+        header: true,
+        skipEmptyLines: true
+      });
+      
+      if (results.errors.length > 0) {
+        console.error('CSV parsing errors:', results.errors);
+        toast.error('Failed to parse CSV file properly');
+        setImportLoading(false);
+        return;
+      }
+      
+      const data = results.data as Record<string, string>[];
+      const parsedPositions: CreatePositionData[] = [];
+      let errorCount = 0;
+      
+      try {
+        // Process each row from the CSV
+        for (const row of data) {
+          try {
+            // Extract data using various possible field names for flexibility
+            const symbol = row.Contract || row.Symbol || row['Stock Symbol'] || row['Company'] || '';
+            const sideValue = (row.Side || 'buy').toLowerCase();
+            const side = ['buy', 'sell'].includes(sideValue) ? sideValue : 'buy';
+            const lots = parseFloat(row.Qty || row.Quantity || '0');
+            const entryPrice = parseFloat(row['Exec.Price'] || row['Entry Price'] || row['Purchase Price'] || row['Avg. Cost'] || '0');
+            const orderValue = parseFloat(
+              row['Order Value'] || row['Order Valu'] || row['Order Val'] || row['Order Val.'] || '0'
+            );
+            const leverage = parseInt(row['Leverage'] || '20');
+            const fee = parseFloat(
+              row['Fee'] || row['Trading Fee'] || row['Trading Fees'] || row['Commission'] || row['Charges'] || '0'
+            );
+            
+            if (!symbol || isNaN(lots) || isNaN(entryPrice)) {
+              console.error('Invalid row data:', row);
+              errorCount++;
+              continue;
+            }
+            
+            const positionData: CreatePositionData = {
+              symbol,
+              side: side as 'buy' | 'sell',
+              entryPrice,
+              currentPrice: entryPrice,
+              lots,
+              investedAmount: orderValue || entryPrice * lots,
+              tradingFee: isNaN(fee) ? 0 : fee,
+              platform: 'Delta Exchange', // Always use Delta Exchange
+              leverage,
+              status: 'open',
+              timestamp: row.Time || row['Date'] || row['Purchase Date'] || new Date().toLocaleString()
+            };
+            
+            parsedPositions.push(positionData);
+          } catch (err) {
+            console.error('Failed to parse position:', err);
+            errorCount++;
+          }
+        }
+        
+        if (parsedPositions.length > 0) {
+          // Store the parsed positions and show confirmation modal
+          console.log('Parsed positions:', parsedPositions.length, parsedPositions);
+          setImportedPositions([...parsedPositions]);
+          setShowImportConfirmModal(true);
+        } else {
+          console.error('No positions found in the import data');
+          toast.warning('No valid positions found in the imported file');
+        }
+        
+        if (errorCount > 0) {
+          toast.warning(`${errorCount} positions could not be parsed from the file`);
+        }
+      } catch (error) {
+        console.error('Error processing CSV data:', error);
+        toast.error('Failed to process CSV data');
+      } finally {
+        setImportLoading(false);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+      }
+    };
+    
+    reader.onerror = () => {
+      console.error('Failed to read file');
+      toast.error('Failed to read file');
+      setImportLoading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    };
+    
+    reader.readAsText(file);
+  };
+
   const totalPnL = positions.reduce((sum, pos) => {
     const { pnl } = calculatePnL(pos);
     return sum + pnl;
   }, 0);
+
+  // Handle confirmation modal actions
+  const handleConfirmImport = async (confirmedPositions: CreatePositionData[]) => {
+    if (confirmedPositions.length === 0) {
+      setShowImportConfirmModal(false);
+      return;
+    }
+
+    try {
+      setImportLoading(true);
+      await dispatch(createPositionsBulk(confirmedPositions)).unwrap();
+      toast.success(`Successfully imported ${confirmedPositions.length} positions to Delta Exchange`);
+    } catch (error) {
+      console.error('Failed to import positions in bulk:', error);
+      toast.error('Failed to import positions');
+    } finally {
+      setImportLoading(false);
+      setShowImportConfirmModal(false);
+      setImportedPositions([]);
+    }
+  };
+
+  const handleCancelImport = () => {
+    setShowImportConfirmModal(false);
+    setImportedPositions([]);
+  };
 
   // Handle error display
   const handleClearError = () => {
@@ -209,24 +363,71 @@ const Positions = memo(function Positions() {
             </h1>
           </div>
           
-          {/* Add Position Button */}
-          <button
-            onClick={() => setShowAddForm(!showAddForm)}
-            className={`px-6 py-3 rounded-lg font-medium transition-colors ${
-              showAddForm
-                ? isDarkMode
-                  ? 'bg-gray-700 text-gray-300'
-                  : 'bg-gray-200 text-gray-700'
-                : 'bg-blue-600 text-white hover:bg-blue-700'
-            }`}
-          >
-            <div className="flex items-center space-x-2">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              <span>{showAddForm ? 'Cancel' : 'Add Position'}</span>
-            </div>
-          </button>
+          {/* Action Buttons */}
+          <div className="flex space-x-3">
+            {/* Import Button */}
+            <input
+              type="file"
+              accept=".csv,.xlsx,.xls"
+              onChange={(e) => {
+                console.log('File selected:', e.target.files);
+                handleFileImport(e);
+              }}
+              className="hidden"
+              ref={fileInputRef}
+            />
+            <button
+              onClick={() => {
+                console.log('Import button clicked');
+                if (fileInputRef.current) {
+                  fileInputRef.current.click();
+                }
+              }}
+              disabled={importLoading}
+              className={`px-6 py-3 rounded-lg font-medium transition-colors ${
+                importLoading
+                  ? isDarkMode
+                    ? 'bg-gray-700 text-gray-300'
+                    : 'bg-gray-200 text-gray-700'
+                  : isDarkMode
+                    ? 'bg-indigo-700 text-white hover:bg-indigo-600'
+                    : 'bg-indigo-600 text-white hover:bg-indigo-700'
+              }`}
+            >
+              <div className="flex items-center space-x-2">
+                {importLoading ? (
+                  <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                ) : (
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3-3m0 0l3 3m-3-3v12" />
+                  </svg>
+                )}
+                <span>{importLoading ? 'Importing...' : 'Import to Delta'}</span>
+              </div>
+            </button>
+
+            {/* Add Position Button */}
+            <button
+              onClick={() => setShowAddForm(!showAddForm)}
+              className={`px-6 py-3 rounded-lg font-medium transition-colors ${
+                showAddForm
+                  ? isDarkMode
+                    ? 'bg-gray-700 text-gray-300'
+                    : 'bg-gray-200 text-gray-700'
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
+              }`}
+            >
+              <div className="flex items-center space-x-2">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                <span>{showAddForm ? 'Cancel' : 'Add Position'}</span>
+              </div>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -312,6 +513,18 @@ const Positions = memo(function Positions() {
               label="Entry Price"
               step="any"
               required
+              isDarkMode={isDarkMode}
+            />
+
+            {/* Trading Fee (optional) */}
+            <Input
+              type="number"
+              value={positionForm.tradingFee ?? ''}
+              onChange={(value) => handleFormChange('tradingFee', value)}
+              placeholder="0.00"
+              label="Trading Fee"
+              step="any"
+              min={0}
               isDarkMode={isDarkMode}
             />
 
@@ -544,6 +757,15 @@ const Positions = memo(function Positions() {
       <div className="flex-1 flex min-h-0 overflow-hidden">
         {content}
       </div>
+      
+      {/* Import Confirmation Modal */}
+      <ImportConfirmModal 
+        positions={importedPositions}
+        isOpen={showImportConfirmModal}
+        onConfirm={handleConfirmImport}
+        onCancel={handleCancelImport}
+        isDarkMode={isDarkMode}
+      />
     </div>
   );
 });

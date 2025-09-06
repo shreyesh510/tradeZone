@@ -33,6 +33,12 @@ export const positionsApi = {
     const response = await api.post('/positions', data);
     return response.data;
   },
+  
+  // Create multiple positions in bulk
+  createPositionsBulk: async (data: CreatePositionData[]): Promise<Position[]> => {
+    const response = await api.post('/positions/bulk', data);
+    return response.data;
+  },
 
   // Update an existing position
   updatePosition: async (id: string, data: UpdatePositionData): Promise<Position> => {

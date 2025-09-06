@@ -26,7 +26,59 @@ export class PositionsService {
       // Don't set createdAt and updatedAt here, they're set in the database service
     };
 
+    // Deduplicate by same userId, symbol, side, entryPrice, leverage, and same date part of timestamp
+    const dateOnly = new Date(positionData.timestamp).toDateString();
+    const existing = await this.firebaseDatabaseService.findDuplicatePosition({
+      userId,
+      symbol: positionData.symbol,
+      side: positionData.side,
+      entryPrice: positionData.entryPrice,
+      leverage: positionData.leverage,
+      dateOnly
+    });
+    if (existing) {
+      return existing;
+    }
+
     return await this.firebaseDatabaseService.createPosition(positionData);
+  }
+  
+  async createBulk(createPositionDtos: CreatePositionDto[], userId: string): Promise<Position[]> {
+    console.log('Creating multiple positions with userId:', userId);
+    console.log('Number of positions to create:', createPositionDtos.length);
+    
+    if (!userId) {
+      throw new Error('UserId is required but was not provided');
+    }
+    
+    const results: Position[] = [];
+    
+    for (const dto of createPositionDtos) {
+      const positionData = {
+        ...dto,
+        userId: userId,
+        status: 'open' as const,
+        timestamp: dto.timestamp || new Date().toLocaleString(),
+      };
+      // Deduplicate by normalized date and key fields
+      const dateOnly = new Date(positionData.timestamp).toDateString();
+      const existing = await this.firebaseDatabaseService.findDuplicatePosition({
+        userId,
+        symbol: positionData.symbol,
+        side: positionData.side,
+        entryPrice: positionData.entryPrice,
+        leverage: positionData.leverage,
+        dateOnly
+      });
+      if (existing) {
+        results.push(existing);
+        continue;
+      }
+      const position = await this.firebaseDatabaseService.createPosition(positionData);
+      results.push(position);
+    }
+    
+    return results;
   }
 
   async findAll(userId: string): Promise<Position[]> {

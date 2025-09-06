@@ -274,18 +274,64 @@ export class FirebaseDatabaseService {
   }
 
   // Position operations
-  async getPositions(userId: string): Promise<Position[]> {
+  async findDuplicatePosition(params: {
+    userId: string;
+    symbol: string;
+    side: 'buy' | 'sell';
+    entryPrice: number;
+    leverage: number;
+    dateOnly: string; // result of new Date(timestamp).toDateString()
+  }): Promise<Position | null> {
     try {
+      const { userId, symbol, side, entryPrice, leverage, dateOnly } = params;
+      // Query by userId + symbol + side + leverage; filter entryPrice/date in memory (Firestore lacks OR and equality on floats reliably)
       const snapshot = await this.getFirestore()
         .collection(this.positionsCollection)
         .where('userId', '==', userId)
-        .orderBy('createdAt', 'desc')
+        .where('symbol', '==', symbol)
+        .where('side', '==', side)
+        .where('leverage', '==', leverage)
         .get();
-      
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Position[];
+
+      if (snapshot.empty) return null;
+
+      for (const doc of snapshot.docs) {
+        const data = doc.data() as any;
+        const ts = data.timestamp ? new Date(data.timestamp).toDateString() : '';
+        if (ts === dateOnly && Number(data.entryPrice) === Number(entryPrice)) {
+          return { id: doc.id, ...(data as any) } as Position;
+        }
+      }
+      return null;
+    } catch (error) {
+      console.error('Error checking duplicate position:', error);
+      return null;
+    }
+  }
+  async getPositions(userId: string): Promise<Position[]> {
+    try {
+      const db = this.getFirestore();
+      try {
+        const snapshot = await db
+          .collection(this.positionsCollection)
+          .where('userId', '==', userId)
+          .orderBy('createdAt', 'desc')
+          .get();
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Position[];
+      } catch (err: any) {
+        // Fallback if composite index is missing
+        const snapshot = await db
+          .collection(this.positionsCollection)
+          .where('userId', '==', userId)
+          .get();
+        const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
+        items.sort((a, b) => {
+          const aTime = a.createdAt?.toDate?.().getTime?.() ?? new Date(a.timestamp || 0).getTime();
+          const bTime = b.createdAt?.toDate?.().getTime?.() ?? new Date(b.timestamp || 0).getTime();
+          return bTime - aTime; // desc
+        });
+        return items as Position[];
+      }
     } catch (error) {
       console.error('Error getting positions:', error);
       return [];
@@ -364,17 +410,30 @@ export class FirebaseDatabaseService {
 
   async getOpenPositions(userId: string): Promise<Position[]> {
     try {
-      const snapshot = await this.getFirestore()
-        .collection(this.positionsCollection)
-        .where('userId', '==', userId)
-        .where('status', '==', 'open')
-        .orderBy('createdAt', 'desc')
-        .get();
-      
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Position[];
+      const db = this.getFirestore();
+      try {
+        const snapshot = await db
+          .collection(this.positionsCollection)
+          .where('userId', '==', userId)
+          .where('status', '==', 'open')
+          .orderBy('createdAt', 'desc')
+          .get();
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Position[];
+      } catch (err: any) {
+        // Fallback no orderBy
+        const snapshot = await db
+          .collection(this.positionsCollection)
+          .where('userId', '==', userId)
+          .where('status', '==', 'open')
+          .get();
+        const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
+        items.sort((a, b) => {
+          const aTime = a.createdAt?.toDate?.().getTime?.() ?? new Date(a.timestamp || 0).getTime();
+          const bTime = b.createdAt?.toDate?.().getTime?.() ?? new Date(b.timestamp || 0).getTime();
+          return bTime - aTime;
+        });
+        return items as Position[];
+      }
     } catch (error) {
       console.error('Error getting open positions:', error);
       return [];
@@ -383,17 +442,30 @@ export class FirebaseDatabaseService {
 
   async getClosedPositions(userId: string): Promise<Position[]> {
     try {
-      const snapshot = await this.getFirestore()
-        .collection(this.positionsCollection)
-        .where('userId', '==', userId)
-        .where('status', '==', 'closed')
-        .orderBy('closedAt', 'desc')
-        .get();
-      
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Position[];
+      const db = this.getFirestore();
+      try {
+        const snapshot = await db
+          .collection(this.positionsCollection)
+          .where('userId', '==', userId)
+          .where('status', '==', 'closed')
+          .orderBy('closedAt', 'desc')
+          .get();
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Position[];
+      } catch (err: any) {
+        // Fallback no orderBy
+        const snapshot = await db
+          .collection(this.positionsCollection)
+          .where('userId', '==', userId)
+          .where('status', '==', 'closed')
+          .get();
+        const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
+        items.sort((a, b) => {
+          const aTime = a.closedAt?.toDate?.().getTime?.() ?? new Date(a.timestamp || 0).getTime();
+          const bTime = b.closedAt?.toDate?.().getTime?.() ?? new Date(b.timestamp || 0).getTime();
+          return bTime - aTime;
+        });
+        return items as Position[];
+      }
     } catch (error) {
       console.error('Error getting closed positions:', error);
       return [];

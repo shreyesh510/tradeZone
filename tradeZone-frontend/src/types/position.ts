@@ -7,6 +7,7 @@ export interface Position {
   currentPrice: number;
   lots: number;
   investedAmount: number;
+  tradingFee?: number;
   platform: 'Delta Exchange' | 'Groww';
   leverage: number;
   timestamp: string;
@@ -28,9 +29,11 @@ export interface CreatePositionData {
   entryPrice: number;
   currentPrice: number;
   investedAmount: number;
+  tradingFee?: number;
   platform: 'Delta Exchange' | 'Groww';
   leverage: number;
   timestamp?: string;
+  status?: 'open' | 'closed';
   stopLoss?: number;
   takeProfit?: number;
   notes?: string;
@@ -43,6 +46,7 @@ export interface UpdatePositionData {
   entryPrice?: number;
   currentPrice?: number;
   investedAmount?: number;
+  tradingFee?: number;
   platform?: 'Delta Exchange' | 'Groww';
   leverage?: number;
   timestamp?: string;

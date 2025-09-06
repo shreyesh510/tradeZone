@@ -30,6 +30,16 @@ export class PositionsController {
     console.log('Extracted userId from token:', userId);
     return await this.positionsService.create(createPositionDto, userId);
   }
+  
+  @Post('bulk')
+  async createBulk(@Body() createPositionDtos: CreatePositionDto[], @Request() req) {
+    console.log('Creating multiple positions:', createPositionDtos.length);
+    const userId = req.user.userId;
+    if (!userId) {
+      throw new Error('User ID not found in JWT token');
+    }
+    return await this.positionsService.createBulk(createPositionDtos, userId);
+  }
 
   @Get()
   async findAll(@Request() req, @Query('status') status?: string) {

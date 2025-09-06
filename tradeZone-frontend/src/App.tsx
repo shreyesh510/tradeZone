@@ -5,6 +5,7 @@ import { initializeAuth } from './redux/slices/authSlice';
 import type { AppDispatch, RootState } from './redux/store';
 import { SettingsProvider } from './contexts/SettingsContext';
 import { ToastProvider } from './contexts/ToastContext';
+import { ReactToastifyProvider } from './contexts/ReactToastifyContext';
 import { SocketProvider } from './contexts/SocketContext';
 import ToastContainer from './components/ToastContainer';
 import Login from './components/Login';
@@ -70,8 +71,9 @@ function App() {
 
   return (
     <SettingsProvider>
-      <ToastProvider>
-        <SocketProvider>
+      <ReactToastifyProvider>
+        <ToastProvider>
+          <SocketProvider>
           <Router>
             <div className="App h-full w-full overflow-hidden">
               <Routes>
@@ -155,6 +157,7 @@ function App() {
           </Router>
         </SocketProvider>
       </ToastProvider>
+    </ReactToastifyProvider>
     </SettingsProvider>
   );
 }

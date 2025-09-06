@@ -41,6 +41,19 @@ export const createPosition = createAsyncThunk(
   }
 );
 
+// Create multiple positions in bulk
+export const createPositionsBulk = createAsyncThunk(
+  'positions/createPositionsBulk',
+  async (data: CreatePositionData[], { rejectWithValue }) => {
+    try {
+      const positions = await positionsApi.createPositionsBulk(data);
+      return positions;
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to create positions in bulk');
+    }
+  }
+);
+
 // Update an existing position
 export const updatePosition = createAsyncThunk(
   'positions/updatePosition',
