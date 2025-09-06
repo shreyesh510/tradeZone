@@ -16,6 +16,7 @@ import {
   updatePosition,
   deletePosition,
 } from '../../../redux/thunks/positions/positionsThunks';
+import { createPositionsBulk } from '../../../redux/thunks/positions/positionsThunks';
 import { clearError } from '../../../redux/slices/positionsSlice';
 import type { Position, CreatePositionData } from '../../../types/position';
 import Input from '../../../components/input';
@@ -316,32 +317,17 @@ const Positions = memo(function Positions() {
     if (importedPositions.length === 0) return;
     
     setImportingPositions(true);
-    let successCount = 0;
-    let errorCount = 0;
-    
     try {
-      for (const positionData of importedPositions) {
-        try {
-          await dispatch(createPosition(positionData)).unwrap();
-          successCount++;
-        } catch (err) {
-          console.error('Failed to import position:', err);
-          errorCount++;
-        }
-      }
-      
-      // Show results
-      if (successCount > 0) {
-        toast.success(`Successfully imported ${successCount} positions`);
-      }
-      if (errorCount > 0) {
-        toast.warning(`${errorCount} positions failed to import`);
-      }
-      
+      const result = await dispatch(createPositionsBulk(importedPositions)).unwrap();
+      const createdCount = result?.created?.length || 0;
+      const skippedCount = result?.skipped?.length || 0;
+
+      if (createdCount > 0) toast.success(`Imported ${createdCount} positions`);
+      if (skippedCount > 0) toast.info(`${skippedCount} duplicate/invalid positions were skipped`);
+
       // Close modal and reset
       setShowImportModal(false);
       setImportedPositions([]);
-      
     } catch (error) {
       console.error('Error importing positions:', error);
       toast.error('Failed to import positions');

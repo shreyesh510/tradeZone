@@ -109,3 +109,16 @@ export const fetchPositionsBySymbol = createAsyncThunk(
     }
   }
 );
+
+// Bulk create positions with backend-side dedupe
+export const createPositionsBulk = createAsyncThunk(
+  'positions/createPositionsBulk',
+  async (positions: CreatePositionData[], { rejectWithValue }) => {
+    try {
+      const result = await positionsApi.createPositionsBulk(positions);
+      return result;
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to import positions');
+    }
+  }
+);

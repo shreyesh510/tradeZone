@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { FirebaseDatabaseService } from '../database/firebase-database.service';
 import { CreatePositionDto } from './dto/create-position.dto';
+import { CreatePositionsBulkDto } from './dto/create-positions-bulk.dto';
 import { UpdatePositionDto } from './dto/update-position.dto';
 import { Position } from './entities/position.entity';
 
@@ -99,6 +100,76 @@ export class PositionsService {
     // Normalize symbol to uppercase to match stored data
     const sym = (symbol || '').toUpperCase();
     return this.firebaseDatabaseService.getPositionsBySymbol(userId, sym);
+  }
+
+  // Helper: same calendar day check
+  private isSameDay(a: Date, b: Date) {
+    return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  }
+
+  // Helper: parse various timestamp formats to a Date. Falls back to today if invalid.
+  private parseToDate(value?: string | Date): Date {
+    if (!value) return new Date();
+    if (value instanceof Date) return value;
+    // Fast-path ISO
+    const iso = Date.parse(value);
+    if (!Number.isNaN(iso)) return new Date(iso);
+    // Handle Delta CSV like: "2025-09-05 20:27:42.507554+05:30 IST Asia/Kolkata"
+    // Extract the YYYY-MM-DD part and construct a date in local time.
+    const match = value.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (match) {
+      // Create date at midnight local time for date-only comparison
+      const [y, m, d] = match[1].split('-').map(Number);
+      return new Date(y, (m || 1) - 1, d || 1);
+    }
+    // Last resort: now
+    return new Date();
+  }
+
+  // Bulk create with dedupe (userId + symbol + entryPrice + same-day timestamp)
+  async createBulk(payload: CreatePositionsBulkDto, userId: string): Promise<{ created: Position[]; skipped: CreatePositionDto[]; reason?: string }> {
+    const list = (payload.positions || []).map(p => ({ ...p }));
+    if (list.length === 0) return { created: [], skipped: [] };
+
+    // Fetch user positions once for dedupe
+    const existing = await this.findAll(userId);
+
+    // Build a set of duplicates for quick lookup
+    const keep: Omit<Position, 'id'>[] = [];
+    const skipped: CreatePositionDto[] = [];
+
+    for (const p of list) {
+      const sym = (p.symbol || '').toUpperCase();
+      const ts = this.parseToDate(p.timestamp);
+      const match = existing.find(e => {
+        const eTs = this.parseToDate((e as any).timestamp || (e as any).createdAt);
+        return (
+          e.userId === userId &&
+          (e.symbol || '').toUpperCase() === sym &&
+          Number(e.entryPrice) === Number(p.entryPrice) &&
+          this.isSameDay(eTs, ts)
+        );
+      });
+
+      if (match) {
+        skipped.push(p);
+        continue;
+      }
+
+      keep.push({
+        ...p,
+        userId,
+        status: 'open',
+        timestamp: p.timestamp ?? new Date().toISOString(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as any);
+    }
+
+    if (keep.length === 0) return { created: [], skipped };
+
+    const created = await this.firebaseDatabaseService.createPositionsBatch(keep);
+    return { created, skipped };
   }
 
   // Calculate P&L for a position

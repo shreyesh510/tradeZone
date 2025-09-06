@@ -444,4 +444,27 @@ export class FirebaseDatabaseService {
       return [];
     }
   }
+
+  async createPositionsBatch(positions: Array<Omit<Position, 'id'>>): Promise<Position[]> {
+    if (!positions || positions.length === 0) return [];
+
+    const db = this.getFirestore();
+    const batch = db.batch();
+    const created: Position[] = [];
+
+    for (const p of positions) {
+      const docRef = db.collection(this.positionsCollection).doc();
+      const now = new Date();
+      const data = {
+        ...p,
+        createdAt: p.createdAt ?? now,
+        updatedAt: p.updatedAt ?? now,
+      } as any;
+      batch.set(docRef, data);
+      created.push({ id: docRef.id, ...(data as any) } as Position);
+    }
+
+    await batch.commit();
+    return created;
+  }
 }

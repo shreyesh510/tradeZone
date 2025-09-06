@@ -71,4 +71,10 @@ export const positionsApi = {
     const response = await api.get(`/positions/symbol/${encodeURIComponent(symbol)}`);
     return response.data;
   },
+
+  // Bulk create positions with backend-side dedupe
+  createPositionsBulk: async (positions: CreatePositionData[]): Promise<{ created: Position[]; skipped: CreatePositionData[] }> => {
+    const response = await api.post('/positions/multiple', { positions });
+    return response.data;
+  },
 };

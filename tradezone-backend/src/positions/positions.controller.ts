@@ -14,6 +14,7 @@ import {
 import { PositionsService } from './positions.service';
 import { CreatePositionDto } from './dto/create-position.dto';
 import { UpdatePositionDto } from './dto/update-position.dto';
+import { CreatePositionsBulkDto } from './dto/create-positions-bulk.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @Controller('positions')
@@ -93,5 +94,11 @@ export class PositionsController {
   async getBySymbol(@Param('symbol') symbol: string, @Request() req) {
     const userId = req.user.userId;
     return await this.positionsService.getBySymbol(userId, symbol);
+  }
+
+  @Post('multiple')
+  async createMultiple(@Body() dto: CreatePositionsBulkDto, @Request() req) {
+    const userId = req.user.userId;
+    return await this.positionsService.createBulk(dto, userId);
   }
 }
