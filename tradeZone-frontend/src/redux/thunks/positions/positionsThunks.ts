@@ -96,3 +96,16 @@ export const fetchClosedPositions = createAsyncThunk(
     }
   }
 );
+
+// Fetch positions by symbol
+export const fetchPositionsBySymbol = createAsyncThunk(
+  'positions/fetchPositionsBySymbol',
+  async (symbol: string, { rejectWithValue }) => {
+    try {
+      const positions = await positionsApi.getPositionsBySymbol(symbol);
+      return positions as Position[];
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to fetch symbol positions');
+    }
+  }
+);

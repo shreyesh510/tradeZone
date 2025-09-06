@@ -88,4 +88,10 @@ export class PositionsController {
     const userId = req.user.userId;
     return await this.positionsService.getClosedPositions(userId);
   }
+
+  @Get('symbol/:symbol')
+  async getBySymbol(@Param('symbol') symbol: string, @Request() req) {
+    const userId = req.user.userId;
+    return await this.positionsService.getBySymbol(userId, symbol);
+  }
 }

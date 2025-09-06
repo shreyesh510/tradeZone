@@ -7,7 +7,7 @@ import FloatingNav, { type MobileTab } from '../../../layouts/FloatingNav';
 import { useSettings } from '../../../contexts/SettingsContext';
 import { usePermissions } from '../../../hooks/usePermissions';
 import type { RootState, AppDispatch } from '../../../redux/store';
-import { fetchPositions } from '../../../redux/thunks/positions/positionsThunks';
+import { fetchPositionsBySymbol } from '../../../redux/thunks/positions/positionsThunks';
 import { clearError } from '../../../redux/slices/positionsSlice';
 import type { Position } from '../../../types/position';
 import Button from '../../../components/button';
@@ -42,28 +42,7 @@ const SymbolPositions = memo(function SymbolPositions() {
     position.symbol.toLowerCase() === symbol?.toLowerCase()
   );
 
-  // Dummy records to show when there are no positions for this symbol
-  const dummyPositions: Position[] = Array.from({ length: 10 }).map((_, i) => {
-    const base = 100 + i * 5;
-    const lots = (i % 5) + 1;
-    const entry = base + (i % 3) * 2;
-    const current = entry + ((i % 2 === 0) ? 1.5 : -1.2);
-    return {
-      id: `dummy-${i + 1}`,
-      symbol: (symbol || 'BTCUSD').toUpperCase(),
-      side: i % 2 === 0 ? 'buy' : 'sell',
-      entryPrice: Number(entry.toFixed(2)),
-      currentPrice: Number(current.toFixed(2)),
-      lots,
-      investedAmount: Number((entry * lots).toFixed(2)),
-      platform: 'Delta Exchange',
-      leverage: 20,
-      status: 'open',
-      timestamp: new Date(Date.now() - i * 24 * 60 * 60 * 1000).toISOString(),
-    } as unknown as Position;
-  });
-
-  const rows: Position[] = symbolPositions.length > 0 ? symbolPositions : dummyPositions;
+  const rows: Position[] = symbolPositions;
 
   // Redirect if no permission
   useEffect(() => {
@@ -83,10 +62,12 @@ const SymbolPositions = memo(function SymbolPositions() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Fetch positions from API
+  // Fetch symbol-specific positions from API
   useEffect(() => {
-    dispatch(fetchPositions());
-  }, [dispatch]);
+    if (symbol) {
+      dispatch(fetchPositionsBySymbol(symbol));
+    }
+  }, [dispatch, symbol]);
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
@@ -313,7 +294,7 @@ const SymbolPositions = memo(function SymbolPositions() {
       )}
 
       {/* No Positions */}
-      {!loading && symbolPositions.length === 0 && (
+  {!loading && rows.length === 0 && (
         <div className="text-center py-12">
           <div className={`w-24 h-24 mx-auto mb-4 rounded-full flex items-center justify-center ${
             isDarkMode ? 'bg-gray-700' : 'bg-gray-200'

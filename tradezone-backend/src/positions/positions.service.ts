@@ -95,6 +95,12 @@ export class PositionsService {
     return allPositions.filter(position => position.status === 'closed');
   }
 
+  async getBySymbol(userId: string, symbol: string): Promise<Position[]> {
+    // Normalize symbol to uppercase to match stored data
+    const sym = (symbol || '').toUpperCase();
+    return this.firebaseDatabaseService.getPositionsBySymbol(userId, sym);
+  }
+
   // Calculate P&L for a position
   calculatePnL(position: Position): { pnl: number; pnlPercent: number } {
     const priceDiff = position.side === 'buy' 

@@ -311,6 +311,32 @@ export class FirebaseDatabaseService {
     }
   }
 
+  async getPositionsBySymbol(userId: string, symbol: string): Promise<Position[]> {
+    try {
+      const sym = (symbol || '').toUpperCase();
+      const snapshot = await this.getFirestore()
+        .collection(this.positionsCollection)
+        .where('userId', '==', userId)
+        .where('symbol', '==', sym)
+        .get();
+
+      const positions = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Position[];
+
+      // Sort by createdAt desc (fallback to 0)
+      return positions.sort((a, b) => {
+        const aTime = a.createdAt ? new Date(a.createdAt as any).getTime() : 0;
+        const bTime = b.createdAt ? new Date(b.createdAt as any).getTime() : 0;
+        return bTime - aTime;
+      });
+    } catch (error) {
+      console.error('Error getting positions by symbol:', error);
+      return [];
+    }
+  }
+
   async getPositionById(positionId: string): Promise<Position | null> {
     try {
       const doc = await this.getFirestore()

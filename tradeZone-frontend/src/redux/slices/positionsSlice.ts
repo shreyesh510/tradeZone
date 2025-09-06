@@ -7,6 +7,7 @@ import {
   deletePosition,
   fetchOpenPositions,
   fetchClosedPositions,
+  fetchPositionsBySymbol,
 } from '../thunks/positions/positionsThunks';
 import type { Position, PositionFilters } from '../../types/position';
 
@@ -259,6 +260,21 @@ const positionsSlice = createSlice({
       })
       .addCase(fetchClosedPositions.rejected, (state, action) => {
         state.closedLoading = false;
+        state.error = action.payload as string;
+      })
+      // Fetch positions by symbol
+      .addCase(fetchPositionsBySymbol.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchPositionsBySymbol.fulfilled, (state, action: PayloadAction<Position[]>) => {
+        state.loading = false;
+        state.positions = action.payload;
+        state.error = null;
+        state.lastUpdated = Date.now();
+      })
+      .addCase(fetchPositionsBySymbol.rejected, (state, action) => {
+        state.loading = false;
         state.error = action.payload as string;
       });
   },

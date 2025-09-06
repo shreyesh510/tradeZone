@@ -65,4 +65,10 @@ export const positionsApi = {
     const response = await api.get('/positions/closed/list');
     return response.data;
   },
+
+  // Get positions for a specific symbol
+  getPositionsBySymbol: async (symbol: string): Promise<Position[]> => {
+    const response = await api.get(`/positions/symbol/${encodeURIComponent(symbol)}`);
+    return response.data;
+  },
 };
