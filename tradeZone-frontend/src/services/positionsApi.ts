@@ -4,6 +4,8 @@ import type { Position, CreatePositionData, UpdatePositionData, PositionFilters 
 export const positionsApi = {
   // Get all positions with optional filters
   getPositions: async (filters?: PositionFilters): Promise<Position[]> => {
+    console.log('🔍 Frontend: getPositions called with filters:', filters);
+    
     const params = new URLSearchParams();
     if (filters?.status && filters.status !== 'all') {
       params.append('status', filters.status);
@@ -18,7 +20,13 @@ export const positionsApi = {
       params.append('symbol', filters.symbol);
     }
     
-    const response = await api.get(`/positions?${params.toString()}`);
+    const url = params.toString() ? `/positions?${params.toString()}` : '/positions';
+    console.log('🔍 Frontend: Making API call to:', url);
+    
+    const response = await api.get(url);
+    console.log('🔍 Frontend: API response:', response.data);
+    console.log('🔍 Frontend: Response length:', response.data.length);
+    
     return response.data;
   },
 
@@ -31,12 +39,6 @@ export const positionsApi = {
   // Create a new position
   createPosition: async (data: CreatePositionData): Promise<Position> => {
     const response = await api.post('/positions', data);
-    return response.data;
-  },
-  
-  // Create multiple positions in bulk
-  createPositionsBulk: async (data: CreatePositionData[]): Promise<Position[]> => {
-    const response = await api.post('/positions/bulk', data);
     return response.data;
   },
 

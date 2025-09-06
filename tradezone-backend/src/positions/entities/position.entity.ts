@@ -7,17 +7,16 @@ export interface Position {
   currentPrice: number;
   lots: number;
   investedAmount: number;
-  tradingFee?: number;
   platform: 'Delta Exchange' | 'Groww';
   leverage: number;
-  timestamp: string;
+  timestamp?: string;
   status?: 'open' | 'closed';
   pnl?: number;
   pnlPercentage?: number;
   stopLoss?: number;
   takeProfit?: number;
-  createdAt?: Date;
-  updatedAt?: Date;
+  createdAt: Date;
+  updatedAt: Date;
   closedAt?: Date;
   notes?: string;
 }

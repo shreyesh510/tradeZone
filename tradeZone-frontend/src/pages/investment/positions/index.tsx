@@ -1,20 +1,18 @@
 import { memo, useState, useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import Header from '../../../layouts/Header';
 import Sidebar from '../../../components/Sidebar';
 import FloatingNav, { type MobileTab } from '../../../layouts/FloatingNav';
-import ImportConfirmModal from '../../../components/ImportConfirmModal';
 import { useSettings } from '../../../contexts/SettingsContext';
 import { toast } from 'react-toastify';
 import { usePermissions } from '../../../hooks/usePermissions';
-import { useNavigate } from 'react-router-dom';
 import type { RootState, AppDispatch } from '../../../redux/store';
 import Papa from 'papaparse';
 import type { ParseError } from 'papaparse';
 import {
   fetchPositions,
   createPosition,
-  createPositionsBulk,
   updatePosition,
   deletePosition,
 } from '../../../redux/thunks/positions/positionsThunks';
@@ -40,7 +38,6 @@ interface PositionForm {
   side: 'buy' | 'sell';
   platform: 'Delta Exchange' | 'Groww';
   leverage: string;
-  tradingFee?: string;
 }
 
 const Positions = memo(function Positions() {
@@ -54,9 +51,10 @@ const Positions = memo(function Positions() {
   const [activeTab, setActiveTab] = useState<MobileTab>('chart');
   const [showAddForm, setShowAddForm] = useState<boolean>(false);
   const [importLoading, setImportLoading] = useState<boolean>(false);
-  const [importedPositions, setImportedPositions] = useState<CreatePositionData[]>([]);
-  const [showImportConfirmModal, setShowImportConfirmModal] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showImportModal, setShowImportModal] = useState<boolean>(false);
+  const [importedPositions, setImportedPositions] = useState<CreatePositionData[]>([]);
+  const [importingPositions, setImportingPositions] = useState<boolean>(false);
 
   // Redux state
   const {
@@ -75,8 +73,7 @@ const Positions = memo(function Positions() {
     entryPrice: '',
     side: 'buy',
     platform: 'Delta Exchange',
-  leverage: '20',
-  tradingFee: ''
+    leverage: '20'
   });
 
   // Leverage options
@@ -151,7 +148,6 @@ const Positions = memo(function Positions() {
       currentPrice: parseFloat(positionForm.entryPrice), // Start with entry price
       lots: parseInt(positionForm.lots),
       investedAmount: parseFloat(positionForm.entryPrice) * parseInt(positionForm.lots),
-  tradingFee: positionForm.tradingFee ? parseFloat(positionForm.tradingFee) : 0,
       platform: positionForm.platform,
       leverage: parseInt(positionForm.leverage),
       timestamp: new Date().toLocaleString()
@@ -191,100 +187,101 @@ const Positions = memo(function Positions() {
     setImportLoading(true);
     
     // Always use Delta Exchange as the platform for imports
+    const platform: 'Delta Exchange' | 'Groww' = 'Delta Exchange';
+    
+    // Using FileReader to read the file first
     const reader = new FileReader();
     
-    reader.onload = function(e) {
-      const csvData = e.target?.result;
-      if (!csvData) {
+    reader.onload = (event: ProgressEvent<FileReader>) => {
+      if (!event.target?.result) {
         setImportLoading(false);
         toast.error('Failed to read file');
         return;
       }
       
-      // Parse the CSV
-      const results = Papa.parse(csvData.toString(), {
+      // Parse the CSV content
+      Papa.parse(event.target.result.toString(), {
         header: true,
-        skipEmptyLines: true
-      });
-      
-      if (results.errors.length > 0) {
-        console.error('CSV parsing errors:', results.errors);
-        toast.error('Failed to parse CSV file properly');
-        setImportLoading(false);
-        return;
-      }
-      
-      const data = results.data as Record<string, string>[];
-      const parsedPositions: CreatePositionData[] = [];
-      let errorCount = 0;
-      
-      try {
-        // Process each row from the CSV
-        for (const row of data) {
+        skipEmptyLines: true,
+        complete: (results) => {
+          const data = results.data as Record<string, string>[];
+          const validPositions: CreatePositionData[] = [];
+          let errorCount = 0;
+          
           try {
-            // Extract data using various possible field names for flexibility
-            const symbol = row.Contract || row.Symbol || row['Stock Symbol'] || row['Company'] || '';
-            const sideValue = (row.Side || 'buy').toLowerCase();
-            const side = ['buy', 'sell'].includes(sideValue) ? sideValue : 'buy';
-            const lots = parseFloat(row.Qty || row.Quantity || '0');
-            const entryPrice = parseFloat(row['Exec.Price'] || row['Entry Price'] || row['Purchase Price'] || row['Avg. Cost'] || '0');
-            const orderValue = parseFloat(
-              row['Order Value'] || row['Order Valu'] || row['Order Val'] || row['Order Val.'] || '0'
-            );
-            const leverage = parseInt(row['Leverage'] || '20');
-            const fee = parseFloat(
-              row['Fee'] || row['Trading Fee'] || row['Trading Fees'] || row['Commission'] || row['Charges'] || '0'
-            );
-            
-            if (!symbol || isNaN(lots) || isNaN(entryPrice)) {
-              console.error('Invalid row data:', row);
-              errorCount++;
-              continue;
+            // Process each row from the CSV
+            for (const row of data) {
+              try {
+                // Always process as Delta Exchange format for all imports
+                let positionData: CreatePositionData;
+                
+                // Extract data using various possible field names for flexibility
+                const symbol = row.Contract || row.Symbol || row['Stock Symbol'] || row['Company'] || '';
+                const sideValue = (row.Side || 'buy').toLowerCase();
+                const side = ['buy', 'sell'].includes(sideValue) ? sideValue : 'buy';
+                const lots = parseFloat(row.Qty || row.Quantity || '0');
+                const entryPrice = parseFloat(row['Exec.Price'] || row['Entry Price'] || row['Purchase Price'] || row['Avg. Cost'] || '0');
+                const orderValue = parseFloat(row['Order Value'] || '0');
+                const leverage = parseInt(row['Leverage'] || '20');
+                
+                if (!symbol || isNaN(lots) || isNaN(entryPrice)) {
+                  console.error('Invalid row data:', row);
+                  errorCount++;
+                  continue;
+                }
+                
+                positionData = {
+                  symbol,
+                  side: side as 'buy' | 'sell',
+                  entryPrice,
+                  currentPrice: entryPrice,
+                  lots,
+                  investedAmount: orderValue || entryPrice * lots,
+                  platform: 'Delta Exchange', // Always use Delta Exchange
+                  leverage,
+                  status: 'open',
+                  timestamp: row.Time || row['Date'] || row['Purchase Date'] || new Date().toLocaleString()
+                };
+                
+                validPositions.push(positionData);
+              } catch (err) {
+                console.error('Failed to parse position:', err);
+                errorCount++;
+              }
             }
             
-            const positionData: CreatePositionData = {
-              symbol,
-              side: side as 'buy' | 'sell',
-              entryPrice,
-              currentPrice: entryPrice,
-              lots,
-              investedAmount: orderValue || entryPrice * lots,
-              tradingFee: isNaN(fee) ? 0 : fee,
-              platform: 'Delta Exchange', // Always use Delta Exchange
-              leverage,
-              status: 'open',
-              timestamp: row.Time || row['Date'] || row['Purchase Date'] || new Date().toLocaleString()
-            };
+            // Show positions in modal for confirmation
+            if (validPositions.length > 0) {
+              setImportedPositions(validPositions);
+              setShowImportModal(true);
+              toast.info(`Found ${validPositions.length} valid positions. Please review and confirm.`);
+            } else {
+              toast.error('No valid positions found in the CSV file');
+            }
             
-            parsedPositions.push(positionData);
-          } catch (err) {
-            console.error('Failed to parse position:', err);
-            errorCount++;
+            if (errorCount > 0) {
+              toast.warning(`${errorCount} rows had invalid data and were skipped`);
+            }
+          } catch (error) {
+            console.error('Error processing CSV data:', error);
+            toast.error('Failed to process CSV data');
+          } finally {
+            setImportLoading(false);
+            // Reset file input
+            if (fileInputRef.current) {
+              fileInputRef.current.value = '';
+            }
+          }
+        },
+        error: (error: ParseError) => {
+          console.error('CSV parsing error:', error);
+          toast.error('Failed to parse CSV file');
+          setImportLoading(false);
+          if (fileInputRef.current) {
+            fileInputRef.current.value = '';
           }
         }
-        
-        if (parsedPositions.length > 0) {
-          // Store the parsed positions and show confirmation modal
-          console.log('Parsed positions:', parsedPositions.length, parsedPositions);
-          setImportedPositions([...parsedPositions]);
-          setShowImportConfirmModal(true);
-        } else {
-          console.error('No positions found in the import data');
-          toast.warning('No valid positions found in the imported file');
-        }
-        
-        if (errorCount > 0) {
-          toast.warning(`${errorCount} positions could not be parsed from the file`);
-        }
-      } catch (error) {
-        console.error('Error processing CSV data:', error);
-        toast.error('Failed to process CSV data');
-      } finally {
-        setImportLoading(false);
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-        }
-      }
+      });
     };
     
     reader.onerror = () => {
@@ -304,35 +301,64 @@ const Positions = memo(function Positions() {
     return sum + pnl;
   }, 0);
 
-  // Handle confirmation modal actions
-  const handleConfirmImport = async (confirmedPositions: CreatePositionData[]) => {
-    if (confirmedPositions.length === 0) {
-      setShowImportConfirmModal(false);
-      return;
-    }
-
-    try {
-      setImportLoading(true);
-      await dispatch(createPositionsBulk(confirmedPositions)).unwrap();
-      toast.success(`Successfully imported ${confirmedPositions.length} positions to Delta Exchange`);
-    } catch (error) {
-      console.error('Failed to import positions in bulk:', error);
-      toast.error('Failed to import positions');
-    } finally {
-      setImportLoading(false);
-      setShowImportConfirmModal(false);
-      setImportedPositions([]);
-    }
-  };
-
-  const handleCancelImport = () => {
-    setShowImportConfirmModal(false);
-    setImportedPositions([]);
-  };
-
   // Handle error display
   const handleClearError = () => {
     dispatch(clearError());
+  };
+
+  // Handle import confirmation
+  const handleConfirmImport = async () => {
+    if (importedPositions.length === 0) return;
+    
+    setImportingPositions(true);
+    let successCount = 0;
+    let errorCount = 0;
+    
+    try {
+      for (const positionData of importedPositions) {
+        try {
+          await dispatch(createPosition(positionData)).unwrap();
+          successCount++;
+        } catch (err) {
+          console.error('Failed to import position:', err);
+          errorCount++;
+        }
+      }
+      
+      // Show results
+      if (successCount > 0) {
+        toast.success(`Successfully imported ${successCount} positions`);
+      }
+      if (errorCount > 0) {
+        toast.warning(`${errorCount} positions failed to import`);
+      }
+      
+      // Close modal and reset
+      setShowImportModal(false);
+      setImportedPositions([]);
+      
+    } catch (error) {
+      console.error('Error importing positions:', error);
+      toast.error('Failed to import positions');
+    } finally {
+      setImportingPositions(false);
+    }
+  };
+
+  // Handle import cancellation
+  const handleCancelImport = () => {
+    setShowImportModal(false);
+    setImportedPositions([]);
+  };
+
+  // Handle removing a position from import list
+  const handleRemoveFromImport = (index: number) => {
+    const updatedPositions = importedPositions.filter((_, i) => i !== index);
+    setImportedPositions(updatedPositions);
+    
+    if (updatedPositions.length === 0) {
+      setShowImportModal(false);
+    }
   };
 
   const content = (
@@ -369,20 +395,12 @@ const Positions = memo(function Positions() {
             <input
               type="file"
               accept=".csv,.xlsx,.xls"
-              onChange={(e) => {
-                console.log('File selected:', e.target.files);
-                handleFileImport(e);
-              }}
+              onChange={handleFileImport}
               className="hidden"
               ref={fileInputRef}
             />
             <button
-              onClick={() => {
-                console.log('Import button clicked');
-                if (fileInputRef.current) {
-                  fileInputRef.current.click();
-                }
-              }}
+              onClick={() => fileInputRef.current?.click()}
               disabled={importLoading}
               className={`px-6 py-3 rounded-lg font-medium transition-colors ${
                 importLoading
@@ -516,18 +534,6 @@ const Positions = memo(function Positions() {
               isDarkMode={isDarkMode}
             />
 
-            {/* Trading Fee (optional) */}
-            <Input
-              type="number"
-              value={positionForm.tradingFee ?? ''}
-              onChange={(value) => handleFormChange('tradingFee', value)}
-              placeholder="0.00"
-              label="Trading Fee"
-              step="any"
-              min={0}
-              isDarkMode={isDarkMode}
-            />
-
             {/* Leverage Progress Bar */}
             <ProgressBar
               value={parseInt(positionForm.leverage)}
@@ -593,7 +599,8 @@ const Positions = memo(function Positions() {
           return (
             <div 
               key={position.id} 
-              className={`p-6 rounded-2xl backdrop-blur-lg border transition-all duration-300 hover:scale-105 ${
+              onClick={() => navigate(`/investment/positions/${position.symbol.toLowerCase()}`)}
+              className={`p-6 rounded-2xl backdrop-blur-lg border transition-all duration-300 hover:scale-105 cursor-pointer ${
                 isDarkMode 
                   ? 'bg-gray-800/30 border-gray-700/50 shadow-xl shadow-gray-900/20 hover:bg-gray-800/40' 
                   : 'bg-white/60 border-white/20 shadow-xl shadow-gray-900/10 hover:bg-white/80'
@@ -757,15 +764,127 @@ const Positions = memo(function Positions() {
       <div className="flex-1 flex min-h-0 overflow-hidden">
         {content}
       </div>
-      
+
       {/* Import Confirmation Modal */}
-      <ImportConfirmModal 
-        positions={importedPositions}
-        isOpen={showImportConfirmModal}
-        onConfirm={handleConfirmImport}
-        onCancel={handleCancelImport}
-        isDarkMode={isDarkMode}
-      />
+      {showImportModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className={`w-full max-w-4xl max-h-[80vh] rounded-2xl backdrop-blur-lg border overflow-hidden ${
+            isDarkMode 
+              ? 'bg-gray-800/90 border-gray-700/50 shadow-xl shadow-gray-900/20' 
+              : 'bg-white/90 border-white/20 shadow-xl shadow-gray-900/10'
+          }`}>
+            {/* Modal Header */}
+            <div className={`p-6 border-b ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+              <div className="flex items-center justify-between">
+                <h2 className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                  Confirm Import ({importedPositions.length} positions)
+                </h2>
+                <button
+                  onClick={handleCancelImport}
+                  className={`p-2 rounded-lg hover:bg-gray-100 ${isDarkMode ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <p className={`text-sm mt-2 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                Review the positions below and confirm to import them into your portfolio. 
+                Click the × button to remove any position from the import list.
+              </p>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 overflow-y-auto max-h-96">
+              <div className="space-y-4">
+                {importedPositions.map((position, index) => (
+                  <div key={index} className={`p-4 rounded-xl border relative ${
+                    isDarkMode 
+                      ? 'bg-gray-700/50 border-gray-600' 
+                      : 'bg-gray-50 border-gray-200'
+                  }`}>
+                    {/* Delete Button */}
+                    <button
+                      onClick={() => handleRemoveFromImport(index)}
+                      className={`absolute top-2 right-2 p-1 rounded-lg transition-colors ${
+                        isDarkMode 
+                          ? 'text-gray-400 hover:text-red-400 hover:bg-red-500/20' 
+                          : 'text-gray-500 hover:text-red-500 hover:bg-red-50'
+                      }`}
+                      title="Remove from import list"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm pr-8">
+                      <div>
+                        <span className={`font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>Symbol:</span>
+                        <p className="font-bold">{position.symbol}</p>
+                      </div>
+                      <div>
+                        <span className={`font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>Side:</span>
+                        <p className={`font-bold ${position.side === 'buy' ? 'text-green-400' : 'text-red-400'}`}>
+                          {position.side.toUpperCase()}
+                        </p>
+                      </div>
+                      <div>
+                        <span className={`font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>Lots:</span>
+                        <p className="font-bold">{position.lots}</p>
+                      </div>
+                      <div>
+                        <span className={`font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>Entry Price:</span>
+                        <p className="font-bold">${position.entryPrice.toLocaleString()}</p>
+                      </div>
+                      <div>
+                        <span className={`font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>Invested:</span>
+                        <p className="font-bold">${position.investedAmount.toLocaleString()}</p>
+                      </div>
+                      <div>
+                        <span className={`font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>Leverage:</span>
+                        <p className="font-bold">{position.leverage}X</p>
+                      </div>
+                      <div>
+                        <span className={`font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>Platform:</span>
+                        <p className="font-bold">{position.platform}</p>
+                      </div>
+                      <div>
+                        <span className={`font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>Date:</span>
+                        <p className="font-bold">{position.timestamp}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className={`p-6 border-t ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+              <div className="flex justify-end space-x-4">
+                <button
+                  onClick={handleCancelImport}
+                  disabled={importingPositions}
+                  className={`px-6 py-2 rounded-lg font-medium transition-colors ${
+                    isDarkMode 
+                      ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' 
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  } disabled:opacity-50`}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmImport}
+                  disabled={importingPositions}
+                  className="px-6 py-2 rounded-lg font-medium bg-blue-500 text-white hover:bg-blue-600 transition-colors disabled:opacity-50"
+                >
+                  {importingPositions ? 'Importing...' : `Import ${importedPositions.length} Positions`}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 });

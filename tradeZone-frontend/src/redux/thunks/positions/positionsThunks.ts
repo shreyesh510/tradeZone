@@ -7,9 +7,12 @@ export const fetchPositions = createAsyncThunk(
   'positions/fetchPositions',
   async (filters: PositionFilters | undefined, { rejectWithValue }) => {
     try {
+      console.log('🔍 Redux: fetchPositions thunk called with filters:', filters);
       const positions = await positionsApi.getPositions(filters);
+      console.log('🔍 Redux: fetchPositions thunk received positions:', positions.length);
       return positions;
     } catch (error: any) {
+      console.error('❌ Redux: fetchPositions thunk error:', error);
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch positions');
     }
   }
@@ -37,19 +40,6 @@ export const createPosition = createAsyncThunk(
       return position;
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Failed to create position');
-    }
-  }
-);
-
-// Create multiple positions in bulk
-export const createPositionsBulk = createAsyncThunk(
-  'positions/createPositionsBulk',
-  async (data: CreatePositionData[], { rejectWithValue }) => {
-    try {
-      const positions = await positionsApi.createPositionsBulk(data);
-      return positions;
-    } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to create positions in bulk');
     }
   }
 );

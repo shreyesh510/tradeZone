@@ -8,7 +8,8 @@ import {
   Delete, 
   UseGuards,
   Request,
-  Query
+  Query,
+  Header
 } from '@nestjs/common';
 import { PositionsService } from './positions.service';
 import { CreatePositionDto } from './dto/create-position.dto';
@@ -22,28 +23,25 @@ export class PositionsController {
 
   @Post()
   async create(@Body() createPositionDto: CreatePositionDto, @Request() req) {
-    console.log('JWT User object:', req.user);
-    const userId = req.user.userId; // Changed from sub to userId based on JWT strategy
-    if (!userId) {
-      throw new Error('User ID not found in JWT token');
-    }
-    console.log('Extracted userId from token:', userId);
-    return await this.positionsService.create(createPositionDto, userId);
-  }
-  
-  @Post('bulk')
-  async createBulk(@Body() createPositionDtos: CreatePositionDto[], @Request() req) {
-    console.log('Creating multiple positions:', createPositionDtos.length);
+    console.log('🔍 Creating position for user:', req.user.userId);
     const userId = req.user.userId;
     if (!userId) {
       throw new Error('User ID not found in JWT token');
     }
-    return await this.positionsService.createBulk(createPositionDtos, userId);
+    return await this.positionsService.create(createPositionDto, userId);
   }
 
   @Get()
+  @Header('Cache-Control', 'no-cache, no-store, must-revalidate')
+  @Header('Pragma', 'no-cache')
+  @Header('Expires', '0')
   async findAll(@Request() req, @Query('status') status?: string) {
+    console.log('🔍 Getting positions for user:', req.user.userId);
     const userId = req.user.userId;
+    
+    if (!userId) {
+      throw new Error('User ID not found in JWT token');
+    }
     
     if (status === 'open') {
       return await this.positionsService.getOpenPositions(userId);
@@ -51,7 +49,9 @@ export class PositionsController {
       return await this.positionsService.getClosedPositions(userId);
     }
     
-    return await this.positionsService.findAll(userId);
+    const positions = await this.positionsService.findAll(userId);
+    console.log(`🔍 Found ${positions.length} positions for user ${userId}`);
+    return positions;
   }
 
   @Get(':id')

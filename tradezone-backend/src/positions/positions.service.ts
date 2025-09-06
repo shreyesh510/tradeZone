@@ -1,147 +1,109 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { FirebaseDatabaseService } from '../database/firebase-database.service';
 import { CreatePositionDto } from './dto/create-position.dto';
 import { UpdatePositionDto } from './dto/update-position.dto';
 import { Position } from './entities/position.entity';
-import { FirebaseDatabaseService } from '../database/firebase-database.service';
 
 @Injectable()
 export class PositionsService {
   constructor(
-    private readonly firebaseDatabaseService: FirebaseDatabaseService,
+    private readonly firebaseDatabaseService: FirebaseDatabaseService
   ) {}
 
   async create(createPositionDto: CreatePositionDto, userId: string): Promise<Position> {
-    console.log('Creating position with userId:', userId);
-    console.log('CreatePositionDto:', createPositionDto);
-    
-    if (!userId) {
-      throw new Error('UserId is required but was not provided');
-    }
+    console.log('🔍 Creating position with data:', createPositionDto);
+    console.log('🔍 For user ID:', userId);
     
     const positionData = {
       ...createPositionDto,
-      userId: userId, // Explicitly set userId
-      status: 'open' as const,
-      timestamp: createPositionDto.timestamp || new Date().toLocaleString(),
-      // Don't set createdAt and updatedAt here, they're set in the database service
+      userId: userId,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      timestamp: createPositionDto.timestamp || new Date().toISOString()
     };
 
-    // Deduplicate by same userId, symbol, side, entryPrice, leverage, and same date part of timestamp
-    const dateOnly = new Date(positionData.timestamp).toDateString();
-    const existing = await this.firebaseDatabaseService.findDuplicatePosition({
-      userId,
-      symbol: positionData.symbol,
-      side: positionData.side,
-      entryPrice: positionData.entryPrice,
-      leverage: positionData.leverage,
-      dateOnly
-    });
-    if (existing) {
-      return existing;
-    }
-
-    return await this.firebaseDatabaseService.createPosition(positionData);
-  }
-  
-  async createBulk(createPositionDtos: CreatePositionDto[], userId: string): Promise<Position[]> {
-    console.log('Creating multiple positions with userId:', userId);
-    console.log('Number of positions to create:', createPositionDtos.length);
-    
-    if (!userId) {
-      throw new Error('UserId is required but was not provided');
-    }
-    
-    const results: Position[] = [];
-    
-    for (const dto of createPositionDtos) {
-      const positionData = {
-        ...dto,
-        userId: userId,
-        status: 'open' as const,
-        timestamp: dto.timestamp || new Date().toLocaleString(),
-      };
-      // Deduplicate by normalized date and key fields
-      const dateOnly = new Date(positionData.timestamp).toDateString();
-      const existing = await this.firebaseDatabaseService.findDuplicatePosition({
-        userId,
-        symbol: positionData.symbol,
-        side: positionData.side,
-        entryPrice: positionData.entryPrice,
-        leverage: positionData.leverage,
-        dateOnly
-      });
-      if (existing) {
-        results.push(existing);
-        continue;
-      }
-      const position = await this.firebaseDatabaseService.createPosition(positionData);
-      results.push(position);
-    }
-    
-    return results;
+    const position = await this.firebaseDatabaseService.createPosition(positionData);
+    console.log('✅ Position created successfully:', position.id);
+    return position;
   }
 
   async findAll(userId: string): Promise<Position[]> {
-    return await this.firebaseDatabaseService.getPositions(userId);
+    console.log('🔍 Finding all positions for user:', userId);
+    
+    try {
+      const positions = await this.firebaseDatabaseService.getPositions(userId);
+      console.log(`📊 Found ${positions.length} positions for user ${userId}`);
+      
+      // Log first few positions for debugging
+      if (positions.length > 0) {
+        console.log('📄 Sample positions:');
+        positions.slice(0, 3).forEach((pos, index) => {
+          console.log(`  ${index + 1}. ${pos.symbol} - ${pos.side} - ${pos.lots} lots`);
+        });
+      }
+      
+      return positions;
+    } catch (error) {
+      console.error('❌ Error in findAll:', error);
+      throw error;
+    }
   }
 
   async findOne(id: string, userId: string): Promise<Position> {
     const position = await this.firebaseDatabaseService.getPositionById(id);
     
     if (!position) {
-      throw new NotFoundException('Position not found');
+      throw new Error('Position not found');
     }
-
+    
     if (position.userId !== userId) {
-      throw new ForbiddenException('Access denied');
+      throw new Error('Unauthorized: Position does not belong to user');
     }
-
+    
     return position;
   }
 
   async update(id: string, updatePositionDto: UpdatePositionDto, userId: string): Promise<Position> {
-    const existingPosition = await this.findOne(id, userId);
+    // First check if position exists and belongs to user
+    await this.findOne(id, userId);
     
     const updateData = {
       ...updatePositionDto,
-      updatedAt: new Date(),
+      updatedAt: new Date()
     };
-
-    // If closing position, set closedAt
-    if (updatePositionDto.status === 'closed' && existingPosition.status === 'open') {
-      updateData.closedAt = new Date();
-    }
-
+    
     await this.firebaseDatabaseService.updatePosition(id, updateData);
     
+    // Return the updated position
     return await this.findOne(id, userId);
   }
 
   async remove(id: string, userId: string): Promise<void> {
-    await this.findOne(id, userId); // This will throw if not found or not authorized
+    // First check if position exists and belongs to user
+    await this.findOne(id, userId);
+    
     await this.firebaseDatabaseService.deletePosition(id);
   }
 
   async getOpenPositions(userId: string): Promise<Position[]> {
-    return await this.firebaseDatabaseService.getOpenPositions(userId);
+    const allPositions = await this.findAll(userId);
+    return allPositions.filter(position => position.status === 'open');
   }
 
   async getClosedPositions(userId: string): Promise<Position[]> {
-    return await this.firebaseDatabaseService.getClosedPositions(userId);
+    const allPositions = await this.findAll(userId);
+    return allPositions.filter(position => position.status === 'closed');
   }
 
-  async calculatePnL(position: Position, currentPrice: number): Promise<{ pnl: number; pnlPercentage: number }> {
-    const { side, lots, entryPrice } = position;
+  // Calculate P&L for a position
+  calculatePnL(position: Position): { pnl: number; pnlPercent: number } {
+    const priceDiff = position.side === 'buy' 
+      ? position.currentPrice - position.entryPrice
+      : position.entryPrice - position.currentPrice;
     
-    let pnl: number;
-    if (side === 'buy') {
-      pnl = (currentPrice - entryPrice) * lots;
-    } else {
-      pnl = (entryPrice - currentPrice) * lots;
-    }
+    const pnl = priceDiff * position.lots;
+    const pnlPercent = (pnl / position.investedAmount) * 100;
     
-    const pnlPercentage = (pnl / (entryPrice * lots)) * 100;
-    
-    return { pnl, pnlPercentage };
+    return { pnl, pnlPercent };
   }
 }

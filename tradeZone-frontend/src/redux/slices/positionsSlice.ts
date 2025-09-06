@@ -3,7 +3,6 @@ import {
   fetchPositions,
   fetchPosition,
   createPosition,
-  createPositionsBulk,
   updatePosition,
   deletePosition,
   fetchOpenPositions,
@@ -138,32 +137,14 @@ const positionsSlice = createSlice({
       })
       .addCase(createPosition.fulfilled, (state, action: PayloadAction<Position>) => {
         state.createLoading = false;
-        const p = action.payload;
-        // Upsert into positions
-        const idx = state.positions.findIndex(x => x.id === p.id);
-        if (idx !== -1) state.positions[idx] = p; else state.positions.unshift(p);
-        // Open list
-        state.openPositions = state.openPositions.filter(x => x.id !== p.id);
-        state.closedPositions = state.closedPositions.filter(x => x.id !== p.id);
-        if (p.status === 'open') state.openPositions.unshift(p); else state.closedPositions.unshift(p);
-        state.error = null;
-        state.lastUpdated = Date.now();
-      })
-      .addCase(createPositionsBulk.pending, (state) => {
-        state.createLoading = true;
-        state.error = null;
-      })
-      .addCase(createPositionsBulk.fulfilled, (state, action: PayloadAction<Position[]>) => {
-        state.createLoading = false;
-        action.payload.forEach(p => {
-          // Upsert into positions
-          const idx = state.positions.findIndex(x => x.id === p.id);
-          if (idx !== -1) state.positions[idx] = p; else state.positions.unshift(p);
-          // Ensure uniqueness across open/closed lists
-          state.openPositions = state.openPositions.filter(x => x.id !== p.id);
-          state.closedPositions = state.closedPositions.filter(x => x.id !== p.id);
-          if (p.status === 'open') state.openPositions.unshift(p); else state.closedPositions.unshift(p);
-        });
+        state.positions.unshift(action.payload);
+        
+        if (action.payload.status === 'open') {
+          state.openPositions.unshift(action.payload);
+        } else {
+          state.closedPositions.unshift(action.payload);
+        }
+        
         state.error = null;
         state.lastUpdated = Date.now();
       })
