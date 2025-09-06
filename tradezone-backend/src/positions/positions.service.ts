@@ -14,7 +14,7 @@ export class PositionsService {
   async create(createPositionDto: CreatePositionDto, userId: string): Promise<Position> {
     console.log('🔍 Creating position with data:', createPositionDto);
     console.log('🔍 For user ID:', userId);
-    
+
     const positionData = {
       ...createPositionDto,
       userId: userId,
@@ -126,6 +126,16 @@ export class PositionsService {
     return new Date();
   }
 
+  // Helper: default leverage by symbol for bulk imports
+  private getDefaultLeverageForSymbol(symbol: string): number {
+    const sym = (symbol || '').toUpperCase();
+    const twoHundred = new Set(['BTCUSD', 'ETHUSD']);
+    const oneHundred = new Set(['SOLUSD', 'AVAXUSD', 'XRPUSD', 'BNBUSD', 'LTCUSD', 'DOGEUSD', 'ALGOUSD', 'SUIUSD', 'FLOKIUSD']);
+    if (twoHundred.has(sym)) return 200;
+    if (oneHundred.has(sym)) return 100;
+    return 20; // sensible fallback
+  }
+
   // Bulk create with dedupe (userId + symbol + entryPrice + same-day timestamp)
   async createBulk(payload: CreatePositionsBulkDto, userId: string): Promise<{ created: Position[]; skipped: CreatePositionDto[]; reason?: string }> {
     const list = (payload.positions || []).map(p => ({ ...p }));
@@ -161,6 +171,8 @@ export class PositionsService {
         userId,
         status: 'open',
         timestamp: p.timestamp ?? new Date().toISOString(),
+  // enforce default leverage mapping on bulk insertion
+        leverage: this.getDefaultLeverageForSymbol(sym),
         createdAt: new Date(),
         updatedAt: new Date(),
       } as any);
