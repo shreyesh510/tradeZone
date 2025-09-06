@@ -42,6 +42,29 @@ const SymbolPositions = memo(function SymbolPositions() {
     position.symbol.toLowerCase() === symbol?.toLowerCase()
   );
 
+  // Dummy records to show when there are no positions for this symbol
+  const dummyPositions: Position[] = Array.from({ length: 10 }).map((_, i) => {
+    const base = 100 + i * 5;
+    const lots = (i % 5) + 1;
+    const entry = base + (i % 3) * 2;
+    const current = entry + ((i % 2 === 0) ? 1.5 : -1.2);
+    return {
+      id: `dummy-${i + 1}`,
+      symbol: (symbol || 'BTCUSD').toUpperCase(),
+      side: i % 2 === 0 ? 'buy' : 'sell',
+      entryPrice: Number(entry.toFixed(2)),
+      currentPrice: Number(current.toFixed(2)),
+      lots,
+      investedAmount: Number((entry * lots).toFixed(2)),
+      platform: 'Delta Exchange',
+      leverage: 20,
+      status: 'open',
+      timestamp: new Date(Date.now() - i * 24 * 60 * 60 * 1000).toISOString(),
+    } as unknown as Position;
+  });
+
+  const rows: Position[] = symbolPositions.length > 0 ? symbolPositions : dummyPositions;
+
   // Redirect if no permission
   useEffect(() => {
     if (!canAccessInvestment()) {
@@ -176,7 +199,7 @@ const SymbolPositions = memo(function SymbolPositions() {
       )}
 
       {/* Positions Table */}
-      {!loading && symbolPositions.length > 0 && (
+  {!loading && rows.length > 0 && (
         <div className={`rounded-2xl backdrop-blur-lg border overflow-hidden ${
           isDarkMode 
             ? 'bg-gray-800/30 border-gray-700/50 shadow-xl shadow-gray-900/20' 
@@ -234,7 +257,7 @@ const SymbolPositions = memo(function SymbolPositions() {
                 </tr>
               </thead>
               <tbody className={`divide-y ${isDarkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
-                {symbolPositions.map((position) => {
+                {rows.map((position) => {
                   const { pnl, pnlPercent } = calculatePnL(position);
                   const isProfitable = pnl >= 0;
 
