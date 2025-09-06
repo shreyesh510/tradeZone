@@ -10,6 +10,8 @@ interface Position {
   investedAmount: number;
   platform: 'Delta Exchange' | 'Groww';
   timestamp: string;
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
 }
 
 interface PositionCardProps {
@@ -28,6 +30,38 @@ const PositionCard = memo<PositionCardProps>(({ position, isDarkMode }) => {
     const pnlPercent = (pnl / position.investedAmount) * 100;
     
     return { pnl, pnlPercent };
+  };
+
+  // Format date for display
+  const formatDate = (dateStr: string | Date | undefined) => {
+    if (!dateStr) return 'N/A';
+    
+    try {
+      // Handle Firebase timestamp objects that might be serialized as objects with seconds and nanoseconds
+      if (typeof dateStr === 'object' && dateStr !== null && 'seconds' in dateStr) {
+        // @ts-ignore - Firebase Timestamp format
+        return new Date(dateStr.seconds * 1000).toLocaleString();
+      }
+      
+      // Handle standard date strings or Date objects
+      const date = typeof dateStr === 'string' ? new Date(dateStr) : dateStr;
+      if (isNaN(date.getTime())) {
+        // If not a valid date object, use the string as is
+        return typeof dateStr === 'string' ? dateStr : 'Invalid Date';
+      }
+      
+      // Format the date as a nice readable string
+      return date.toLocaleString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (e) {
+      console.error('Error formatting date:', e);
+      return typeof dateStr === 'string' ? dateStr : 'Error';
+    }
   };
 
   const { pnl, pnlPercent } = calculatePnL(position);
@@ -129,7 +163,7 @@ const PositionCard = memo<PositionCardProps>(({ position, isDarkMode }) => {
       {/* Timestamp */}
       <div className="mt-4 text-center">
         <p className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-          Added: {position.timestamp}
+          Added: {formatDate(position.createdAt || position.timestamp)}
         </p>
       </div>
 

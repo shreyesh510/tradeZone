@@ -62,17 +62,15 @@ const Zone = memo(function Zone() {
             margin: '0px'
           }}
         >
-          {/* Content - full screen minus nav */}
-          <div className="flex-1 overflow-hidden" style={{ height: 'calc(100vh - 80px)' }}>
+          {/* Content - full screen */}
+          <div className="flex-1 overflow-hidden" style={{ height: '100vh' }}>
             {activeTab === 'chart' && <LiveChart key="live-chart" />}
             {activeTab === 'chat' && <Chat onlineUsers={onlineUsers} setOnlineUsers={setOnlineUsers} />}
             {activeTab === 'settings' && <Settings />}
           </div>
 
-          {/* Floating Navigation - Fixed at bottom */}
-          <div className="flex-shrink-0" style={{ height: '80px' }}>
-            <FloatingNav activeTab={activeTab} onTabChange={handleTabChange} />
-          </div>
+          {/* Floating Navigation */}
+          <FloatingNav activeTab={activeTab} onTabChange={handleTabChange} />
         </div>
       );
     }

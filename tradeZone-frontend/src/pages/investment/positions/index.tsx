@@ -1,10 +1,24 @@
 import { memo, useState, useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import Header from '../../../layouts/Header';
 import Sidebar from '../../../components/Sidebar';
 import FloatingNav, { type MobileTab } from '../../../layouts/FloatingNav';
 import { useSettings } from '../../../contexts/SettingsContext';
 import { usePermissions } from '../../../hooks/usePermissions';
 import { useNavigate } from 'react-router-dom';
+import type { RootState, AppDispatch } from '../../../redux/store';
+import {
+  fetchPositions,
+  createPosition,
+  updatePosition,
+  deletePosition,
+} from '../../../redux/thunks/positions/positionsThunks';
+import { clearError } from '../../../redux/slices/positionsSlice';
+import type { Position, CreatePositionData } from '../../../types/position';
+import Input from '../../../components/input';
+import Select from '../../../components/select';
+import Radio from '../../../components/radio';
+import ProgressBar from '../../../components/progressbar';
 
 interface OnlineUser {
   userId: string;
@@ -12,17 +26,7 @@ interface OnlineUser {
   socketId: string;
 }
 
-interface Position {
-  id: string;
-  symbol: string;
-  side: 'buy' | 'sell';
-  entryPrice: number;
-  currentPrice: number;
-  lots: number;
-  investedAmount: number;
-  platform: 'Delta Exchange' | 'Groww';
-  timestamp: string;
-}
+// Position interface is now imported from types
 
 interface PositionForm {
   symbol: string;
@@ -30,10 +34,12 @@ interface PositionForm {
   entryPrice: string;
   side: 'buy' | 'sell';
   platform: 'Delta Exchange' | 'Groww';
+  leverage: string;
 }
 
 const Positions = memo(function Positions() {
   const navigate = useNavigate();
+  const dispatch = useDispatch<AppDispatch>();
   const { settings } = useSettings();
   const { canAccessInvestment } = usePermissions();
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
@@ -41,7 +47,16 @@ const Positions = memo(function Positions() {
   const [isMobile, setIsMobile] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<MobileTab>('chart');
   const [showAddForm, setShowAddForm] = useState<boolean>(false);
-  const [positions, setPositions] = useState<Position[]>([]);
+
+  // Redux state
+  const {
+    positions,
+    loading,
+    createLoading,
+    updateLoading,
+    deleteLoading,
+    error,
+  } = useSelector((state: RootState) => state.positions);
 
   // Form state
   const [positionForm, setPositionForm] = useState<PositionForm>({
@@ -49,8 +64,12 @@ const Positions = memo(function Positions() {
     lots: '',
     entryPrice: '',
     side: 'buy',
-    platform: 'Delta Exchange'
+    platform: 'Delta Exchange',
+    leverage: '20'
   });
+
+  // Leverage options
+  const leverageOptions = [20, 50, 100, 150, 200];
 
   // Redirect if no permission
   useEffect(() => {
@@ -70,67 +89,10 @@ const Positions = memo(function Positions() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Initialize mock positions
+  // Fetch positions from API
   useEffect(() => {
-    const mockPositions: Position[] = [
-      {
-        id: '1',
-        symbol: 'BTCUSD',
-        side: 'buy',
-        entryPrice: 42000,
-        currentPrice: 43500,
-        lots: 2,
-        investedAmount: 15000,
-        platform: 'Delta Exchange',
-        timestamp: '2024-01-15 14:30'
-      },
-      {
-        id: '2',
-        symbol: 'ETHUSD',
-        side: 'buy',
-        entryPrice: 2500,
-        currentPrice: 2750,
-        lots: 10,
-        investedAmount: 12000,
-        platform: 'Delta Exchange',
-        timestamp: '2024-01-15 12:15'
-      },
-      {
-        id: '3',
-        symbol: 'AAPL',
-        side: 'sell',
-        entryPrice: 185.50,
-        currentPrice: 182.30,
-        lots: 15,
-        investedAmount: 8000,
-        platform: 'Groww',
-        timestamp: '2024-01-14 16:20'
-      },
-      {
-        id: '4',
-        symbol: 'TSLA',
-        side: 'buy',
-        entryPrice: 240.75,
-        currentPrice: 265.20,
-        lots: 8,
-        investedAmount: 7000,
-        platform: 'Groww',
-        timestamp: '2024-01-14 09:45'
-      },
-      {
-        id: '5',
-        symbol: 'DOGE',
-        side: 'sell',
-        entryPrice: 0.08,
-        currentPrice: 0.075,
-        lots: 5,
-        investedAmount: 3000,
-        platform: 'Delta Exchange',
-        timestamp: '2024-01-13 11:20'
-      }
-    ];
-    setPositions(mockPositions);
-  }, []);
+    dispatch(fetchPositions());
+  }, [dispatch]);
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
@@ -163,7 +125,7 @@ const Positions = memo(function Positions() {
   };
 
   // Handle form submission
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!positionForm.symbol || !positionForm.lots || !positionForm.entryPrice) {
@@ -171,8 +133,7 @@ const Positions = memo(function Positions() {
       return;
     }
 
-    const newPosition: Position = {
-      id: Date.now().toString(),
+    const newPositionData: CreatePositionData = {
       symbol: positionForm.symbol.toUpperCase(),
       side: positionForm.side,
       entryPrice: parseFloat(positionForm.entryPrice),
@@ -180,20 +141,26 @@ const Positions = memo(function Positions() {
       lots: parseInt(positionForm.lots),
       investedAmount: parseFloat(positionForm.entryPrice) * parseInt(positionForm.lots),
       platform: positionForm.platform,
+      leverage: parseInt(positionForm.leverage),
       timestamp: new Date().toLocaleString()
     };
 
-    setPositions(prev => [newPosition, ...prev]);
-    setPositionForm({
-      symbol: '',
-      lots: '',
-      entryPrice: '',
-      side: 'buy',
-      platform: 'Delta Exchange'
-    });
-    setShowAddForm(false);
-    
-    alert('Position added successfully!');
+    try {
+      await dispatch(createPosition(newPositionData)).unwrap();
+      setPositionForm({
+        symbol: '',
+        lots: '',
+        entryPrice: '',
+        side: 'buy',
+        platform: 'Delta Exchange',
+        leverage: '20'
+      });
+      setShowAddForm(false);
+      alert('Position added successfully!');
+    } catch (error) {
+      console.error('Failed to create position:', error);
+      alert('Failed to add position. Please try again.');
+    }
   };
 
   // Symbol options for the form
@@ -209,44 +176,55 @@ const Positions = memo(function Positions() {
     return sum + pnl;
   }, 0);
 
+  // Handle error display
+  const handleClearError = () => {
+    dispatch(clearError());
+  };
+
   const content = (
     <div className={`flex-1 p-6 overflow-y-auto ${
-      isDarkMode 
-        ? 'bg-gradient-to-br from-gray-900 via-slate-900 to-black text-white' 
-        : 'bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 text-gray-900'
+      isDarkMode ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-900'
     }`}>
+      {/* Error Display */}
+      {error && (
+        <div className="mb-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
+          <div className="flex justify-between items-center">
+            <p>Error: {error}</p>
+            <button
+              onClick={handleClearError}
+              className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-sm"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header with futuristic glow */}
       <div className="mb-8">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className={`text-4xl font-bold bg-gradient-to-r ${
-              isDarkMode 
-                ? 'from-cyan-400 via-purple-400 to-pink-400' 
-                : 'from-blue-600 via-purple-600 to-indigo-600'
-            } bg-clip-text text-transparent mb-2`}>
+            <h1 className={`text-xl font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
               Your Positions
             </h1>
-            <div className={`h-1 w-32 bg-gradient-to-r ${
-              isDarkMode 
-                ? 'from-cyan-400 via-purple-400 to-pink-400' 
-                : 'from-blue-600 via-purple-600 to-indigo-600'
-            } rounded-full`}></div>
           </div>
           
           {/* Add Position Button */}
           <button
             onClick={() => setShowAddForm(!showAddForm)}
-            className={`px-6 py-3 rounded-xl font-medium transition-all duration-300 ${
-              isDarkMode
-                ? 'bg-gradient-to-r from-cyan-500 to-purple-500 text-white shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40'
-                : 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40'
-            } hover:scale-105 backdrop-blur-sm`}
+            className={`px-6 py-3 rounded-lg font-medium transition-colors ${
+              showAddForm
+                ? isDarkMode
+                  ? 'bg-gray-700 text-gray-300'
+                  : 'bg-gray-200 text-gray-700'
+                : 'bg-blue-600 text-white hover:bg-blue-700'
+            }`}
           >
             <div className="flex items-center space-x-2">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
-              <span>Add Position</span>
+              <span>{showAddForm ? 'Cancel' : 'Add Position'}</span>
             </div>
           </button>
         </div>
@@ -263,7 +241,7 @@ const Positions = memo(function Positions() {
             <h2 className={`text-lg font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
               Total P&L
             </h2>
-            <p className={`text-4xl font-bold ${totalPnL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+            <p className={`text-lg font-semibold ${totalPnL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
               ${totalPnL.toFixed(2)}
             </p>
           </div>
@@ -287,132 +265,86 @@ const Positions = memo(function Positions() {
             ? 'bg-gray-800/30 border-gray-700/50 shadow-xl shadow-gray-900/20' 
             : 'bg-white/60 border-white/20 shadow-xl shadow-gray-900/10'
         }`}>
-          <h2 className="text-2xl font-bold mb-6">Add New Position</h2>
+          <h2 className="text-lg font-semibold mb-4">Add New Position</h2>
           
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6">
             {/* Platform Selection */}
-            <div>
-              <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                Platform
-              </label>
-              <select
-                value={positionForm.platform}
-                onChange={(e) => handleFormChange('platform', e.target.value)}
-                className={`w-full p-3 rounded-xl border backdrop-blur-sm ${
-                  isDarkMode 
-                    ? 'bg-gray-700/50 border-gray-600/50 text-white' 
-                    : 'bg-white/70 border-gray-300/50 text-gray-900'
-                } focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all`}
-              >
-                <option value="Delta Exchange">Delta Exchange</option>
-                <option value="Groww">Groww</option>
-              </select>
-            </div>
+            <Select
+              value={positionForm.platform}
+              onChange={(value) => handleFormChange('platform', value)}
+              options={[
+                { value: 'Delta Exchange', label: 'Delta Exchange' },
+                { value: 'Groww', label: 'Groww' }
+              ]}
+              label="Platform"
+              isDarkMode={isDarkMode}
+            />
 
             {/* Symbol Selection */}
-            <div>
-              <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                Symbol
-              </label>
-              <select
-                value={positionForm.symbol}
-                onChange={(e) => handleFormChange('symbol', e.target.value)}
-                className={`w-full p-3 rounded-xl border backdrop-blur-sm ${
-                  isDarkMode 
-                    ? 'bg-gray-700/50 border-gray-600/50 text-white' 
-                    : 'bg-white/70 border-gray-300/50 text-gray-900'
-                } focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all`}
-                required
-              >
-                <option value="">Select Symbol</option>
-                {availableSymbols.map(symbol => (
-                  <option key={symbol} value={symbol}>{symbol}</option>
-                ))}
-              </select>
-            </div>
+            <Select
+              value={positionForm.symbol}
+              onChange={(value) => handleFormChange('symbol', value)}
+              options={availableSymbols.map(symbol => ({ value: symbol, label: symbol }))}
+              placeholder="Select Symbol"
+              label="Symbol"
+              required
+              isDarkMode={isDarkMode}
+            />
 
             {/* Lots */}
-            <div>
-              <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                Lots
-              </label>
-              <input
-                type="number"
-                value={positionForm.lots}
-                onChange={(e) => handleFormChange('lots', e.target.value)}
-                placeholder="Enter lots"
-                min="1"
-                className={`w-full p-3 rounded-xl border backdrop-blur-sm ${
-                  isDarkMode 
-                    ? 'bg-gray-700/50 border-gray-600/50 text-white placeholder-gray-400' 
-                    : 'bg-white/70 border-gray-300/50 text-gray-900 placeholder-gray-500'
-                } focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all`}
-                required
-              />
-            </div>
+            <Input
+              type="number"
+              value={positionForm.lots}
+              onChange={(value) => handleFormChange('lots', value)}
+              placeholder="Enter lots"
+              label="Lots"
+              min={1}
+              required
+              isDarkMode={isDarkMode}
+            />
 
             {/* Entry Price */}
-            <div>
-              <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                Entry Price
-              </label>
-              <input
-                type="number"
-                step="any"
-                value={positionForm.entryPrice}
-                onChange={(e) => handleFormChange('entryPrice', e.target.value)}
-                placeholder="Entry price"
-                className={`w-full p-3 rounded-xl border backdrop-blur-sm ${
-                  isDarkMode 
-                    ? 'bg-gray-700/50 border-gray-600/50 text-white placeholder-gray-400' 
-                    : 'bg-white/70 border-gray-300/50 text-gray-900 placeholder-gray-500'
-                } focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all`}
-                required
-              />
-            </div>
+            <Input
+              type="number"
+              value={positionForm.entryPrice}
+              onChange={(value) => handleFormChange('entryPrice', value)}
+              placeholder="Entry price"
+              label="Entry Price"
+              step="any"
+              required
+              isDarkMode={isDarkMode}
+            />
+
+            {/* Leverage Progress Bar */}
+            <ProgressBar
+              value={parseInt(positionForm.leverage)}
+              onChange={(value) => handleFormChange('leverage', value.toString())}
+              options={leverageOptions}
+              label="Leverage"
+              required
+              isDarkMode={isDarkMode}
+            />
 
             {/* Buy/Sell Toggle */}
-            <div>
-              <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                Side
-              </label>
-              <div className="flex rounded-xl overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => handleFormChange('side', 'buy')}
-                  className={`flex-1 py-3 px-4 font-medium transition-all ${
-                    positionForm.side === 'buy'
-                      ? 'bg-green-500 text-white'
-                      : isDarkMode
-                      ? 'bg-gray-700/50 text-gray-300 hover:bg-gray-600/50'
-                      : 'bg-gray-200/50 text-gray-700 hover:bg-gray-300/50'
-                  }`}
-                >
-                  Buy
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleFormChange('side', 'sell')}
-                  className={`flex-1 py-3 px-4 font-medium transition-all ${
-                    positionForm.side === 'sell'
-                      ? 'bg-red-500 text-white'
-                      : isDarkMode
-                      ? 'bg-gray-700/50 text-gray-300 hover:bg-gray-600/50'
-                      : 'bg-gray-200/50 text-gray-700 hover:bg-gray-300/50'
-                  }`}
-                >
-                  Sell
-                </button>
-              </div>
-            </div>
+            <Radio
+              value={positionForm.side}
+              onChange={(value) => handleFormChange('side', value)}
+              options={[
+                { value: 'buy', label: 'Buy' },
+                { value: 'sell', label: 'Sell' }
+              ]}
+              label="Side"
+              isDarkMode={isDarkMode}
+            />
 
             {/* Submit Button */}
-            <div className="md:col-span-2 lg:col-span-5 flex gap-4">
+            <div className="md:col-span-2 lg:col-span-6 flex gap-4">
               <button
                 type="submit"
-                className="px-8 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-medium rounded-xl hover:from-green-600 hover:to-emerald-600 transition-all duration-300 hover:scale-105"
+                disabled={createLoading}
+                className="px-8 py-3 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-medium rounded-xl hover:from-green-600 hover:to-emerald-600 transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Add Position
+                {createLoading ? 'Adding...' : 'Add Position'}
               </button>
               <button
                 type="button"
@@ -430,9 +362,18 @@ const Positions = memo(function Positions() {
         </div>
       )}
 
+      {/* Loading State */}
+      {loading && (
+        <div className="text-center py-8">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+          <p className="mt-2 text-gray-600">Loading positions...</p>
+        </div>
+      )}
+
       {/* Positions Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {positions.map((position) => {
+      {!loading && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {positions.map((position) => {
           const { pnl, pnlPercent } = calculatePnL(position);
           const isProfitable = pnl >= 0;
 
@@ -474,6 +415,11 @@ const Positions = memo(function Positions() {
                     isDarkMode ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-700'
                   }`}>
                     {position.lots} Lots
+                  </div>
+                  <div className={`px-3 py-1 rounded-lg text-xs font-medium ${
+                    isDarkMode ? 'bg-purple-500/20 text-purple-400' : 'bg-purple-100 text-purple-700'
+                  }`}>
+                    {position.leverage}X
                   </div>
                 </div>
               </div>
@@ -539,17 +485,25 @@ const Positions = memo(function Positions() {
 
               {/* Action Buttons */}
               <div className="mt-4 flex space-x-2">
-                <button className="flex-1 py-2 px-3 text-sm rounded-lg bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-colors">
-                  Modify
+                <button 
+                  disabled={updateLoading}
+                  className="flex-1 py-2 px-3 text-sm rounded-lg bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-colors disabled:opacity-50"
+                >
+                  {updateLoading ? 'Updating...' : 'Modify'}
                 </button>
-                <button className="flex-1 py-2 px-3 text-sm rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors">
-                  Close
+                <button 
+                  onClick={() => dispatch(deletePosition(position.id))}
+                  disabled={deleteLoading}
+                  className="flex-1 py-2 px-3 text-sm rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors disabled:opacity-50"
+                >
+                  {deleteLoading ? 'Deleting...' : 'Close'}
                 </button>
               </div>
             </div>
           );
         })}
-      </div>
+        </div>
+      )}
     </div>
   );
 
@@ -571,12 +525,10 @@ const Positions = memo(function Positions() {
           margin: '0px'
         }}
       >
-        <div className="flex-1 overflow-hidden" style={{ height: 'calc(100vh - 80px)' }}>
+        <div className="flex-1 overflow-hidden" style={{ height: '100vh' }}>
           {content}
         </div>
-        <div className="flex-shrink-0" style={{ height: '80px' }}>
-          <FloatingNav activeTab={activeTab} onTabChange={handleTabChange} />
-        </div>
+        <FloatingNav activeTab={activeTab} onTabChange={handleTabChange} />
       </div>
     );
   }

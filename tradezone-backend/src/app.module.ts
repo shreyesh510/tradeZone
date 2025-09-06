@@ -6,11 +6,12 @@ import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { ChatModule } from './chat/chat.module';
 import { DatabaseModule } from './database/database.module';
+import { PositionsModule } from './positions/positions.module';
 
 import { FirebaseDatabaseService } from './database/firebase-database.service';
 
 @Module({
-  imports: [AuthModule, ChatModule, DatabaseModule],
+  imports: [AuthModule, ChatModule, DatabaseModule, PositionsModule],
   controllers: [AppController],
   providers: [
     AppService,

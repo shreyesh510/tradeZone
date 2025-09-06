@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAppDispatch } from '../../redux/hooks';
+import { useAppDispatch, useAppSelector } from '../../redux/hooks';
 import { logoutUser } from '../../redux/slices/authSlice';
 import { 
   useSettings, 
@@ -8,13 +8,64 @@ import {
   timeframeOptions, 
   chartStyleOptions 
 } from '../../contexts/SettingsContext';
+import Header from '../../layouts/Header';
+import Sidebar from '../../components/Sidebar';
+import FloatingNav, { type MobileTab } from '../../layouts/FloatingNav';
+
+interface OnlineUser {
+  userId: string;
+  userName: string;
+  socketId: string;
+}
 
 const Settings: React.FC = () => {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
+  const user = useAppSelector((state: any) => state.auth.user);
   const { settings, updateSettings, resetSettings, saveSettings } = useSettings();
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
+  const [userPermissions, setUserPermissions] = useState<any>(null);
+  const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
+  const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
+  const [isMobile, setIsMobile] = useState<boolean>(false);
+  const [activeTab, setActiveTab] = useState<MobileTab>('settings');
+
+  // Check if mobile
+  useEffect(() => {
+    const checkMobile = () => {
+      const isMobileView = window.innerWidth < 768;
+      setIsMobile(isMobileView);
+      // Open sidebar by default on desktop
+      if (!isMobileView && !sidebarOpen) {
+        setSidebarOpen(true);
+      }
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, [sidebarOpen]);
+
+  // Load permissions from localStorage
+  useEffect(() => {
+    const loadPermissions = () => {
+      try {
+        const savedPermissions = localStorage.getItem('permissions');
+        if (savedPermissions) {
+          setUserPermissions(JSON.parse(savedPermissions));
+        } else {
+          // Fallback to default permissions
+          setUserPermissions({ AiChat: false, investment: false });
+        }
+      } catch (error) {
+        console.error('Error loading permissions from localStorage:', error);
+        setUserPermissions({ AiChat: false, investment: false });
+      }
+    };
+
+    loadPermissions();
+  }, []);
 
   const handleSave = () => {
     saveSettings();
@@ -29,6 +80,14 @@ const Settings: React.FC = () => {
     setTimeout(() => setShowSaveSuccess(false), 2000);
   };
 
+  const toggleSidebar = () => {
+    setSidebarOpen(!sidebarOpen);
+  };
+
+  const handleTabChange = (tab: MobileTab) => {
+    setActiveTab(tab);
+  };
+
   const goBack = () => {
     navigate('/zone');
   };
@@ -38,48 +97,119 @@ const Settings: React.FC = () => {
     navigate('/');
   };
 
+  // Use settings for theme
+  const isDarkMode = settings.theme === 'dark';
+
+  // Mobile view - show settings in mobile layout
+  if (isMobile) {
+    return (
+      <div 
+        className={`${isDarkMode ? 'bg-gray-900' : 'bg-gray-100'} flex flex-col fixed inset-0 overflow-hidden`}
+        style={{ 
+          height: '100svh',
+          minHeight: '100vh',
+          maxHeight: '100vh',
+          width: '100vw',
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          paddingBottom: '0px',
+          margin: '0px'
+        }}
+      >
+        {/* Content - full screen settings */}
+        <div className="flex-1 overflow-hidden" style={{ height: '100vh' }}>
+          {renderSettingsContent()}
+        </div>
+
+        {/* Floating Navigation */}
+        <FloatingNav activeTab={activeTab} onTabChange={handleTabChange} />
+      </div>
+    );
+  }
+
+  // Desktop view - with Header and Sidebar
   return (
-    <div className={`h-screen flex flex-col overflow-hidden ${settings.theme === 'dark' ? 'bg-gray-900' : 'bg-gray-100'}`}>
-      {/* Header */}
-      <div className={`${settings.theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border-b`}>
-        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
+    <div className={`h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-100'} flex flex-col`}>
+      {/* Top Header */}
+      <Header 
+        onlineUsers={onlineUsers} 
+        sidebarOpen={sidebarOpen} 
+        onSidebarToggle={toggleSidebar} 
+      />
+
+      {/* Sidebar */}
+      <Sidebar isOpen={sidebarOpen} onToggle={toggleSidebar} />
+
+      {/* Main Content - Settings */}
+      <div className="flex-1 overflow-hidden">
+        {renderSettingsContent()}
+      </div>
+    </div>
+  );
+
+  // Settings content component
+  function renderSettingsContent() {
+  return (
+      <div className={`h-full flex flex-col overflow-hidden ${settings.theme === 'dark' ? 'bg-gray-900' : 'bg-gray-50'}`}>
+      {/* Modern Header with Gradient */}
+      <div className={`${settings.theme === 'dark' 
+        ? 'bg-gradient-to-r from-gray-800 via-gray-800 to-gray-700 border-gray-700' 
+        : 'bg-gradient-to-r from-white via-blue-50 to-indigo-50 border-gray-200'
+      } border-b shadow-sm`}>
+        <div className="max-w-6xl mx-auto px-6 py-6 flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <button
               onClick={goBack}
-              className={`p-2 rounded-lg transition-colors ${
+              className={`p-3 rounded-full transition-all duration-200 ${
                 settings.theme === 'dark' 
-                  ? 'text-gray-400 hover:text-white hover:bg-gray-700' 
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                  ? 'text-gray-400 hover:text-white hover:bg-gray-700 hover:scale-110' 
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-blue-100 hover:scale-110'
               }`}
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
             </button>
-            <h1 className={`text-2xl font-bold ${settings.theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+            <div>
+              <h1 className={`text-3xl font-bold ${settings.theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
               Settings
             </h1>
+              <p className={`text-sm ${settings.theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
+                Manage your account and preferences
+              </p>
+            </div>
           </div>
           
           <div className="flex items-center space-x-3">
-            {/* Header Save Button */}
+            {/* Modern Save Button */}
             <button
               onClick={handleSave}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+              className={`px-6 py-3 rounded-xl font-medium transition-all duration-200 flex items-center space-x-2 ${
+                settings.theme === 'dark'
+                  ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg hover:shadow-blue-500/25'
+                  : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-blue-500/25'
+              } transform hover:scale-105`}
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3-3m0 0l-3 3m3-3v12" />
               </svg>
-              <span>Save</span>
+              <span>Save Changes</span>
             </button>
           
-            {/* Save Success Notification */}
+            {/* Animated Success Notification */}
             {showSaveSuccess && (
-              <div className="bg-green-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2">
+              <div className={`px-4 py-3 rounded-xl flex items-center space-x-2 animate-pulse ${
+                settings.theme === 'dark'
+                  ? 'bg-green-600 text-white'
+                  : 'bg-gradient-to-r from-green-500 to-emerald-500 text-white'
+              } shadow-lg`}>
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
-                <span>Settings saved!</span>
+                <span className="font-medium">Saved!</span>
               </div>
             )}
           </div>
@@ -88,11 +218,140 @@ const Settings: React.FC = () => {
 
       {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-4xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="max-w-6xl mx-auto px-6 py-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+          
+          {/* Profile Section */}
+          <div className={`col-span-1 lg:col-span-2 xl:col-span-1 ${
+            settings.theme === 'dark' 
+              ? 'bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700' 
+              : 'bg-gradient-to-br from-white to-blue-50 border-gray-200'
+          } rounded-2xl border shadow-lg p-6`}>
+            <div className="text-center">
+              {/* Avatar */}
+              <div className={`w-24 h-24 rounded-full mx-auto mb-4 flex items-center justify-center text-2xl font-bold ${
+                settings.theme === 'dark'
+                  ? 'bg-gradient-to-br from-blue-500 to-purple-600 text-white'
+                  : 'bg-gradient-to-br from-blue-500 to-indigo-600 text-white'
+              } shadow-lg`}>
+                {user?.name?.charAt(0).toUpperCase() || 'U'}
+              </div>
+              
+              {/* User Info */}
+              <h3 className={`text-xl font-bold mb-1 ${settings.theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                {user?.name || 'User'}
+              </h3>
+              <p className={`text-sm mb-4 ${settings.theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
+                {user?.email || 'user@example.com'}
+              </p>
+              
+              {/* Status Badge */}
+              <div className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+                settings.theme === 'dark'
+                  ? 'bg-green-900 text-green-300 border border-green-700'
+                  : 'bg-green-100 text-green-800 border border-green-200'
+              }`}>
+                <div className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></div>
+                Active
+              </div>
+            </div>
+          </div>
+
+          {/* Permissions Section */}
+          <div className={`col-span-1 lg:col-span-2 ${
+            settings.theme === 'dark' 
+              ? 'bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700' 
+              : 'bg-gradient-to-br from-white to-purple-50 border-gray-200'
+          } rounded-2xl border shadow-lg p-6`}>
+            <div className="flex items-center mb-6">
+              <div className={`p-3 rounded-xl mr-4 ${
+                settings.theme === 'dark'
+                  ? 'bg-purple-900/50 text-purple-400'
+                  : 'bg-purple-100 text-purple-600'
+              }`}>
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className={`text-lg font-semibold ${settings.theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                  Your Permissions
+                </h3>
+                <p className={`text-sm ${settings.theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
+                  Features available to your account
+                </p>
+              </div>
+            </div>
+            
+            <div className="space-y-3">
+              {/* AI Chat Permission */}
+              <div className={`flex items-center justify-between p-4 rounded-xl ${
+                settings.theme === 'dark' ? 'bg-gray-700/50' : 'bg-gray-50'
+              }`}>
+                <div className="flex items-center">
+                  <div className={`p-2 rounded-lg mr-3 ${
+                    userPermissions?.AiChat
+                      ? (settings.theme === 'dark' ? 'bg-green-900/50 text-green-400' : 'bg-green-100 text-green-600')
+                      : (settings.theme === 'dark' ? 'bg-red-900/50 text-red-400' : 'bg-red-100 text-red-600')
+                  }`}>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className={`font-medium ${settings.theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>AI Chat</p>
+                    <p className={`text-xs ${settings.theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
+                      Access to AI-powered trading assistant
+                    </p>
+                  </div>
+                </div>
+                <div className={`px-3 py-1 rounded-full text-xs font-medium ${
+                  userPermissions?.AiChat
+                    ? (settings.theme === 'dark' ? 'bg-green-900 text-green-300' : 'bg-green-100 text-green-700')
+                    : (settings.theme === 'dark' ? 'bg-red-900 text-red-300' : 'bg-red-100 text-red-700')
+                }`}>
+                  {userPermissions?.AiChat ? 'Enabled' : 'Disabled'}
+                </div>
+              </div>
+
+              {/* Investment Permission */}
+              <div className={`flex items-center justify-between p-4 rounded-xl ${
+                settings.theme === 'dark' ? 'bg-gray-700/50' : 'bg-gray-50'
+              }`}>
+                <div className="flex items-center">
+                  <div className={`p-2 rounded-lg mr-3 ${
+                    userPermissions?.investment
+                      ? (settings.theme === 'dark' ? 'bg-green-900/50 text-green-400' : 'bg-green-100 text-green-600')
+                      : (settings.theme === 'dark' ? 'bg-red-900/50 text-red-400' : 'bg-red-100 text-red-600')
+                  }`}>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className={`font-medium ${settings.theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Investment Portal</p>
+                    <p className={`text-xs ${settings.theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
+                      Access to investment management features
+                    </p>
+                  </div>
+                </div>
+                <div className={`px-3 py-1 rounded-full text-xs font-medium ${
+                  userPermissions?.investment
+                    ? (settings.theme === 'dark' ? 'bg-green-900 text-green-300' : 'bg-green-100 text-green-700')
+                    : (settings.theme === 'dark' ? 'bg-red-900 text-red-300' : 'bg-red-100 text-red-700')
+                }`}>
+                  {userPermissions?.investment ? 'Enabled' : 'Disabled'}
+                </div>
+              </div>
+            </div>
+          </div>
           
           {/* Appearance Settings */}
-          <div className={`${settings.theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-lg border p-6`}>
+          <div className={`${
+            settings.theme === 'dark' 
+              ? 'bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700' 
+              : 'bg-gradient-to-br from-white to-orange-50 border-gray-200'
+          } rounded-2xl border shadow-lg p-6`}>
             <h2 className={`text-xl font-semibold mb-6 ${settings.theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
               Appearance
             </h2>
@@ -345,6 +604,7 @@ const Settings: React.FC = () => {
       )}
     </div>
   );
+  }
 };
 
 export default Settings;

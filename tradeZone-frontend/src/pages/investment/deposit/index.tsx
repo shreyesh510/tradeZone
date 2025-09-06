@@ -483,42 +483,29 @@ const Deposit = memo(function Deposit() {
 
   const content = (
     <div className={`flex-1 p-6 overflow-y-auto ${
-      isDarkMode 
-        ? 'bg-gradient-to-br from-gray-900 via-slate-900 to-black text-white' 
-        : 'bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 text-gray-900'
+      isDarkMode ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-900'
     }`}>
-      {/* Header with futuristic glow */}
-      <div className="mb-8">
-        <h1 className={`text-4xl font-bold bg-gradient-to-r ${
-          isDarkMode 
-            ? 'from-cyan-400 via-purple-400 to-pink-400' 
-            : 'from-blue-600 via-purple-600 to-indigo-600'
-        } bg-clip-text text-transparent mb-2`}>
+      {/* Header */}
+      <div className="mb-6">
+        <h1 className={`text-xl font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
           Deposit Funds
         </h1>
-        <div className={`h-1 w-32 bg-gradient-to-r ${
-          isDarkMode 
-            ? 'from-cyan-400 via-purple-400 to-pink-400' 
-            : 'from-blue-600 via-purple-600 to-indigo-600'
-        } rounded-full`}></div>
       </div>
 
       {/* Time Filter Buttons */}
-      <div className="mb-8">
+      <div className="mb-6">
         <div className="flex flex-wrap gap-2">
           {(['1W', '1M', '6M', '1Y', '5Y'] as TimeFilter[]).map(filter => (
             <button
               key={filter}
               onClick={() => setSelectedTimeFilter(filter)}
-              className={`px-4 py-2 rounded-xl font-medium transition-all duration-300 ${
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                 selectedTimeFilter === filter
-                  ? isDarkMode
-                    ? 'bg-gradient-to-r from-cyan-500 to-purple-500 text-white shadow-lg shadow-cyan-500/25'
-                    : 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg shadow-blue-500/25'
+                  ? 'bg-blue-600 text-white'
                   : isDarkMode
-                  ? 'bg-gray-800/50 text-gray-300 hover:bg-gray-700/70 border border-gray-700/50'
-                  : 'bg-white/70 text-gray-700 hover:bg-white/90 border border-gray-200/50'
-              } backdrop-blur-sm`}
+                  ? 'bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-700'
+                  : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+              }`}
             >
               {filter}
             </button>
@@ -537,7 +524,7 @@ const Deposit = memo(function Deposit() {
             <h2 className={`text-lg font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
               Total Deposits ({selectedTimeFilter})
             </h2>
-            <p className="text-4xl font-bold text-transparent bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text">
+            <p className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
               ${totalDeposits.toLocaleString()}
             </p>
           </div>
@@ -556,7 +543,7 @@ const Deposit = memo(function Deposit() {
           : 'bg-white/60 border-white/20 shadow-xl shadow-gray-900/10'
       }`}>
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold">Deposit History</h2>
+          <h2 className="text-lg font-semibold">Deposit History</h2>
           <div className="flex items-center space-x-4">
             <div className={`px-3 py-1 rounded-lg ${
               isDarkMode ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-700'
@@ -579,7 +566,7 @@ const Deposit = memo(function Deposit() {
             ? 'bg-gray-800/30 border-gray-700/50 shadow-xl shadow-gray-900/20' 
             : 'bg-white/60 border-white/20 shadow-xl shadow-gray-900/10'
         }`}>
-          <h2 className="text-2xl font-bold mb-6">New Deposit</h2>
+          <h2 className="text-lg font-semibold mb-4">New Deposit</h2>
           
           <form onSubmit={handleDepositSubmit} className="space-y-6">
             <div>
@@ -622,7 +609,7 @@ const Deposit = memo(function Deposit() {
             ? 'bg-gray-800/30 border-gray-700/50 shadow-xl shadow-gray-900/20' 
             : 'bg-white/60 border-white/20 shadow-xl shadow-gray-900/10'
         }`}>
-          <h2 className="text-2xl font-bold mb-6">Recent Deposits</h2>
+          <h2 className="text-lg font-semibold mb-4">Recent Deposits</h2>
           
           <div className="space-y-4 max-h-96 overflow-y-auto">
             {filteredDeposits.length === 0 ? (
@@ -691,12 +678,10 @@ const Deposit = memo(function Deposit() {
           margin: '0px'
         }}
       >
-        <div className="flex-1 overflow-hidden" style={{ height: 'calc(100vh - 80px)' }}>
+        <div className="flex-1 overflow-hidden" style={{ height: '100vh' }}>
           {content}
         </div>
-        <div className="flex-shrink-0" style={{ height: '80px' }}>
-          <FloatingNav activeTab={activeTab} onTabChange={handleTabChange} />
-        </div>
+        <FloatingNav activeTab={activeTab} onTabChange={handleTabChange} />
       </div>
     );
   }

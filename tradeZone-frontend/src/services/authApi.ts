@@ -37,6 +37,7 @@ export const authApi = {
   },
 
   logout: () => {
+    localStorage.removeItem('token');
     localStorage.removeItem('testToken');
     localStorage.removeItem('user');
     localStorage.removeItem('permissions');

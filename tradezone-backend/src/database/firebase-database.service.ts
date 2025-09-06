@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { FirebaseConfig } from '../config/firebase.config';
 import * as admin from 'firebase-admin';
 import { Permission, UserPermissions, DEFAULT_USER_PERMISSIONS } from '../auth/entities/permission.entity';
+import { Position } from '../positions/entities/position.entity';
 
 export interface User {
   id: string;
@@ -20,6 +21,7 @@ export class FirebaseDatabaseService {
   private firestore: admin.firestore.Firestore;
   private usersCollection = 'users';
   private permissionsCollection = 'permissions';
+  private positionsCollection = 'positions';
 
   constructor(private firebaseConfig: FirebaseConfig) {
     // Firestore will be initialized in onModuleInit
@@ -268,6 +270,133 @@ export class FirebaseDatabaseService {
     } catch (error) {
       console.error('Error getting all permissions:', error);
       throw error;
+    }
+  }
+
+  // Position operations
+  async getPositions(userId: string): Promise<Position[]> {
+    try {
+      const snapshot = await this.getFirestore()
+        .collection(this.positionsCollection)
+        .where('userId', '==', userId)
+        .orderBy('createdAt', 'desc')
+        .get();
+      
+      return snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Position[];
+    } catch (error) {
+      console.error('Error getting positions:', error);
+      return [];
+    }
+  }
+
+  async getPositionById(positionId: string): Promise<Position | null> {
+    try {
+      const doc = await this.getFirestore()
+        .collection(this.positionsCollection)
+        .doc(positionId)
+        .get();
+
+      if (!doc.exists) {
+        return null;
+      }
+
+      return {
+        id: doc.id,
+        ...doc.data()
+      } as Position;
+    } catch (error) {
+      console.error('Error getting position by ID:', error);
+      return null;
+    }
+  }
+
+  async createPosition(positionData: Omit<Position, 'id'>): Promise<Position> {
+    try {
+      // Use serverTimestamp() for Firestore timestamps
+      const now = new Date();
+      const docRef = await this.getFirestore().collection(this.positionsCollection).add({
+        ...positionData,
+        createdAt: now,
+        updatedAt: now
+      });
+
+      return {
+        id: docRef.id,
+        ...positionData,
+        createdAt: now,
+        updatedAt: now
+      };
+    } catch (error) {
+      console.error('Error creating position:', error);
+      throw error;
+    }
+  }
+
+  async updatePosition(positionId: string, positionData: Partial<Position>): Promise<void> {
+    try {
+      await this.getFirestore()
+        .collection(this.positionsCollection)
+        .doc(positionId)
+        .update({
+          ...positionData,
+          updatedAt: new Date()
+        });
+    } catch (error) {
+      console.error('Error updating position:', error);
+      throw error;
+    }
+  }
+
+  async deletePosition(positionId: string): Promise<void> {
+    try {
+      await this.getFirestore()
+        .collection(this.positionsCollection)
+        .doc(positionId)
+        .delete();
+    } catch (error) {
+      console.error('Error deleting position:', error);
+      throw error;
+    }
+  }
+
+  async getOpenPositions(userId: string): Promise<Position[]> {
+    try {
+      const snapshot = await this.getFirestore()
+        .collection(this.positionsCollection)
+        .where('userId', '==', userId)
+        .where('status', '==', 'open')
+        .orderBy('createdAt', 'desc')
+        .get();
+      
+      return snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Position[];
+    } catch (error) {
+      console.error('Error getting open positions:', error);
+      return [];
+    }
+  }
+
+  async getClosedPositions(userId: string): Promise<Position[]> {
+    try {
+      const snapshot = await this.getFirestore()
+        .collection(this.positionsCollection)
+        .where('userId', '==', userId)
+        .where('status', '==', 'closed')
+        .orderBy('closedAt', 'desc')
+        .get();
+      
+      return snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Position[];
+    } catch (error) {
+      console.error('Error getting closed positions:', error);
+      return [];
     }
   }
 }

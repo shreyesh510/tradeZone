@@ -16,7 +16,11 @@ const api = axios.create({
 // Request interceptor to add auth token
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('testToken');
+    // Try to get JWT token first, fallback to testToken
+    const jwtToken = localStorage.getItem('token');
+    const testToken = localStorage.getItem('testToken');
+    const token = jwtToken || testToken;
+    
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -24,7 +28,8 @@ api.interceptors.request.use(
       method: config.method?.toUpperCase(),
       url: config.url,
       baseURL: config.baseURL,
-      hasToken: !!token
+      hasToken: !!token,
+      tokenType: jwtToken ? 'JWT' : 'testToken'
     });
     return config;
   },
@@ -54,8 +59,10 @@ api.interceptors.response.use(
     
     if (error.response?.status === 401) {
       console.log('🔒 Unauthorized, clearing tokens...');
+      localStorage.removeItem('token');
       localStorage.removeItem('testToken');
       localStorage.removeItem('user');
+      localStorage.removeItem('permissions');
       // Don't redirect for login requests to avoid page refresh
       if (!error.config?.url?.includes('/auth/login')) {
         window.location.href = '/login';
