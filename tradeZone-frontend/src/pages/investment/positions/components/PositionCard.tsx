@@ -5,7 +5,7 @@ interface Position {
   symbol: string;
   side: 'buy' | 'sell';
   entryPrice: number;
-  currentPrice: number;
+  currentPrice?: number;
   lots: number;
   investedAmount: number;
   platform: 'Delta Exchange' | 'Groww';
@@ -22,9 +22,10 @@ interface PositionCardProps {
 const PositionCard = memo<PositionCardProps>(({ position, isDarkMode }) => {
   // Calculate P&L for a position
   const calculatePnL = (position: Position) => {
+    const current = position.currentPrice ?? position.entryPrice;
     const priceDiff = position.side === 'buy' 
-      ? position.currentPrice - position.entryPrice
-      : position.entryPrice - position.currentPrice;
+      ? current - position.entryPrice
+      : position.entryPrice - current;
     
     const pnl = priceDiff * position.lots;
     const pnlPercent = (pnl / position.investedAmount) * 100;

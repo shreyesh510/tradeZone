@@ -6,7 +6,7 @@ interface Position {
   symbol: string;
   side: 'buy' | 'sell';
   entryPrice: number;
-  currentPrice: number;
+  currentPrice?: number;
   lots: number;
   investedAmount: number;
   platform: 'Delta Exchange' | 'Groww';

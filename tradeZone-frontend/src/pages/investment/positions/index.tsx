@@ -113,11 +113,41 @@ const Positions = memo(function Positions() {
 
   const isDarkMode = settings.theme === 'dark';
 
+  // Show unique symbols only (keep the most recent position per symbol)
+  const uniquePositions: Position[] = (() => {
+    const bySymbol = new Map<string, Position>();
+    const toEpoch = (p: Position): number => {
+      const t1 = p.createdAt ? new Date(p.createdAt).getTime() : NaN;
+      const t2 = p.updatedAt ? new Date(p.updatedAt).getTime() : NaN;
+      const t3 = p.timestamp ? Date.parse(p.timestamp) : NaN;
+      // choose the max valid timestamp; fallback to 0 if all invalid
+      return Math.max(
+        Number.isFinite(t1) ? t1 : 0,
+        Number.isFinite(t2) ? t2 : 0,
+        Number.isFinite(t3) ? t3 : 0
+      );
+    };
+    positions.forEach((p) => {
+      const key = p.symbol.toUpperCase();
+      const existing = bySymbol.get(key);
+      if (!existing) {
+        bySymbol.set(key, p);
+        return;
+      }
+      // keep the most recent
+      if (toEpoch(p) >= toEpoch(existing)) {
+        bySymbol.set(key, p);
+      }
+    });
+    return Array.from(bySymbol.values());
+  })();
+
   // Calculate P&L for a position
   const calculatePnL = (position: Position) => {
+    const current = (position as any).currentPrice ?? position.entryPrice; // fallback if not stored
     const priceDiff = position.side === 'buy' 
-      ? position.currentPrice - position.entryPrice
-      : position.entryPrice - position.currentPrice;
+      ? current - position.entryPrice
+      : position.entryPrice - current;
     
     const pnl = priceDiff * position.lots;
     const pnlPercent = (pnl / position.investedAmount) * 100;
@@ -142,13 +172,23 @@ const Positions = memo(function Positions() {
       return;
     }
 
+    const lotsNum = parseInt(String(positionForm.lots).replace(/[,\s]/g, ''));
+    const entryNum = parseFloat(String(positionForm.entryPrice).replace(/[,\s]/g, ''));
+    if (!Number.isFinite(lotsNum) || lotsNum <= 0) {
+      toast.warning('Lots must be a positive number');
+      return;
+    }
+    if (!Number.isFinite(entryNum) || entryNum <= 0) {
+      toast.warning('Entry price must be a positive number');
+      return;
+    }
+
     const newPositionData: CreatePositionData = {
       symbol: positionForm.symbol.toUpperCase(),
       side: positionForm.side,
-      entryPrice: parseFloat(positionForm.entryPrice),
-      currentPrice: parseFloat(positionForm.entryPrice), // Start with entry price
+      entryPrice: entryNum,
       lots: parseInt(positionForm.lots),
-      investedAmount: parseFloat(positionForm.entryPrice) * parseInt(positionForm.lots),
+      investedAmount: entryNum * lotsNum,
       platform: positionForm.platform,
       leverage: parseInt(positionForm.leverage),
       timestamp: new Date().toLocaleString()
@@ -213,6 +253,7 @@ const Positions = memo(function Positions() {
           const data = results.data as Record<string, string>[];
           const validPositions: CreatePositionData[] = [];
           let errorCount = 0;
+          let skippedNonPositive = 0;
           
           try {
             // Process each row from the CSV
@@ -225,14 +266,20 @@ const Positions = memo(function Positions() {
                 const symbol = row.Contract || row.Symbol || row['Stock Symbol'] || row['Company'] || '';
                 const sideValue = (row.Side || 'buy').toLowerCase();
                 const side = ['buy', 'sell'].includes(sideValue) ? sideValue : 'buy';
-                const lots = parseFloat(row.Qty || row.Quantity || '0');
-                const entryPrice = parseFloat(row['Exec.Price'] || row['Entry Price'] || row['Purchase Price'] || row['Avg. Cost'] || '0');
-                const orderValue = parseFloat(row['Order Value'] || '0');
-                const leverage = parseInt(row['Leverage'] || '20');
+                const parseNum = (v: any) => parseFloat(String(v ?? '0').replace(/[,\s]/g, ''));
+                const lots = parseNum(row.Qty || row.Quantity || '0');
+                const entryPrice = parseNum(row['Exec.Price'] || row['Entry Price'] || row['Purchase Price'] || row['Avg. Cost'] || '0');
+                const orderValue = parseNum(row['Order Value'] || '0');
+                const leverageParsed = parseInt(String(row['Leverage'] || '20').replace(/[,\s]/g, ''));
+                const leverage = Number.isFinite(leverageParsed) && leverageParsed > 0 ? leverageParsed : 20;
                 
-                if (!symbol || isNaN(lots) || isNaN(entryPrice)) {
+                if (!symbol || !Number.isFinite(lots) || !Number.isFinite(entryPrice)) {
                   console.error('Invalid row data:', row);
                   errorCount++;
+                  continue;
+                }
+                if (lots <= 0 || entryPrice <= 0) {
+                  skippedNonPositive++;
                   continue;
                 }
                 
@@ -240,15 +287,18 @@ const Positions = memo(function Positions() {
                   symbol,
                   side: side as 'buy' | 'sell',
                   entryPrice,
-                  currentPrice: entryPrice,
                   lots,
-                  investedAmount: orderValue || entryPrice * lots,
+                  investedAmount: (orderValue && orderValue > 0) ? orderValue : entryPrice * lots,
                   platform: 'Delta Exchange', // Always use Delta Exchange
                   leverage,
                   status: 'open',
                   timestamp: row.Time || row['Date'] || row['Purchase Date'] || new Date().toLocaleString()
                 };
                 
+                if (!Number.isFinite(positionData.investedAmount) || positionData.investedAmount <= 0) {
+                  skippedNonPositive++;
+                  continue;
+                }
                 validPositions.push(positionData);
               } catch (err) {
                 console.error('Failed to parse position:', err);
@@ -267,6 +317,9 @@ const Positions = memo(function Positions() {
             
             if (errorCount > 0) {
               toast.warning(`${errorCount} rows had invalid data and were skipped`);
+            }
+            if (skippedNonPositive > 0) {
+              toast.warning(`${skippedNonPositive} rows had non-positive numbers and were skipped`);
             }
           } catch (error) {
             console.error('Error processing CSV data:', error);
@@ -583,7 +636,7 @@ const Positions = memo(function Positions() {
       {/* Positions Grid */}
       {!loading && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {positions.map((position) => {
+          {uniquePositions.map((position) => {
           const { pnl, pnlPercent } = calculatePnL(position);
           const isProfitable = pnl >= 0;
 

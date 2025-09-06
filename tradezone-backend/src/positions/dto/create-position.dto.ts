@@ -15,9 +15,10 @@ export class CreatePositionDto {
   @IsPositive()
   entryPrice: number;
 
+  @IsOptional()
   @IsNumber()
   @IsPositive()
-  currentPrice: number;
+  currentPrice?: number;
 
   @IsNumber()
   @IsPositive()

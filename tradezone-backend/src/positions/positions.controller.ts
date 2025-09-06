@@ -36,7 +36,7 @@ export class PositionsController {
   @Header('Cache-Control', 'no-cache, no-store, must-revalidate')
   @Header('Pragma', 'no-cache')
   @Header('Expires', '0')
-  async findAll(@Request() req, @Query('status') status?: string) {
+  async findAll(@Request() req, @Query('status') status?: string, @Query('unique') unique?: string) {
     console.log('🔍 Getting positions for user:', req.user.userId);
     const userId = req.user.userId;
     
@@ -44,13 +44,19 @@ export class PositionsController {
       throw new Error('User ID not found in JWT token');
     }
     
+    const wantUnique = String(unique).toLowerCase() === 'true';
+    
     if (status === 'open') {
-      return await this.positionsService.getOpenPositions(userId);
+      const list = await this.positionsService.getOpenPositions(userId);
+      return wantUnique ? this.positionsService.uniqueBySymbol(list) : list;
     } else if (status === 'closed') {
-      return await this.positionsService.getClosedPositions(userId);
+      const list = await this.positionsService.getClosedPositions(userId);
+      return wantUnique ? this.positionsService.uniqueBySymbol(list) : list;
     }
     
-    const positions = await this.positionsService.findAll(userId);
+    const positions = wantUnique
+      ? await this.positionsService.findAllUnique(userId)
+      : await this.positionsService.findAll(userId);
     console.log(`🔍 Found ${positions.length} positions for user ${userId}`);
     return positions;
   }

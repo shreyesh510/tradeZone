@@ -9,6 +9,7 @@ import { usePermissions } from '../../../hooks/usePermissions';
 import type { RootState, AppDispatch } from '../../../redux/store';
 import type { Position } from '../../../types/position';
 import { fetchPositions } from '../../../redux/thunks/positions/positionsThunks';
+import { tradingViewService } from '../../../services/tradingViewService';
 
 interface OnlineUser {
   userId: string;
@@ -29,6 +30,8 @@ export default function InvestmentPositionsBySymbol() {
   const [activeTab, setActiveTab] = useState<MobileTab>('chart');
 
   const { positions, loading } = useSelector((state: RootState) => state.positions);
+  const [livePrice, setLivePrice] = useState<number | null>(null);
+  const [priceUpdatedAt, setPriceUpdatedAt] = useState<number | null>(null);
 
   // Guard: redirect if no access
   useEffect(() => {
@@ -52,6 +55,24 @@ export default function InvestmentPositionsBySymbol() {
     }
   }, [dispatch]);
 
+  // Live price fetch for the selected symbol (refresh every 30s)
+  useEffect(() => {
+    let intervalId: number | undefined;
+    const fetchLive = async () => {
+      if (!symbol) return;
+      const info = await tradingViewService.getCryptoInfo(symbol);
+      if (info && typeof info.current_price === 'number') {
+        setLivePrice(info.current_price);
+        setPriceUpdatedAt(Date.now());
+      }
+    };
+    fetchLive();
+    intervalId = window.setInterval(fetchLive, 30000);
+    return () => {
+      if (intervalId) window.clearInterval(intervalId);
+    };
+  }, [symbol]);
+
   const toggleSidebar = () => setSidebarOpen((s) => !s);
   const handleTabChange = (tab: MobileTab) => setActiveTab(tab);
   const isDarkMode = settings.theme === 'dark';
@@ -71,7 +92,8 @@ export default function InvestmentPositionsBySymbol() {
   }, [list]);
 
   const calcPnL = (p: Position) => {
-    const priceDiff = p.side === 'buy' ? p.currentPrice - p.entryPrice : p.entryPrice - p.currentPrice;
+    const current = (livePrice ?? (p as any).currentPrice ?? p.entryPrice) as number;
+    const priceDiff = p.side === 'buy' ? current - p.entryPrice : p.entryPrice - current;
     const pnl = priceDiff * p.lots;
     const pnlPercent = p.investedAmount ? (pnl / p.investedAmount) * 100 : 0;
     return { pnl, pnlPercent };
@@ -133,9 +155,16 @@ export default function InvestmentPositionsBySymbol() {
                     </td>
                     <td className="px-4 py-3 text-right">{p.lots}</td>
                     <td className="px-4 py-3 text-right">${p.entryPrice.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-right">${p.currentPrice.toLocaleString()}</td>
+                    <td className="px-4 py-3 text-right">
+                      {livePrice ? `$${livePrice.toLocaleString()}` : `$${((p as any).currentPrice ?? p.entryPrice).toLocaleString()}`}
+                      {priceUpdatedAt && (
+                        <span className={`ml-2 text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>
+                          updated {new Date(priceUpdatedAt).toLocaleTimeString()}
+                        </span>
+                      )}
+                    </td>
                     <td className="px-4 py-3 text-right">${p.investedAmount.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-right">{typeof p.tradingFee === 'number' ? `$${p.tradingFee.toFixed(4)}` : '-'}</td>
+                    <td className="px-4 py-3 text-right">{typeof (p as any).tradingFee === 'number' ? `$${(p as any).tradingFee.toFixed(4)}` : '-'}</td>
                     <td className={`px-4 py-3 text-right font-semibold ${pnlColor}`}>${pnl.toFixed(2)}</td>
                     <td className={`px-4 py-3 text-right ${pnlColor}`}>({pnlPercent.toFixed(2)}%)</td>
                     <td className="px-4 py-3">{p.status}</td>

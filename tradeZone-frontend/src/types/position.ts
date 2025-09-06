@@ -4,7 +4,7 @@ export interface Position {
   symbol: string;
   side: 'buy' | 'sell';
   entryPrice: number;
-  currentPrice: number;
+  currentPrice?: number; // may be omitted; UI should use live price
   lots: number;
   investedAmount: number;
   platform: 'Delta Exchange' | 'Groww';
@@ -26,7 +26,7 @@ export interface CreatePositionData {
   side: 'buy' | 'sell';
   lots: number;
   entryPrice: number;
-  currentPrice: number;
+  currentPrice?: number; // optional; live price will be fetched client-side
   investedAmount: number;
   platform: 'Delta Exchange' | 'Groww';
   leverage: number;

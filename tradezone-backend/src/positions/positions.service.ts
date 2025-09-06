@@ -50,6 +50,38 @@ export class PositionsService {
     }
   }
 
+  // Helper: pick most recent position per symbol (case-insensitive)
+  public uniqueBySymbol(positions: Position[]): Position[] {
+    const bySymbol = new Map<string, Position>();
+    const toEpoch = (p: Position): number => {
+      const t1 = (p as any).createdAt ? new Date((p as any).createdAt).getTime() : NaN;
+      const t2 = (p as any).updatedAt ? new Date((p as any).updatedAt).getTime() : NaN;
+      const t3 = (p as any).timestamp ? Date.parse((p as any).timestamp) : NaN;
+      return Math.max(
+        Number.isFinite(t1) ? t1 : 0,
+        Number.isFinite(t2) ? t2 : 0,
+        Number.isFinite(t3) ? t3 : 0
+      );
+    };
+    for (const p of positions) {
+      const key = (p.symbol || '').toUpperCase();
+      const existing = bySymbol.get(key);
+      if (!existing) {
+        bySymbol.set(key, p);
+        continue;
+      }
+      if (toEpoch(p) >= toEpoch(existing)) {
+        bySymbol.set(key, p);
+      }
+    }
+    return Array.from(bySymbol.values());
+  }
+
+  async findAllUnique(userId: string): Promise<Position[]> {
+    const positions = await this.findAll(userId);
+    return this.uniqueBySymbol(positions);
+  }
+
   async findOne(id: string, userId: string): Promise<Position> {
     const position = await this.firebaseDatabaseService.getPositionById(id);
     
@@ -171,8 +203,8 @@ export class PositionsService {
         userId,
         status: 'open',
         timestamp: p.timestamp ?? new Date().toISOString(),
-  // enforce default leverage mapping on bulk insertion
-        leverage: this.getDefaultLeverageForSymbol(sym),
+        // Preserve provided leverage; fallback to sensible default by symbol
+        leverage: (p as any).leverage ?? this.getDefaultLeverageForSymbol(sym),
         createdAt: new Date(),
         updatedAt: new Date(),
       } as any);
@@ -186,9 +218,10 @@ export class PositionsService {
 
   // Calculate P&L for a position
   calculatePnL(position: Position): { pnl: number; pnlPercent: number } {
+    const current = (position as any).currentPrice ?? position.entryPrice;
     const priceDiff = position.side === 'buy' 
-      ? position.currentPrice - position.entryPrice
-      : position.entryPrice - position.currentPrice;
+      ? current - position.entryPrice
+      : position.entryPrice - current;
     
     const pnl = priceDiff * position.lots;
     const pnlPercent = (pnl / position.investedAmount) * 100;
