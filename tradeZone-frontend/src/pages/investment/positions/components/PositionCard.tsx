@@ -108,21 +108,7 @@ const PositionCard = memo<PositionCardProps>(({ position, isDarkMode }) => {
         </div>
       </div>
 
-      {/* Price Information */}
-      <div className="space-y-3 mb-4">
-        <div className="flex justify-between">
-          <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Entry Price:</span>
-          <span className="font-medium">${position.entryPrice.toLocaleString()}</span>
-        </div>
-        <div className="flex justify-between">
-          <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Current Price:</span>
-          <span className="font-medium">${position.currentPrice.toLocaleString()}</span>
-        </div>
-        <div className="flex justify-between">
-          <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Invested Amount:</span>
-          <span className="font-medium">${position.investedAmount.toLocaleString()}</span>
-        </div>
-      </div>
+  {/* Price Information removed per request */}
 
       {/* P&L Display */}
       <div className={`p-4 rounded-xl ${
@@ -160,12 +146,7 @@ const PositionCard = memo<PositionCardProps>(({ position, isDarkMode }) => {
         </div>
       </div>
 
-      {/* Timestamp */}
-      <div className="mt-4 text-center">
-        <p className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-          Added: {formatDate(position.createdAt || position.timestamp)}
-        </p>
-      </div>
+  {/* Timestamp removed per request */}
 
       {/* Action Buttons */}
       <div className="mt-4 flex space-x-2">

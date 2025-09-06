@@ -12,6 +12,12 @@ import { clearError } from '../../../redux/slices/positionsSlice';
 import type { Position } from '../../../types/position';
 import Button from '../../../components/button';
 
+interface OnlineUser {
+  userId: string;
+  userName: string;
+  socketId: string;
+}
+
 const SymbolPositions = memo(function SymbolPositions() {
   const { symbol } = useParams<{ symbol: string }>();
   const navigate = useNavigate();
@@ -20,6 +26,7 @@ const SymbolPositions = memo(function SymbolPositions() {
   const { canAccessInvestment } = usePermissions();
   
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
+  const [onlineUsers] = useState<OnlineUser[]>([]);
   const [isMobile, setIsMobile] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<MobileTab>('chart');
 
@@ -271,7 +278,7 @@ const SymbolPositions = memo(function SymbolPositions() {
                         {position.platform}
                       </td>
                       <td className={`px-6 py-4 whitespace-nowrap text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-900'}`}>
-                        {new Date(position.timestamp).toLocaleDateString()}
+                        {position.timestamp ? new Date(position.timestamp).toLocaleDateString() : '-'}
                       </td>
                     </tr>
                   );
@@ -332,6 +339,7 @@ const SymbolPositions = memo(function SymbolPositions() {
   return (
     <div className={`h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-100'} flex flex-col`}>
       <Header 
+        onlineUsers={onlineUsers}
         sidebarOpen={sidebarOpen} 
         onSidebarToggle={toggleSidebar} 
       />

@@ -199,11 +199,16 @@ const Positions = memo(function Positions() {
         return;
       }
       
+      // Ensure we have a string to parse (FileReader can return string or ArrayBuffer)
+      const csvText = typeof event.target.result === 'string'
+        ? event.target.result
+        : new TextDecoder().decode(event.target.result as ArrayBuffer);
+
       // Parse the CSV content
-      Papa.parse(event.target.result.toString(), {
+  (Papa as any).parse(csvText, {
         header: true,
         skipEmptyLines: true,
-        complete: (results) => {
+  complete: (results: Papa.ParseResult<Record<string, string>>) => {
           const data = results.data as Record<string, string>[];
           const validPositions: CreatePositionData[] = [];
           let errorCount = 0;
@@ -636,29 +641,10 @@ const Positions = memo(function Positions() {
                   }`}>
                     {position.lots} Lots
                   </div>
-                  <div className={`px-3 py-1 rounded-lg text-xs font-medium ${
-                    isDarkMode ? 'bg-purple-500/20 text-purple-400' : 'bg-purple-100 text-purple-700'
-                  }`}>
-                    {position.leverage}X
-                  </div>
                 </div>
               </div>
 
-              {/* Price Information */}
-              <div className="space-y-3 mb-4">
-                <div className="flex justify-between">
-                  <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Entry Price:</span>
-                  <span className="font-medium">${position.entryPrice.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Current Price:</span>
-                  <span className="font-medium">${position.currentPrice.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Invested Amount:</span>
-                  <span className="font-medium">${position.investedAmount.toLocaleString()}</span>
-                </div>
-              </div>
+              
 
               {/* P&L Display */}
               <div className={`p-4 rounded-xl ${
@@ -696,23 +682,19 @@ const Positions = memo(function Positions() {
                 </div>
               </div>
 
-              {/* Timestamp */}
-              <div className="mt-4 text-center">
-                <p className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-                  Added: {position.timestamp}
-                </p>
-              </div>
+              
 
               {/* Action Buttons */}
               <div className="mt-4 flex space-x-2">
                 <button 
+                  onClick={(e) => e.stopPropagation()}
                   disabled={updateLoading}
                   className="flex-1 py-2 px-3 text-sm rounded-lg bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-colors disabled:opacity-50"
                 >
                   {updateLoading ? 'Updating...' : 'Modify'}
                 </button>
                 <button 
-                  onClick={() => dispatch(deletePosition(position.id))}
+                  onClick={(e) => { e.stopPropagation(); dispatch(deletePosition(position.id)); }}
                   disabled={deleteLoading}
                   className="flex-1 py-2 px-3 text-sm rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors disabled:opacity-50"
                 >
