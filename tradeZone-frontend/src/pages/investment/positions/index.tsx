@@ -274,8 +274,9 @@ const Positions = memo(function Positions() {
                 const lots = parseNum(row.Qty || row.Quantity || '0');
                 const entryPrice = parseNum(row['Exec.Price'] || row['Entry Price'] || row['Purchase Price'] || row['Avg. Cost'] || '0');
                 const orderValue = parseNum(row['Order Value'] || '0');
-                const leverageParsed = parseInt(String(row['Leverage'] || '20').replace(/[,\s]/g, ''));
-                const leverage = Number.isFinite(leverageParsed) && leverageParsed > 0 ? leverageParsed : 20;
+                // Enforce leverage for bulk insert based on symbol
+                const symUpper = String(symbol || '').toUpperCase();
+                const leverage = symUpper === 'BTCUSD' || symUpper === 'ETHUSD' ? 200 : 100;
                 
                 if (!symbol || !Number.isFinite(lots) || !Number.isFinite(entryPrice)) {
                   console.error('Invalid row data:', row);

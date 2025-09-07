@@ -211,21 +211,10 @@ export class PositionsService {
   // Helper: default leverage by symbol for bulk imports
   private getDefaultLeverageForSymbol(symbol: string): number {
     const sym = (symbol || '').toUpperCase();
-    const twoHundred = new Set(['BTCUSD', 'ETHUSD']);
-    const oneHundred = new Set([
-      'SOLUSD',
-      'AVAXUSD',
-      'XRPUSD',
-      'BNBUSD',
-      'LTCUSD',
-      'DOGEUSD',
-      'ALGOUSD',
-      'SUIUSD',
-      'FLOKIUSD',
-    ]);
-    if (twoHundred.has(sym)) return 200;
-    if (oneHundred.has(sym)) return 100;
-    return 20; // sensible fallback
+  const twoHundred = new Set(['BTCUSD', 'ETHUSD']);
+  if (twoHundred.has(sym)) return 200;
+  // Requirement: all other symbols default to 100x
+  return 100;
   }
 
   // Bulk create with dedupe (userId + symbol + entryPrice + same-day timestamp)
@@ -272,8 +261,9 @@ export class PositionsService {
         userId,
         status: 'open',
         timestamp: p.timestamp ?? new Date().toISOString(),
-        // Preserve provided leverage; fallback to sensible default by symbol
-        leverage: (p as any).leverage ?? this.getDefaultLeverageForSymbol(sym),
+        // Enforce leverage for bulk inserts based on symbol
+        // BTCUSD/ETHUSD => 200x, all others => 100x
+        leverage: this.getDefaultLeverageForSymbol(sym),
         createdAt: new Date(),
         updatedAt: new Date(),
       } as any);

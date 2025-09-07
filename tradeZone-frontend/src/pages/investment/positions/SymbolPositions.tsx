@@ -11,7 +11,6 @@ import { fetchPositionsBySymbol, deletePosition } from "../../../redux/thunks/po
 import { clearError } from "../../../redux/slices/positionsSlice";
 import type { Position } from "../../../types/position";
 import Button from "../../../components/button";
-import { getLotSize } from "../../../utils/lotSize";
 import { toast } from "react-toastify";
 
 interface OnlineUser {
@@ -103,16 +102,11 @@ const SymbolPositions = memo(function SymbolPositions() {
 
   // P&L removed from detail page
 
-  // Derive invested USD consistently for rows and totals
+  // Invested = lots * entryPrice (as per Delta Notional)
   const getInvestedUsd = (position: Position) => {
-    const lotSize = getLotSize(position.symbol);
-    if (lotSize > 0) {
-      const qty = (position.lots || 0) * lotSize;
-      const notionalAtEntry = position.entryPrice * qty;
-      const lev = position.leverage || 1;
-      return lev > 0 ? notionalAtEntry / lev : notionalAtEntry;
-    }
-    return position.investedAmount || 0;
+    const lots = Number(position.lots || 0);
+    const price = Number(position.entryPrice || 0);
+    return lots * price;
   };
 
   // Handle error display
@@ -402,7 +396,7 @@ const SymbolPositions = memo(function SymbolPositions() {
                           isDarkMode ? "text-gray-300" : "text-gray-900"
                         }`}
                       >
-                       $ {Number(position?.investedAmount / 86).toLocaleString()}
+                       $ {Number(investedUsd).toLocaleString()}
                       </td>
                       <td
                         className={`px-6 py-4 whitespace-nowrap text-sm ${
