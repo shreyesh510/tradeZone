@@ -156,12 +156,7 @@ const Positions = memo(function Positions() {
     platform: 'Delta Exchange',
     account: 'longterm',
   });
-  const leverageOptions = [20, 50, 100, 150, 200];
-  const symbolOptions = {
-    'Delta Exchange': ['BTCUSD', 'ETHUSD', 'DOGEUSD', 'ADAUSD', 'SOLUSD'],
-    'Groww': ['AAPL', 'TSLA', 'GOOGL', 'MSFT', 'AMZN', 'NVDA'],
-  };
-  const availableSymbols = symbolOptions[positionForm.platform];
+  // NOTE: Symbol is now a free-text field (Investment Name)
 
   // Handle form input changes
   const handleFormChange = (field: keyof PositionForm, value: string) => {
@@ -465,13 +460,13 @@ const Positions = memo(function Positions() {
               isDarkMode={isDarkMode}
             />
 
-            {/* Symbol Selection */}
-            <Select
+            {/* Investment Name (replaces Symbol dropdown) */}
+            <Input
+              type="text"
               value={positionForm.symbol}
               onChange={(value) => handleFormChange('symbol', value)}
-              options={availableSymbols.map((symbol) => ({ value: symbol, label: symbol }))}
-              placeholder="Select Symbol"
-              label="Symbol"
+              placeholder="Enter investment name"
+              label="Investment Name"
               required
               isDarkMode={isDarkMode}
             />

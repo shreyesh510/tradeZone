@@ -50,13 +50,7 @@ const ModifyPositionModal: React.FC<ModifyPositionModalProps> = ({
     }));
   };
 
-  // Symbol options for the form
-  const symbolOptions = {
-    'Delta Exchange': ['BTCUSD', 'ETHUSD', 'DOGEUSD', 'ADAUSD', 'SOLUSD'],
-    'Groww': ['AAPL', 'TSLA', 'GOOGL', 'MSFT', 'AMZN', 'NVDA']
-  };
-
-  const availableSymbols = symbolOptions[formData.platform || position.platform];
+  // Symbol is now free-text (Investment Name)
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
@@ -113,27 +107,25 @@ const ModifyPositionModal: React.FC<ModifyPositionModalProps> = ({
               </select>
             </div>
 
-            {/* Symbol Selection */}
+            {/* Investment Name */}
             <div>
               <label className={`block text-sm font-medium mb-2 ${
                 isDarkMode ? 'text-gray-300' : 'text-gray-700'
               }`}>
-                Symbol
+                Investment Name
               </label>
-              <select
+              <input
+                type="text"
                 value={formData.symbol || position.symbol}
                 onChange={(e) => handleChange('symbol', e.target.value)}
+                placeholder="Enter investment name"
                 className={`w-full p-3 rounded-xl border backdrop-blur-sm ${
                   isDarkMode 
-                    ? 'bg-gray-700/50 border-gray-600/50 text-white' 
-                    : 'bg-white/70 border-gray-300/50 text-gray-900'
+                    ? 'bg-gray-700/50 border-gray-600/50 text-white placeholder-gray-400' 
+                    : 'bg-white/70 border-gray-300/50 text-gray-900 placeholder-gray-500'
                 } focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all`}
                 required
-              >
-                {availableSymbols.map(symbol => (
-                  <option key={symbol} value={symbol}>{symbol}</option>
-                ))}
-              </select>
+              />
             </div>
 
             {/* Lots */}
@@ -286,4 +278,5 @@ const ModifyPositionModal: React.FC<ModifyPositionModalProps> = ({
 };
 
 export default ModifyPositionModal;
+
 

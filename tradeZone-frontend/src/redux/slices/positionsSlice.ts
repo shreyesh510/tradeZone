@@ -7,7 +7,6 @@ import {
   deletePosition,
   fetchOpenPositions,
   fetchClosedPositions,
-  closeAllPositions,
 } from '../thunks/positions/positionsThunks';
 import type { Position, PositionLike, PositionFilters } from '../../types/position';
 
@@ -264,30 +263,7 @@ const positionsSlice = createSlice({
         state.error = action.payload as string;
       })
   // Bulk import removed
-      // Close all positions
-      .addCase(closeAllPositions.pending, (state) => {
-        state.updateLoading = true;
-        state.error = null;
-      })
-      .addCase(closeAllPositions.fulfilled, (state, action: PayloadAction<{ updated: number }>) => {
-        state.updateLoading = false;
-        // Optimistically update local state: mark all open positions as closed
-        const now = new Date().toISOString();
-        state.openPositions = [];
-        state.positions = state.positions.map((p) => {
-          if ('status' in p && (p as any).status === 'open') {
-            const updated = { ...(p as any), status: 'closed', closedAt: now } as Position;
-            state.closedPositions.unshift(updated);
-            return updated;
-          }
-          return p;
-        });
-        state.lastUpdated = Date.now();
-      })
-      .addCase(closeAllPositions.rejected, (state, action) => {
-        state.updateLoading = false;
-        state.error = action.payload as string;
-      });
+  // Close all positions removed
   },
 });
 

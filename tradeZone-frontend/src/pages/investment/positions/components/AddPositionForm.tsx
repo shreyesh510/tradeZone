@@ -27,13 +27,7 @@ const AddPositionForm = memo<AddPositionFormProps>(({
 }) => {
   if (!showForm) return null;
 
-  // Symbol options for the form
-  const symbolOptions = {
-    'Delta Exchange': ['BTCUSD', 'ETHUSD', 'DOGEUSD', 'ADAUSD', 'SOLUSD'],
-    'Groww': ['AAPL', 'TSLA', 'GOOGL', 'MSFT', 'AMZN', 'NVDA']
-  };
-
-  const availableSymbols = symbolOptions[positionForm.platform];
+  // Symbol is now a free-text field captured as Investment Name
 
   return (
     <div className={`p-8 rounded-2xl backdrop-blur-lg border mb-8 ${
@@ -63,26 +57,23 @@ const AddPositionForm = memo<AddPositionFormProps>(({
           </select>
         </div>
 
-        {/* Symbol Selection */}
+        {/* Investment Name */}
         <div>
           <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-            Symbol
+            Investment Name
           </label>
-          <select
+          <input
+            type="text"
             value={positionForm.symbol}
             onChange={(e) => onFormChange('symbol', e.target.value)}
+            placeholder="Enter investment name"
             className={`w-full p-3 rounded-xl border backdrop-blur-sm ${
               isDarkMode 
-                ? 'bg-gray-700/50 border-gray-600/50 text-white' 
-                : 'bg-white/70 border-gray-300/50 text-gray-900'
+                ? 'bg-gray-700/50 border-gray-600/50 text-white placeholder-gray-400' 
+                : 'bg-white/70 border-gray-300/50 text-gray-900 placeholder-gray-500'
             } focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all`}
             required
-          >
-            <option value="">Select Symbol</option>
-            {availableSymbols.map(symbol => (
-              <option key={symbol} value={symbol}>{symbol}</option>
-            ))}
-          </select>
+          />
         </div>
 
         {/* Lots */}

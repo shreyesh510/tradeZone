@@ -14,7 +14,6 @@ import {
 import { PositionsService } from './positions.service';
 import { CreatePositionDto } from './dto/create-position.dto';
 import { UpdatePositionDto } from './dto/update-position.dto';
-import { CreatePositionsBulkDto } from './dto/create-positions-bulk.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @Controller('positions')
@@ -74,12 +73,7 @@ export class PositionsController {
     return result;
   }
 
-  // Static and specific routes must come before dynamic ':id' to avoid being captured by it
-  @Get('getAllPositionsWithPnl')
-  async getAll(@Request() req) {
-    const userId = req.user.userId;
-    return await this.positionsService.getAllPositionsWithPnl(userId);
-  }
+  // Removed getAllPositionsWithPnl
 
   @Get('history')
   async history(@Request() req, @Query('limit') limit?: string) {
@@ -106,18 +100,9 @@ export class PositionsController {
     return await this.positionsService.getBySymbol(userId, symbol);
   }
 
-  @Post('multiple')
-  async createMultiple(@Body() dto: CreatePositionsBulkDto, @Request() req) {
-    const userId = req.user.userId;
-    return await this.positionsService.createBulk(dto, userId);
-  }
+  // Removed bulk create endpoint
 
-  @Post('close-all')
-  async closeAll(@Request() req, @Body('pnl') pnl?: number) {
-    const userId = req.user.userId;
-    const result = await this.positionsService.closeAllOpenForUser(userId, pnl);
-    return { updated: result };
-  }
+  // Removed close-all endpoint
 
   // Generic ID-based routes last
   @Get(':id')

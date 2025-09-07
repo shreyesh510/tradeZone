@@ -80,11 +80,6 @@ export const positionsApi = {
   },
 
 
-  // Close all open positions for the authenticated user
-  closeAllPositions: async (pnl?: number): Promise<{ updated: number }> => {
-    const response = await api.post('/positions/close-all', { pnl });
-    return response.data;
-  },
 
   // Get recent position history activities
   getHistory: async (limit = 20): Promise<any[]> => {

@@ -27,6 +27,8 @@ export class FirebaseDatabaseService {
   private withdrawalsCollection = 'withdrawals';
   private depositsCollection = 'deposits';
   private walletsCollection = 'wallets';
+  // New collection for explicit wallet history entries
+  private walletHistoryCollection = 'wallet_history';
 
   constructor(private firebaseConfig: FirebaseConfig) {
     // Firestore will be initialized in onModuleInit
@@ -775,6 +777,50 @@ export class FirebaseDatabaseService {
    */
   async getWalletHistory(userId: string, limit?: number): Promise<any[]> {
     try {
+      // Prefer explicit wallet_history collection when available
+      try {
+        const db = this.getFirestore();
+        let snap: admin.firestore.QuerySnapshot | null = null as any;
+        try {
+          // Primary path: requires composite index (userId asc, createdAt desc)
+          let query = db
+            .collection(this.walletHistoryCollection)
+            .where('userId', '==', userId)
+            .orderBy('createdAt', 'desc');
+          if (typeof limit === 'number' && limit > 0) {
+            query = query.limit(limit);
+          }
+          snap = await query.get();
+        } catch (idxErr) {
+          // Fallback when index is missing: query without orderBy, then sort/limit in-memory
+          const query = db
+            .collection(this.walletHistoryCollection)
+            .where('userId', '==', userId);
+          snap = await query.get();
+        }
+
+        const fromCollection = (snap?.docs || []).map((d) => {
+          const data = d.data() as any;
+          const createdAt = this.serializeDate(data.createdAt);
+          const updatedAt = this.serializeDate(data.updatedAt);
+          return { id: d.id, ...data, ...(createdAt ? { createdAt } : {}), ...(updatedAt ? { updatedAt } : {}) };
+        });
+
+        if (fromCollection.length > 0) {
+          // Ensure desc order by createdAt and apply limit if needed
+          fromCollection.sort((a: any, b: any) => {
+            const at = a?.createdAt ? new Date(a.createdAt).getTime() : 0;
+            const bt = b?.createdAt ? new Date(b.createdAt).getTime() : 0;
+            return bt - at;
+          });
+          return typeof limit === 'number' && limit > 0
+            ? fromCollection.slice(0, limit)
+            : fromCollection;
+        }
+      } catch (e) {
+        // Fall through to legacy composition if collection doesn't exist or other error
+      }
+
       const deposits = await this.getDeposits(userId);
       const withdrawals = await this.getWithdrawals(userId);
       const normalizeTime = (x: any): number => {
@@ -806,6 +852,20 @@ export class FirebaseDatabaseService {
       const docRef = await db.collection(this.walletsCollection).add(payload);
       const createdAt = this.serializeDate(payload.createdAt);
       const updatedAt = this.serializeDate(payload.updatedAt);
+
+      // Record history entry
+      try {
+        await db.collection(this.walletHistoryCollection).add({
+          userId: payload.userId,
+          walletId: docRef.id,
+          action: 'create',
+          data: { ...payload },
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+      } catch (e) {
+        console.warn('Failed to write wallet_history (create):', e);
+      }
       return { id: docRef.id, ...(payload as any), createdAt, updatedAt } as any;
     } catch (error) {
       console.error('Error creating wallet:', error);
@@ -850,6 +910,19 @@ export class FirebaseDatabaseService {
         return acc;
       }, {} as Record<string, any>);
       await ref.update(payload);
+      // Record history entry
+      try {
+        await db.collection(this.walletHistoryCollection).add({
+          userId: existing.userId,
+          walletId: id,
+          action: 'update',
+          data: { ...payload },
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+      } catch (e) {
+        console.warn('Failed to write wallet_history (update):', e);
+      }
       return true;
     } catch (error) {
       console.error('Error updating wallet:', error);
