@@ -18,11 +18,12 @@ import {
 } from '../../../redux/thunks/positions/positionsThunks';
 import { createPositionsBulk } from '../../../redux/thunks/positions/positionsThunks';
 import { clearError } from '../../../redux/slices/positionsSlice';
-import type { Position, CreatePositionData } from '../../../types/position';
+import type { Position, PositionLike, AggregatedPosition, CreatePositionData } from '../../../types/position';
 import Input from '../../../components/input';
 import Select from '../../../components/select';
 import Radio from '../../../components/radio';
 import ProgressBar from '../../../components/progressbar';
+import { getLotSize } from '../../../utils/lotSize';
 
 interface OnlineUser {
   userId: string;
@@ -113,8 +114,12 @@ const Positions = memo(function Positions() {
 
   const isDarkMode = settings.theme === 'dark';
 
+  // Currency conversion: 1 USD = 86 INR (UI display only)
+  const INR_PER_USD = 86;
+  const toUSD = (inr?: number) => (Number(inr || 0) / INR_PER_USD);
+
   // Show unique symbols only (keep the most recent position per symbol)
-  const uniquePositions: Position[] = (() => {
+  const uniquePositions: PositionLike[] = (() => {
     const bySymbol = new Map<string, Position>();
     const toEpoch = (p: Position): number => {
       const t1 = p.createdAt ? new Date(p.createdAt).getTime() : NaN;
@@ -127,14 +132,18 @@ const Positions = memo(function Positions() {
         Number.isFinite(t3) ? t3 : 0
       );
     };
-    positions.forEach((p) => {
+    // If data is aggregated, it's already one per symbol; bypass dedupe
+    const looksAggregated = positions.every((p: any) => !('id' in p) && 'pnl' in p && !('entryPrice' in p));
+    if (looksAggregated) {
+      return positions as AggregatedPosition[];
+    }
+    (positions as Position[]).forEach((p) => {
       const key = p.symbol.toUpperCase();
       const existing = bySymbol.get(key);
       if (!existing) {
         bySymbol.set(key, p);
         return;
       }
-      // keep the most recent
       if (toEpoch(p) >= toEpoch(existing)) {
         bySymbol.set(key, p);
       }
@@ -142,18 +151,7 @@ const Positions = memo(function Positions() {
     return Array.from(bySymbol.values());
   })();
 
-  // Calculate P&L for a position
-  const calculatePnL = (position: Position) => {
-    const current = (position as any).currentPrice ?? position.entryPrice; // fallback if not stored
-    const priceDiff = position.side === 'buy' 
-      ? current - position.entryPrice
-      : position.entryPrice - current;
-    
-    const pnl = priceDiff * position.lots;
-    const pnlPercent = (pnl / position.investedAmount) * 100;
-    
-    return { pnl, pnlPercent };
-  };
+  // No P&L logic required on this page
 
   // Handle form input changes
   const handleFormChange = (field: keyof PositionForm, value: string) => {
@@ -355,10 +353,12 @@ const Positions = memo(function Positions() {
     reader.readAsText(file);
   };
 
-  const totalPnL = positions.reduce((sum, pos) => {
-    const { pnl } = calculatePnL(pos);
-    return sum + pnl;
-  }, 0);
+  // Total invested across all unique (visible) positions (display in USD)
+  const totalInvestedInr = uniquePositions.reduce(
+    (sum, pos: PositionLike) => sum + (pos.investedAmount || 0),
+    0
+  );
+  const totalInvestedUsd = toUSD(totalInvestedInr);
 
   // Handle error display
   const handleClearError = () => {
@@ -427,12 +427,9 @@ const Positions = memo(function Positions() {
       {/* Header with futuristic glow */}
       <div className="mb-8">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className={`text-xl font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-              Your Positions
-            </h1>
-          </div>
-          
+          <h1 className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+            Positions
+          </h1>
           {/* Action Buttons */}
           <div className="flex space-x-3">
             {/* Import Button */}
@@ -493,7 +490,7 @@ const Positions = memo(function Positions() {
         </div>
       </div>
 
-      {/* Total P&L Summary */}
+      {/* Total Investment Summary */}
       <div className={`p-6 rounded-2xl backdrop-blur-lg border mb-8 ${
         isDarkMode 
           ? 'bg-gray-800/30 border-gray-700/50 shadow-xl shadow-gray-900/20' 
@@ -502,20 +499,15 @@ const Positions = memo(function Positions() {
         <div className="flex items-center justify-between">
           <div>
             <h2 className={`text-lg font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-              Total P&L
+              Total Investment (USD)
             </h2>
-            <p className={`text-lg font-semibold ${totalPnL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-              ${totalPnL.toFixed(2)}
+            <p className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+              ${totalInvestedUsd.toFixed(2)}
             </p>
           </div>
-          <div className={`w-16 h-16 rounded-2xl flex items-center justify-center ${
-            totalPnL >= 0 
-              ? 'bg-gradient-to-br from-green-500 to-emerald-500' 
-              : 'bg-gradient-to-br from-red-500 to-pink-500'
-          }`}>
+          <div className={`w-16 h-16 rounded-2xl flex items-center justify-center bg-gradient-to-br from-blue-500 to-indigo-500`}>
             <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                    d={totalPnL >= 0 ? "M7 11l5-5m0 0l5 5m-5-5v12" : "M17 13l-5 5m0 0l-5-5m5 5V6"} />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-3.314 0-6 1.79-6 4s2.686 4 6 4 6-1.79 6-4-2.686-4-6-4zm0-4v4m0 8v4" />
             </svg>
           </div>
         </div>
@@ -636,14 +628,13 @@ const Positions = memo(function Positions() {
       {/* Positions Grid */}
       {!loading && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {uniquePositions.map((position) => {
-          const { pnl, pnlPercent } = calculatePnL(position);
-          const isProfitable = pnl >= 0;
+      {uniquePositions.map((position) => {
+  // P&L logic removed
 
           return (
             <div 
-              key={position.id} 
-              onClick={() => navigate(`/investment/positions/${position.symbol.toLowerCase()}`)}
+        key={(position as any).id ?? (position as any).symbol}
+  onClick={() => navigate(`/investment/positions/${position.symbol.toLowerCase()}`)}
               className={`p-6 rounded-2xl backdrop-blur-lg border transition-all duration-300 hover:scale-105 cursor-pointer ${
                 isDarkMode 
                   ? 'bg-gray-800/30 border-gray-700/50 shadow-xl shadow-gray-900/20 hover:bg-gray-800/40' 
@@ -654,16 +645,17 @@ const Positions = memo(function Positions() {
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center space-x-3">
                   <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold text-white ${
-                    position.platform === 'Delta Exchange' ? 'bg-gradient-to-br from-purple-500 to-pink-500' 
-                    : 'bg-gradient-to-br from-blue-500 to-cyan-500'
+                    ('platform' in position && position.platform === 'Delta Exchange')
+                      ? 'bg-gradient-to-br from-purple-500 to-pink-500'
+                      : 'bg-gradient-to-br from-blue-500 to-cyan-500'
                   }`}>
                     {position.symbol.substring(0, 2)}
                   </div>
                   <div>
                     <h3 className="text-xl font-bold">{position.symbol}</h3>
-                    <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                      {position.platform}
-                    </p>
+                    {('platform' in position) && (
+                      <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>{(position as Position).platform}</p>
+                    )}
                   </div>
                 </div>
                 
@@ -683,43 +675,21 @@ const Positions = memo(function Positions() {
                 </div>
               </div>
 
-              
+              {/* P&L section removed */}
 
-              {/* P&L Display */}
-              <div className={`p-4 rounded-xl ${
-                isProfitable 
-                  ? isDarkMode ? 'bg-green-500/10 border border-green-500/20' : 'bg-green-50 border border-green-200'
-                  : isDarkMode ? 'bg-red-500/10 border border-red-500/20' : 'bg-red-50 border border-red-200'
+              {/* Invested Amount (USD) */}
+              <div className={`mt-3 px-4 py-3 rounded-xl border ${
+                isDarkMode ? 'border-gray-700/50 bg-gray-800/30' : 'border-gray-200 bg-white/60'
               }`}>
                 <div className="flex justify-between items-center">
-                  <span className={`font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                    P&L:
+                  <span className={`${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Invested (USD)</span>
+                  <span className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                    ${toUSD(position.investedAmount).toFixed(2)}
                   </span>
-                  <div className="text-right">
-                    <p className={`text-xl font-bold ${isProfitable ? 'text-green-400' : 'text-red-400'}`}>
-                      ${pnl.toFixed(2)}
-                    </p>
-                    <p className={`text-sm ${isProfitable ? 'text-green-400' : 'text-red-400'}`}>
-                      ({pnlPercent.toFixed(2)}%)
-                    </p>
-                  </div>
                 </div>
               </div>
 
-              {/* Progress Bar */}
-              <div className="mt-4">
-                <div className={`w-full h-2 rounded-full ${isDarkMode ? 'bg-gray-600' : 'bg-gray-200'}`}>
-                  <div 
-                    className={`h-2 rounded-full transition-all duration-500 ${
-                      isProfitable ? 'bg-gradient-to-r from-green-400 to-emerald-500' 
-                      : 'bg-gradient-to-r from-red-400 to-pink-500'
-                    }`}
-                    style={{ 
-                      width: `${Math.min(Math.abs(pnlPercent), 100)}%` 
-                    }}
-                  ></div>
-                </div>
-              </div>
+              {/* Progress removed */}
 
               
 
@@ -733,11 +703,16 @@ const Positions = memo(function Positions() {
                   {updateLoading ? 'Updating...' : 'Modify'}
                 </button>
                 <button 
-                  onClick={(e) => { e.stopPropagation(); dispatch(deletePosition(position.id)); }}
-                  disabled={deleteLoading}
+                  onClick={(e) => { 
+                    e.stopPropagation(); 
+                    if ('id' in position) {
+                      dispatch(updatePosition({ id: (position as any).id, data: { status: 'closed' } }));
+                    }
+                  }}
+                  disabled={updateLoading}
                   className="flex-1 py-2 px-3 text-sm rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors disabled:opacity-50"
                 >
-                  {deleteLoading ? 'Deleting...' : 'Close'}
+                  {updateLoading ? 'Closing...' : 'Close'}
                 </button>
               </div>
             </div>

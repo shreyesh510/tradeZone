@@ -123,7 +123,7 @@ export class FirebaseDatabaseService {
       const usersSnapshot = await this.getFirestore().collection(this.usersCollection).get();
       
       if (usersSnapshot.empty) {
-        console.log('📝 Initializing sample users...');
+  // Initializing sample users...
         
         const sampleUsers = [
           {
@@ -146,7 +146,7 @@ export class FirebaseDatabaseService {
           await this.createUser(user);
         }
         
-        console.log('✅ Sample users initialized successfully');
+  // Sample users initialized successfully
       }
     } catch (error) {
       console.error('Error initializing sample data:', error);
@@ -168,7 +168,7 @@ export class FirebaseDatabaseService {
         ...permissionData,
       };
 
-      console.log(`✅ Created permissions for user ${userId}`);
+  // Permissions created for user
       return permission;
     } catch (error) {
       console.error('Error creating user permissions:', error);
@@ -185,7 +185,7 @@ export class FirebaseDatabaseService {
         .get();
 
       if (snapshot.empty) {
-        console.log(`No permissions found for user ${userId}, creating default permissions`);
+  // No permissions found; creating default permissions
         return await this.createUserPermissions(userId);
       }
 
@@ -228,7 +228,7 @@ export class FirebaseDatabaseService {
         .doc(existingPermission._id)
         .update(updateData);
 
-      console.log(`✅ Updated permissions for user ${userId}`);
+  // Updated permissions for user
       
       return {
         ...existingPermission,
@@ -253,7 +253,7 @@ export class FirebaseDatabaseService {
       });
 
       await batch.commit();
-      console.log(`✅ Deleted permissions for user ${userId}`);
+  // Deleted permissions for user
     } catch (error) {
       console.error('Error deleting user permissions:', error);
       throw error;
@@ -276,25 +276,25 @@ export class FirebaseDatabaseService {
   // Position operations
   async getPositions(userId: string): Promise<Position[]> {
     try {
-      console.log('🔍 FirebaseDatabaseService.getPositions called with userId:', userId);
+  // Fetching positions for user
       
       const snapshot = await this.getFirestore()
         .collection(this.positionsCollection)
         .where('userId', '==', userId)
         .get();
       
-      console.log(`📊 Firestore query returned ${snapshot.docs.length} documents`);
+  // Firestore query returned documents
       
       const positions = snapshot.docs.map(doc => {
         const data = doc.data();
-        console.log(`📄 Position ${doc.id}: userId=${data.userId}, symbol=${data.symbol}`);
+  // Mapping position document
         return {
           id: doc.id,
           ...data
         };
       }) as Position[];
       
-      console.log(`📊 Mapped ${positions.length} positions`);
+  // Mapped positions
       
       // Sort by createdAt in JavaScript instead of Firestore
       const sortedPositions = positions.sort((a, b) => {
@@ -303,7 +303,7 @@ export class FirebaseDatabaseService {
         return dateB - dateA; // Descending order
       });
       
-      console.log(`📊 Returning ${sortedPositions.length} sorted positions`);
+  // Returning sorted positions
       return sortedPositions;
     } catch (error) {
       console.error('❌ Error getting positions:', error);
@@ -407,6 +407,48 @@ export class FirebaseDatabaseService {
     }
   }
 
+  // New: get all open positions across all users (for cron jobs)
+  async getAllOpenPositions(): Promise<Position[]> {
+    try {
+      const snapshot = await this.getFirestore()
+        .collection(this.positionsCollection)
+        .where('status', '==', 'open')
+        .get();
+
+      return snapshot.docs.map((doc) => ({ id: doc.id, ...(doc.data() as any) })) as Position[];
+    } catch (error) {
+      console.error('Error getting all open positions:', error);
+      return [];
+    }
+  }
+
+  // New: batch update currentPrice by symbol for open positions
+  async updatePositionsCurrentPriceBySymbol(symbol: string, price: number): Promise<number> {
+    const sym = (symbol || '').toUpperCase();
+    if (!sym || !(price > 0)) return 0;
+    try {
+      const db = this.getFirestore();
+      const snapshot = await db
+        .collection(this.positionsCollection)
+        .where('symbol', '==', sym)
+        .where('status', '==', 'open')
+        .get();
+
+      if (snapshot.empty) return 0;
+      const batch = db.batch();
+      let count = 0;
+      const now = new Date();
+      snapshot.docs.forEach((doc) => {
+        batch.update(doc.ref, { currentPrice: price, updatedAt: now });
+        count += 1;
+      });
+      await batch.commit();
+      return count;
+    } catch (error) {
+      console.error('Error updating currentPrice by symbol:', error);
+      return 0;
+    }
+  }
   async getOpenPositions(userId: string): Promise<Position[]> {
     try {
       const snapshot = await this.getFirestore()

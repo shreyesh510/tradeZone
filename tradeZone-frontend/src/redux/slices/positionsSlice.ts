@@ -10,10 +10,10 @@ import {
   fetchPositionsBySymbol,
   createPositionsBulk,
 } from '../thunks/positions/positionsThunks';
-import type { Position, PositionFilters } from '../../types/position';
+import type { Position, PositionLike, PositionFilters } from '../../types/position';
 
 interface PositionsState {
-  positions: Position[];
+  positions: PositionLike[];
   openPositions: Position[];
   closedPositions: Position[];
   currentPosition: Position | null;
@@ -64,9 +64,10 @@ const positionsSlice = createSlice({
       const updatedPosition = action.payload;
       
       // Update in main positions array
-      const index = state.positions.findIndex(p => p.id === updatedPosition.id);
+      const index = state.positions.findIndex((p) => 'id' in p && p.id === updatedPosition.id);
       if (index !== -1) {
-        state.positions[index] = updatedPosition;
+        // Cast safe since we only replace an element that had an id
+        (state.positions as unknown as Position[])[index] = updatedPosition;
       }
       
       // Update in open positions if it's open
@@ -97,7 +98,7 @@ const positionsSlice = createSlice({
     },
     removePositionFromList: (state, action: PayloadAction<string>) => {
       const positionId = action.payload;
-      state.positions = state.positions.filter(p => p.id !== positionId);
+      state.positions = state.positions.filter((p) => !('id' in p) || p.id !== positionId);
       state.openPositions = state.openPositions.filter(p => p.id !== positionId);
       state.closedPositions = state.closedPositions.filter(p => p.id !== positionId);
       
@@ -113,7 +114,7 @@ const positionsSlice = createSlice({
         state.loading = true;
         state.error = null;
       })
-      .addCase(fetchPositions.fulfilled, (state, action: PayloadAction<Position[]>) => {
+  .addCase(fetchPositions.fulfilled, (state, action: PayloadAction<PositionLike[]>) => {
         state.loading = false;
         state.positions = action.payload;
         state.error = null;
@@ -165,9 +166,9 @@ const positionsSlice = createSlice({
         const updatedPosition = action.payload;
         
         // Update in main positions array
-        const index = state.positions.findIndex(p => p.id === updatedPosition.id);
+        const index = state.positions.findIndex((p) => 'id' in p && p.id === updatedPosition.id);
         if (index !== -1) {
-          state.positions[index] = updatedPosition;
+          (state.positions as unknown as Position[])[index] = updatedPosition;
         }
         
         // Update in open positions if it's open
@@ -218,7 +219,7 @@ const positionsSlice = createSlice({
         state.deleteLoading = false;
         const positionId = action.payload;
         
-        state.positions = state.positions.filter(p => p.id !== positionId);
+        state.positions = state.positions.filter((p) => !('id' in p) || p.id !== positionId);
         state.openPositions = state.openPositions.filter(p => p.id !== positionId);
         state.closedPositions = state.closedPositions.filter(p => p.id !== positionId);
         
@@ -288,8 +289,13 @@ const positionsSlice = createSlice({
         const created = action.payload.created || [];
         // Upsert created positions at the start
         for (const p of created) {
-          const i = state.positions.findIndex(x => x.id === p.id);
-          if (i >= 0) state.positions[i] = p; else state.positions.unshift(p);
+          const i = state.positions.findIndex((x) => 'id' in x && x.id === p.id);
+          if (i >= 0) {
+            (state.positions as unknown as Position[])[i] = p;
+          } else {
+            // Prepend; it's okay if positions currently contains aggregated entries
+            state.positions.unshift(p);
+          }
           if (p.status === 'open') {
             const oi = state.openPositions.findIndex(x => x.id === p.id);
             if (oi >= 0) state.openPositions[oi] = p; else state.openPositions.unshift(p);

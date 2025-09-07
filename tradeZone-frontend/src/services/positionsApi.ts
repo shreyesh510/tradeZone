@@ -1,11 +1,21 @@
 import api from './api';
-import type { Position, CreatePositionData, UpdatePositionData, PositionFilters } from '../types/position';
+import type { Position, AggregatedPosition, PositionLike, CreatePositionData, UpdatePositionData, PositionFilters } from '../types/position';
 
 export const positionsApi = {
   // Get all positions with optional filters
-  getPositions: async (filters?: PositionFilters): Promise<Position[]> => {
-    console.log('🔍 Frontend: getPositions called with filters:', filters);
-    
+  getPositions: async (filters?: PositionFilters): Promise<PositionLike[]> => {
+  // removed debug log
+
+    // If no filters, use the new backend endpoint that includes P&L
+    if (!filters || Object.keys(filters).length === 0) {
+      const url = '/positions/getAllPositionsWithPnl';
+  // removed debug log
+      const response = await api.get(url);
+  // removed debug logs
+      return response.data as AggregatedPosition[];
+    }
+
+    // Otherwise fall back to the generic /positions with query params
     const params = new URLSearchParams();
     if (filters?.status && filters.status !== 'all') {
       params.append('status', filters.status);
@@ -19,15 +29,11 @@ export const positionsApi = {
     if (filters?.symbol) {
       params.append('symbol', filters.symbol);
     }
-    
-    const url = params.toString() ? `/positions?${params.toString()}` : '/positions';
-    console.log('🔍 Frontend: Making API call to:', url);
-    
+    const url = `/positions?${params.toString()}`;
+  // removed debug log
     const response = await api.get(url);
-    console.log('🔍 Frontend: API response:', response.data);
-    console.log('🔍 Frontend: Response length:', response.data.length);
-    
-    return response.data;
+  // removed debug logs
+  return response.data as Position[];
   },
 
   // Get a specific position by ID

@@ -99,12 +99,7 @@ const authSlice = createSlice({
       const user = localStorage.getItem('user');
       const permissions = localStorage.getItem('permissions');
       
-      console.log('🔄 Initializing auth from localStorage:', { 
-        token: !!token,
-        testToken: !!testToken, 
-        user: !!user, 
-        permissions: !!permissions 
-      });
+  // Initialize from localStorage if present
       
       if ((token || testToken) && user) {
         try {
@@ -121,7 +116,7 @@ const authSlice = createSlice({
           
           state.user = userData;
           state.isAuthenticated = true;
-          console.log('✅ Auth initialized successfully:', state.user);
+          // Auth initialized successfully
         } catch (error) {
           console.error('❌ Error parsing user data:', error);
           // Clear invalid data
@@ -131,7 +126,7 @@ const authSlice = createSlice({
           localStorage.removeItem('permissions');
         }
       } else {
-        console.log('❌ No valid credentials found in localStorage');
+  // No valid credentials found in localStorage
       }
     },
   },

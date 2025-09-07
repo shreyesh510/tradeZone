@@ -40,19 +40,14 @@ function App() {
     const testToken = localStorage.getItem('testToken');
     const userData = localStorage.getItem('user');
     
-    console.log('🔍 Checking localStorage:', { 
-      hasToken: !!testToken, 
-      hasUser: !!userData,
-      token: testToken ? testToken.substring(0, 20) + '...' : null,
-      user: userData ? JSON.parse(userData) : null
-    });
+  // removed debug logs
 
     if (testToken && userData) {
       // User has credentials, initialize auth state
       dispatch(initializeAuth());
-      console.log('✅ Credentials found, initializing auth...');
+  // removed debug log
     } else {
-      console.log('❌ No credentials found, user needs to login');
+  // removed debug log
     }
     
     setIsInitialized(true);

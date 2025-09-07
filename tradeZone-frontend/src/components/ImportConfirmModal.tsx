@@ -23,7 +23,6 @@ const ImportConfirmModal: React.FC<ImportConfirmModalProps> = ({
   React.useEffect(() => {
     if (isOpen && positions.length > 0) {
       setSelectedPositions([...positions]);
-      console.log('Positions set in modal:', positions.length);
     }
   }, [positions, isOpen]);
 

@@ -36,52 +36,39 @@ export class PositionsController {
   @Header('Cache-Control', 'no-cache, no-store, must-revalidate')
   @Header('Pragma', 'no-cache')
   @Header('Expires', '0')
-  async findAll(@Request() req, @Query('status') status?: string, @Query('unique') unique?: string) {
+  async findAll(
+    @Request() req,
+    @Query('status') status?: string,
+    @Query('unique') unique?: string,
+  @Query('aggregated') aggregated?: string,
+  @Query('representative') representative?: 'latest' | 'earliest',
+  @Query('compact') compact?: string,
+  ) {
     console.log('🔍 Getting positions for user:', req.user.userId);
     const userId = req.user.userId;
     
     if (!userId) {
       throw new Error('User ID not found in JWT token');
     }
-    
-    const wantUnique = String(unique).toLowerCase() === 'true';
-    
-    if (status === 'open') {
-      const list = await this.positionsService.getOpenPositions(userId);
-      return wantUnique ? this.positionsService.uniqueBySymbol(list) : list;
-    } else if (status === 'closed') {
-      const list = await this.positionsService.getClosedPositions(userId);
-      return wantUnique ? this.positionsService.uniqueBySymbol(list) : list;
+
+    const result = await this.positionsService.findAllByQuery(userId, {
+      status,
+      unique,
+      aggregated,
+      representative,
+      compact,
+    });
+    if (Array.isArray(result)) {
+      console.log(`🔍 Found ${result.length} positions for user ${userId}`);
     }
-    
-    const positions = wantUnique
-      ? await this.positionsService.findAllUnique(userId)
-      : await this.positionsService.findAll(userId);
-    console.log(`🔍 Found ${positions.length} positions for user ${userId}`);
-    return positions;
+    return result;
   }
 
-  @Get(':id')
-  async findOne(@Param('id') id: string, @Request() req) {
+  // Static and specific routes must come before dynamic ':id' to avoid being captured by it
+  @Get('getAllPositionsWithPnl')
+  async getAll(@Request() req) {
     const userId = req.user.userId;
-    return await this.positionsService.findOne(id, userId);
-  }
-
-  @Patch(':id')
-  async update(
-    @Param('id') id: string, 
-    @Body() updatePositionDto: UpdatePositionDto,
-    @Request() req
-  ) {
-    const userId = req.user.userId;
-    return await this.positionsService.update(id, updatePositionDto, userId);
-  }
-
-  @Delete(':id')
-  async remove(@Param('id') id: string, @Request() req) {
-    const userId = req.user.userId;
-    await this.positionsService.remove(id, userId);
-    return { message: 'Position deleted successfully' };
+    return await this.positionsService.getAllPositionsWithPnl(userId);
   }
 
   @Get('open/list')
@@ -106,5 +93,29 @@ export class PositionsController {
   async createMultiple(@Body() dto: CreatePositionsBulkDto, @Request() req) {
     const userId = req.user.userId;
     return await this.positionsService.createBulk(dto, userId);
+  }
+
+  // Generic ID-based routes last
+  @Get(':id')
+  async findOne(@Param('id') id: string, @Request() req) {
+    const userId = req.user.userId;
+    return await this.positionsService.findOne(id, userId);
+  }
+
+  @Patch(':id')
+  async update(
+    @Param('id') id: string, 
+    @Body() updatePositionDto: UpdatePositionDto,
+    @Request() req
+  ) {
+    const userId = req.user.userId;
+    return await this.positionsService.update(id, updatePositionDto, userId);
+  }
+
+  @Delete(':id')
+  async remove(@Param('id') id: string, @Request() req) {
+    const userId = req.user.userId;
+    await this.positionsService.remove(id, userId);
+    return { message: 'Position deleted successfully' };
   }
 }

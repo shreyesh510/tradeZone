@@ -25,8 +25,10 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
     return false;
   };
 
+  const hasAuth = isAuthenticated || checkLocalStorageAuth();
+
   // If not authenticated in Redux state, check localStorage
-  if (!isAuthenticated && !checkLocalStorageAuth()) {
+  if (!hasAuth) {
     return <Navigate to="/" replace />;
   }
   

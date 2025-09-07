@@ -10,6 +10,7 @@ interface Position {
   lots: number;
   investedAmount: number;
   platform: 'Delta Exchange' | 'Groww';
+  leverage: number;
   timestamp: string;
 }
 

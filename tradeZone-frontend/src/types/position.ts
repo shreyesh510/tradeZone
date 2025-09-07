@@ -21,6 +21,19 @@ export interface Position {
   notes?: string;
 }
 
+// Aggregated response returned by /positions/getAllPositionsWithPnl
+export interface AggregatedPosition {
+  symbol: string;
+  lots: number;
+  investedAmount: number;
+  side: 'buy' | 'sell';
+  pnl: number;
+  currentPrice: number | null;
+}
+
+// Union for places that can handle either full Position or aggregated
+export type PositionLike = Position | AggregatedPosition;
+
 export interface CreatePositionData {
   symbol: string;
   side: 'buy' | 'sell';
@@ -30,6 +43,7 @@ export interface CreatePositionData {
   investedAmount: number;
   platform: 'Delta Exchange' | 'Groww';
   leverage: number;
+  tradingFee?: number;
   timestamp?: string;
   status?: 'open' | 'closed';
   stopLoss?: number;

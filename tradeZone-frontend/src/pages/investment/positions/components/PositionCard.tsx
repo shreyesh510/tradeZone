@@ -1,4 +1,5 @@
 import { memo } from 'react';
+import { getLotSize } from '../../../../utils/lotSize';
 
 interface Position {
   id: string;
@@ -9,6 +10,7 @@ interface Position {
   lots: number;
   investedAmount: number;
   platform: 'Delta Exchange' | 'Groww';
+  leverage: number;
   timestamp: string;
   createdAt?: string | Date;
   updatedAt?: string | Date;
@@ -20,16 +22,31 @@ interface PositionCardProps {
 }
 
 const PositionCard = memo<PositionCardProps>(({ position, isDarkMode }) => {
-  // Calculate P&L for a position
+  // Calculate P&L for a position (use lot-size-based qty; fallback when unknown)
   const calculatePnL = (position: Position) => {
     const current = position.currentPrice ?? position.entryPrice;
-    const priceDiff = position.side === 'buy' 
+    const priceDiff = position.side === 'buy'
       ? current - position.entryPrice
       : position.entryPrice - current;
-    
-    const pnl = priceDiff * position.lots;
-    const pnlPercent = (pnl / position.investedAmount) * 100;
-    
+
+    const lotSize = getLotSize(position.symbol);
+    let qty = 0;
+    let investedUsd = 0;
+
+    if (lotSize > 0) {
+      qty = (position.lots || 0) * lotSize;
+      const notionalAtEntry = position.entryPrice * qty;
+      const lev = position.leverage || 1;
+      investedUsd = lev > 0 ? notionalAtEntry / lev : notionalAtEntry;
+    } else {
+      investedUsd = position.investedAmount || 0;
+      const lev = position.leverage || 1;
+      const notional = investedUsd * lev;
+      qty = position.entryPrice > 0 ? notional / position.entryPrice : 0;
+    }
+
+    const pnl = priceDiff * qty;
+    const pnlPercent = investedUsd > 0 ? (pnl / investedUsd) * 100 : 0;
     return { pnl, pnlPercent };
   };
 

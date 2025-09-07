@@ -1,15 +1,13 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
 import { positionsApi } from '../../../services/positionsApi';
-import type { Position, CreatePositionData, UpdatePositionData, PositionFilters } from '../../../types/position';
+import type { Position, PositionLike, CreatePositionData, UpdatePositionData, PositionFilters } from '../../../types/position';
 
 // Fetch all positions with optional filters
 export const fetchPositions = createAsyncThunk(
   'positions/fetchPositions',
   async (filters: PositionFilters | undefined, { rejectWithValue }) => {
     try {
-      console.log('🔍 Redux: fetchPositions thunk called with filters:', filters);
-      const positions = await positionsApi.getPositions(filters);
-      console.log('🔍 Redux: fetchPositions thunk received positions:', positions.length);
+  const positions = await positionsApi.getPositions(filters);
       return positions;
     } catch (error: any) {
       console.error('❌ Redux: fetchPositions thunk error:', error);

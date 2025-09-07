@@ -12,6 +12,7 @@ import { clearError } from "../../../redux/slices/positionsSlice";
 import type { Position } from "../../../types/position";
 import Button from "../../../components/button";
 import { tradingViewService } from "../../../services/tradingViewService";
+import { getLotSize } from "../../../utils/lotSize";
 
 interface OnlineUser {
   userId: string;
@@ -25,6 +26,9 @@ const SymbolPositions = memo(function SymbolPositions() {
   const dispatch = useDispatch<AppDispatch>();
   const { settings } = useSettings();
   const { canAccessInvestment } = usePermissions();
+
+  // Debug: Log the symbol parameter
+  // removed debug logs
 
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
   const [onlineUsers] = useState<OnlineUser[]>([]);
@@ -45,11 +49,20 @@ const SymbolPositions = memo(function SymbolPositions() {
     (position) => position.symbol.toLowerCase() === symbol?.toLowerCase()
   );
 
-  const rows: Position[] = symbolPositions;
+  const rows: Position[] = symbolPositions as Position[];
+
+  // Debug: Log data state
+  // removed debug logs
+
+  // If we navigated from aggregated list, the store may still hold aggregated rows briefly.
+  // Wait until detailed positions (with entryPrice) are loaded.
+  const hasDetailedData = rows.length > 0 && Object.prototype.hasOwnProperty.call(rows[0], 'entryPrice');
 
   // Redirect if no permission
   useEffect(() => {
+  // removed debug log
     if (!canAccessInvestment()) {
+  // removed debug log
       navigate("/zone");
     }
   }, [canAccessInvestment, navigate]);
@@ -68,7 +81,10 @@ const SymbolPositions = memo(function SymbolPositions() {
   // Fetch symbol-specific positions from API
   useEffect(() => {
     if (symbol) {
+  // removed debug log
       dispatch(fetchPositionsBySymbol(symbol));
+    } else {
+  // removed debug log
     }
   }, [dispatch, symbol]);
 
@@ -158,20 +174,46 @@ const SymbolPositions = memo(function SymbolPositions() {
 
   const isDarkMode = settings.theme === "dark";
 
-  // Calculate P&L for a position using notional = invested * leverage and qty = notional / entry
+  // Calculate P&L. Prefer lot-size-based qty if known; otherwise use notional/entry fallback.
   const calculatePnL = (position: Position) => {
     const current = (livePrice ?? position.currentPrice ?? position.entryPrice) as number;
     const priceDiff = position.side === "buy" ? current - position.entryPrice : position.entryPrice - current;
 
-    // Convert invested to USD if we have FX
-    const investedUsd = usdInrRate ? (position.investedAmount || 0) / usdInrRate : (position.investedAmount || 0);
-    const notional = investedUsd * (position.leverage || 1);
-    const qty = position.entryPrice > 0 ? notional / position.entryPrice : 0;
+    // If we know platform lot size, compute qty directly from lots
+    const lotSize = getLotSize(position.symbol);
+    let qty: number;
+    let investedUsd: number;
+    if (lotSize > 0) {
+      qty = (position.lots || 0) * lotSize;
+      // For percentage calculation, use notional value (like Delta Exchange)
+      const notionalAtEntry = position.entryPrice * qty; // USD notionally
+      const lev = position.leverage || 1;
+      investedUsd = lev > 0 ? notionalAtEntry / lev : notionalAtEntry;
+    } else {
+      // Fallback: treat investedAmount as USD (backend normalized); notional = invested * leverage and qty = notional / entry
+      investedUsd = (position.investedAmount || 0);
+      const notional = investedUsd * (position.leverage || 1);
+      qty = position.entryPrice > 0 ? notional / position.entryPrice : 0;
+    }
 
     const pnl = priceDiff * qty; // P&L in USD
-    const pnlPercent = investedUsd > 0 ? (pnl / investedUsd) * 100 : 0;
+    // Calculate percentage based on notional value (like Delta Exchange)
+    const notionalValue = position.entryPrice * qty;
+    const pnlPercent = notionalValue > 0 ? (pnl / notionalValue) * 100 : 0;
 
     return { pnl, pnlPercent };
+  };
+
+  // Derive invested USD consistently for rows and totals
+  const getInvestedUsd = (position: Position) => {
+    const lotSize = getLotSize(position.symbol);
+    if (lotSize > 0) {
+      const qty = (position.lots || 0) * lotSize;
+      const notionalAtEntry = position.entryPrice * qty;
+      const lev = position.leverage || 1;
+      return lev > 0 ? notionalAtEntry / lev : notionalAtEntry;
+    }
+    return position.investedAmount || 0;
   };
 
   // Handle error display
@@ -180,21 +222,18 @@ const SymbolPositions = memo(function SymbolPositions() {
   };
 
   const totalPnL = symbolPositions.reduce((sum, pos) => {
-    const { pnl } = calculatePnL(pos);
+    const { pnl } = calculatePnL(pos as Position);
     return sum + pnl;
   }, 0);
 
   // Derived totals for summary
-  const totalInvestment = symbolPositions.reduce(
-    (sum, pos) => sum + (pos.investedAmount || 0),
-    0
-  );
+  const totalInvestment = symbolPositions.reduce((sum, pos) => sum + getInvestedUsd(pos as Position), 0);
   const totalLots = symbolPositions.reduce(
     (sum, pos) => sum + (pos.lots || 0),
     0
   );
   const totalLoss = symbolPositions.reduce((sum, pos) => {
-    const { pnl } = calculatePnL(pos);
+    const { pnl } = calculatePnL(pos as Position);
     return sum + Math.min(pnl, 0);
   }, 0);
 
@@ -207,6 +246,16 @@ const SymbolPositions = memo(function SymbolPositions() {
     if (match) return match[1];
     return ts;
   };
+
+  // Simple test to see if component renders
+  if (!symbol) {
+    return (
+      <div className="p-6">
+        <h1>No symbol provided</h1>
+        <button onClick={() => navigate("/investment/positions")}>Back</button>
+      </div>
+    );
+  }
 
   const content = (
     <div
@@ -296,9 +345,7 @@ const SymbolPositions = memo(function SymbolPositions() {
                 )}
               </p>
               <p className={`${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
-                Total Investment: {usdInrRate
-                  ? `$${(totalInvestment / usdInrRate).toLocaleString()}`
-                  : `$${totalInvestment.toLocaleString()}`}
+                Total Investment: ${totalInvestment.toLocaleString()}
               </p>
               <p className={`${isDarkMode ? "text-gray-300" : "text-gray-700"}`}>
                 Total Lots: {totalLots.toLocaleString()}
@@ -326,14 +373,8 @@ const SymbolPositions = memo(function SymbolPositions() {
               >
                 Total Investment
               </h3>
-              <p
-                className={`mt-1 text-xl font-bold ${
-                  isDarkMode ? "text-white" : "text-gray-900"
-                }`}
-              >
-                {usdInrRate
-                  ? `$${(totalInvestment / usdInrRate).toLocaleString()}`
-                  : `$${totalInvestment.toLocaleString()}`}
+              <p className={`mt-1 text-xl font-bold ${isDarkMode ? "text-white" : "text-gray-900"}`}>
+                ${totalInvestment.toLocaleString()}
               </p>
             </div>
 
@@ -372,14 +413,8 @@ const SymbolPositions = memo(function SymbolPositions() {
               >
                 Total Loss
               </h3>
-              <p
-                className={`mt-1 text-xl font-bold ${
-                  totalLoss < 0 ? "text-red-400" : "text-green-400"
-                }`}
-              >
-                {usdInrRate
-                  ? `$${Math.abs(totalLoss / usdInrRate).toFixed(2)}`
-                  : `$${Math.abs(totalLoss).toFixed(2)}`}
+              <p className={`mt-1 text-xl font-bold ${totalLoss < 0 ? "text-red-400" : "text-green-400"}`}>
+                ${Math.abs(totalLoss).toFixed(2)}
               </p>
             </div>
           </div>
@@ -390,12 +425,14 @@ const SymbolPositions = memo(function SymbolPositions() {
       {loading && (
         <div className="text-center py-8">
           <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-          <p className="mt-2 text-gray-600">Loading positions...</p>
+          <p className="mt-2 text-gray-600">Loading positions for {symbol}...</p>
         </div>
       )}
 
-      {/* Positions Table */}
-      {!loading && rows.length > 0 && (
+  {/* Debug Info removed */}
+
+  {/* Positions Table */}
+  {!loading && rows.length > 0 && hasDetailedData && (
         <div
           className={`rounded-2xl backdrop-blur-lg border overflow-hidden ${
             isDarkMode
@@ -481,9 +518,8 @@ const SymbolPositions = memo(function SymbolPositions() {
               >
                 {rows.map((position) => {
                   const { pnl, pnlPercent } = calculatePnL(position);
-                  const investedUsd = usdInrRate
-                    ? position.investedAmount / usdInrRate
-                    : position.investedAmount;
+                  // Align invested display with calculation path (USD only)
+                  const investedUsd = getInvestedUsd(position);
                   const displayPercent = investedUsd > 0 ? (pnl / investedUsd) * 100 : pnlPercent;
                   const isProfitable = pnl >= 0;
 
@@ -517,16 +553,14 @@ const SymbolPositions = memo(function SymbolPositions() {
                           isDarkMode ? "text-gray-300" : "text-gray-900"
                         }`}
                       >
-                        ${position.entryPrice.toLocaleString()}
+                        ${Number(position.entryPrice ?? 0).toLocaleString()}
                       </td>
                       <td
                         className={`px-6 py-4 whitespace-nowrap text-sm ${
                           isDarkMode ? "text-gray-300" : "text-gray-900"
                         }`}
                       >
-                        ${(
-                          (livePrice ?? position.currentPrice ?? position.entryPrice) as number
-                        ).toLocaleString()}
+                        ${Number(livePrice ?? position.currentPrice ?? position.entryPrice ?? 0).toLocaleString()}
                       </td>
                       <td
                         className={`px-6 py-4 whitespace-nowrap text-sm ${
@@ -540,7 +574,7 @@ const SymbolPositions = memo(function SymbolPositions() {
                           isDarkMode ? "text-gray-300" : "text-gray-900"
                         }`}
                       >
-                        ${investedUsd.toLocaleString()}
+                        ${Number(investedUsd ?? 0).toLocaleString()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-right">
@@ -580,6 +614,14 @@ const SymbolPositions = memo(function SymbolPositions() {
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {/* Waiting for detailed rows (navigated from aggregated list) */}
+      {!loading && rows.length > 0 && !hasDetailedData && (
+        <div className="text-center py-8">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+          <p className="mt-2 text-gray-600">Loading symbol details...</p>
         </div>
       )}
 

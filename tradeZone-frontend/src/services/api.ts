@@ -3,8 +3,6 @@ import config from '../config/env';
 
 const API_BASE_URL = config.API_BASE_URL;
 
-console.log('🔗 API Base URL:', API_BASE_URL);
-
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -24,13 +22,6 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    console.log('📡 API Request:', {
-      method: config.method?.toUpperCase(),
-      url: config.url,
-      baseURL: config.baseURL,
-      hasToken: !!token,
-      tokenType: jwtToken ? 'JWT' : 'testToken'
-    });
     return config;
   },
   (error) => {
@@ -42,11 +33,6 @@ api.interceptors.request.use(
 // Response interceptor to handle errors
 api.interceptors.response.use(
   (response) => {
-    console.log('✅ API Response:', {
-      status: response.status,
-      url: response.config.url,
-      data: response.data
-    });
     return response;
   },
   (error) => {
@@ -57,8 +43,7 @@ api.interceptors.response.use(
       data: error.response?.data
     });
     
-    if (error.response?.status === 401) {
-      console.log('🔒 Unauthorized, clearing tokens...');
+  if (error.response?.status === 401) {
       localStorage.removeItem('token');
       localStorage.removeItem('testToken');
       localStorage.removeItem('user');
