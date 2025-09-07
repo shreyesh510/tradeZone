@@ -27,6 +27,12 @@ export const positionsApi = {
     if (filters?.platform) {
       params.append('platform', filters.platform);
     }
+    if (filters?.account) {
+      params.append('account', filters.account);
+    }
+    if (filters?.timeframe) {
+      params.append('timeframe', filters.timeframe);
+    }
     if (filters?.symbol) {
       params.append('symbol', filters.symbol);
     }
@@ -73,21 +79,16 @@ export const positionsApi = {
     return response.data;
   },
 
-  // Get positions for a specific symbol
-  getPositionsBySymbol: async (symbol: string): Promise<Position[]> => {
-    const response = await api.get(`/positions/symbol/${encodeURIComponent(symbol)}`);
-    return response.data;
-  },
-
-  // Bulk create positions with backend-side dedupe
-  createPositionsBulk: async (positions: CreatePositionData[]): Promise<{ created: Position[]; skipped: CreatePositionData[] }> => {
-    const response = await api.post('/positions/multiple', { positions });
-    return response.data;
-  },
 
   // Close all open positions for the authenticated user
   closeAllPositions: async (pnl?: number): Promise<{ updated: number }> => {
     const response = await api.post('/positions/close-all', { pnl });
     return response.data;
+  },
+
+  // Get recent position history activities
+  getHistory: async (limit = 20): Promise<any[]> => {
+    const response = await api.get(`/positions/history?limit=${limit}`);
+    return response.data as any[];
   },
 };

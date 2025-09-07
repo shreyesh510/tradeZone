@@ -22,11 +22,11 @@ export class FirebaseDatabaseService {
   private usersCollection = 'users';
   private permissionsCollection = 'permissions';
   private positionsCollection = 'positions';
+  private positionsHistoryCollection = 'positions_history';
   private exitPositionsCollection = 'exit_positions';
   private withdrawalsCollection = 'withdrawals';
   private depositsCollection = 'deposits';
   private walletsCollection = 'wallets';
-  private walletHistoryCollection = 'walletHistory';
 
   constructor(private firebaseConfig: FirebaseConfig) {
     // Firestore will be initialized in onModuleInit
@@ -412,6 +412,69 @@ export class FirebaseDatabaseService {
     }
   }
 
+  // ---------------- Position History ----------------
+  /**
+   * Append an immutable activity record to positions_history
+   */
+  async addPositionHistoryEntry(entry: {
+    userId: string;
+    action:
+      | 'create'
+      | 'update'
+      | 'close'
+      | 'close-all'
+      | 'delete'
+      | 'bulk-create';
+    positionId?: string;
+    symbol?: string;
+    details?: Record<string, any>;
+  }): Promise<string | null> {
+    try {
+      const db = this.getFirestore();
+      const now = new Date();
+      const raw = {
+        ...entry,
+        symbol: (entry.symbol || '').toUpperCase() || undefined,
+        createdAt: now,
+      } as Record<string, any>;
+      // Strip undefined
+      const payload = Object.entries(raw).reduce((acc, [k, v]) => {
+        if (v !== undefined) (acc as any)[k] = v;
+        return acc;
+      }, {} as Record<string, any>);
+      const docRef = await db.collection(this.positionsHistoryCollection).add(payload);
+      return docRef.id;
+    } catch (error) {
+      console.error('Error adding position history entry:', error);
+      return null;
+    }
+  }
+
+  async getPositionHistory(userId: string, limit?: number): Promise<any[]> {
+    try {
+      const db = this.getFirestore();
+      // Avoid requiring a composite index by sorting in memory
+      const snap = await db
+        .collection(this.positionsHistoryCollection)
+        .where('userId', '==', userId)
+        .get();
+      const items = snap.docs.map((d) => {
+        const data = d.data() as any;
+        const createdAt = this.serializeDate(data.createdAt);
+        return { id: d.id, ...data, createdAt };
+      });
+      const sorted = items.sort((a, b) => {
+        const at = a.createdAt ? new Date(a.createdAt as any).getTime() : 0;
+        const bt = b.createdAt ? new Date(b.createdAt as any).getTime() : 0;
+        return bt - at;
+      });
+      return typeof limit === 'number' && limit > 0 ? sorted.slice(0, limit) : sorted;
+    } catch (error) {
+      console.error('Error getting position history:', error);
+      return [];
+    }
+  }
+
   // New: get all open positions across all users (for cron jobs)
   async getAllOpenPositions(): Promise<Position[]> {
     try {
@@ -706,6 +769,30 @@ export class FirebaseDatabaseService {
     }
   }
 
+  /**
+   * Combined wallet history for a user from deposits and withdrawals.
+   * Sorted by requestedAt/createdAt desc and limited when provided.
+   */
+  async getWalletHistory(userId: string, limit?: number): Promise<any[]> {
+    try {
+      const deposits = await this.getDeposits(userId);
+      const withdrawals = await this.getWithdrawals(userId);
+      const normalizeTime = (x: any): number => {
+        const t = x?.requestedAt || x?.createdAt || x?.updatedAt;
+        const d = t ? new Date(t) : null;
+        return d && !isNaN(d.getTime()) ? d.getTime() : 0;
+      };
+      const items = [
+        ...deposits.map((d: any) => ({ type: 'deposit', ...d })),
+        ...withdrawals.map((w: any) => ({ type: 'withdrawal', ...w })),
+      ].sort((a, b) => normalizeTime(b) - normalizeTime(a));
+      return typeof limit === 'number' && limit > 0 ? items.slice(0, limit) : items;
+    } catch (error) {
+      console.error('Error getting wallet history:', error);
+      return [];
+    }
+  }
+
   // Wallets operations
   async createWallet(data: Omit<import('../wallets/entities/wallet.entity').Wallet, 'id'>): Promise<import('../wallets/entities/wallet.entity').Wallet> {
     try {
@@ -717,18 +804,6 @@ export class FirebaseDatabaseService {
         return acc;
       }, {} as Record<string, any>);
       const docRef = await db.collection(this.walletsCollection).add(payload);
-      // Log to walletHistory on create
-      try {
-        await db.collection(this.walletHistoryCollection).add({
-          userId: payload.userId,
-          walletId: docRef.id,
-          action: 'create',
-          data: payload,
-          createdAt: now,
-        });
-      } catch (e) {
-        console.error('Error logging wallet history (create):', e);
-      }
       const createdAt = this.serializeDate(payload.createdAt);
       const updatedAt = this.serializeDate(payload.updatedAt);
       return { id: docRef.id, ...(payload as any), createdAt, updatedAt } as any;
@@ -775,18 +850,6 @@ export class FirebaseDatabaseService {
         return acc;
       }, {} as Record<string, any>);
       await ref.update(payload);
-      // Log to walletHistory on update
-      try {
-        await db.collection(this.walletHistoryCollection).add({
-          userId,
-          walletId: id,
-          action: 'update',
-          data: payload,
-          createdAt: new Date(),
-        });
-      } catch (e) {
-        console.error('Error logging wallet history (update):', e);
-      }
       return true;
     } catch (error) {
       console.error('Error updating wallet:', error);
@@ -807,30 +870,6 @@ export class FirebaseDatabaseService {
     } catch (error) {
       console.error('Error deleting wallet:', error);
       return false;
-    }
-  }
-
-  // Wallet history retrieval
-  async getWalletHistory(userId: string, limit?: number): Promise<any[]> {
-    try {
-      const snap = await this.getFirestore()
-        .collection(this.walletHistoryCollection)
-        .where('userId', '==', userId)
-        .get();
-      const items = snap.docs.map((d) => {
-        const data = d.data() as any;
-        const createdAt = this.serializeDate(data.createdAt);
-        return { id: d.id, ...data, createdAt };
-      });
-      const sorted = items.sort((a, b) => {
-        const aT = a.createdAt ? new Date(a.createdAt as any).getTime() : 0;
-        const bT = b.createdAt ? new Date(b.createdAt as any).getTime() : 0;
-        return bT - aT;
-      });
-      return typeof limit === 'number' && limit > 0 ? sorted.slice(0, limit) : sorted;
-    } catch (error) {
-      console.error('Error fetching wallet history:', error);
-      return [];
     }
   }
 

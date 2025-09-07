@@ -3,12 +3,13 @@ export interface Position {
   userId?: string;
   symbol: string;
   side: 'buy' | 'sell';
-  entryPrice: number;
+  entryPrice?: number;
   currentPrice?: number; // may be omitted; UI should use live price
   lots: number;
   investedAmount: number;
   platform: 'Delta Exchange' | 'Groww';
-  leverage: number;
+  leverage?: number;
+  account?: 'main' | 'longterm';
   timestamp?: string;
   status?: 'open' | 'closed';
   pnl?: number;
@@ -29,6 +30,10 @@ export interface AggregatedPosition {
   side: 'buy' | 'sell';
   pnl: number;
   currentPrice: number | null;
+  platform?: 'Delta Exchange' | 'Groww';
+  account?: 'main' | 'longterm';
+  id?: string; // representative leg id
+  ids?: string[]; // all leg ids for this symbol
 }
 
 // Union for places that can handle either full Position or aggregated
@@ -42,7 +47,8 @@ export interface CreatePositionData {
   currentPrice?: number; // optional; live price will be fetched client-side
   investedAmount: number;
   platform: 'Delta Exchange' | 'Groww';
-  leverage: number;
+  leverage?: number;
+  account?: 'main' | 'longterm';
   tradingFee?: number;
   timestamp?: string;
   status?: 'open' | 'closed';
@@ -60,6 +66,7 @@ export interface UpdatePositionData {
   investedAmount?: number;
   platform?: 'Delta Exchange' | 'Groww';
   leverage?: number;
+  account?: 'main' | 'longterm';
   timestamp?: string;
   status?: 'open' | 'closed';
   pnl?: number;
@@ -75,6 +82,8 @@ export interface PositionFilters {
   symbol?: string;
   side?: 'buy' | 'sell';
   platform?: 'Delta Exchange' | 'Groww';
+  account?: 'main' | 'longterm';
+  timeframe?: '1D' | '7D' | '30D' | '90D' | 'all';
 }
 
 export interface PositionStats {

@@ -3,12 +3,13 @@ export interface Position {
   userId: string;
   symbol: string;
   side: 'buy' | 'sell';
-  entryPrice: number;
+  entryPrice?: number;
   currentPrice?: number;
   lots: number;
   investedAmount: number;
   platform: 'Delta Exchange' | 'Groww';
-  leverage: number;
+  leverage?: number;
+  account?: 'main' | 'longterm';
   timestamp?: string;
   status?: 'open' | 'closed';
   pnl?: number;
