@@ -23,6 +23,7 @@ export class FirebaseDatabaseService {
   private permissionsCollection = 'permissions';
   private positionsCollection = 'positions';
   private exitPositionsCollection = 'exit_positions';
+  private withdrawalsCollection = 'withdrawals';
 
   constructor(private firebaseConfig: FirebaseConfig) {
     // Firestore will be initialized in onModuleInit
@@ -509,6 +510,40 @@ export class FirebaseDatabaseService {
 
     await batch.commit();
     return created;
+  }
+
+  // Withdrawals operations
+  async createWithdrawal(data: Omit<import('../withdrawals/entities/withdrawal.entity').Withdrawal, 'id'>): Promise<import('../withdrawals/entities/withdrawal.entity').Withdrawal> {
+    try {
+      const db = this.getFirestore();
+      const now = data.requestedAt ?? new Date();
+      // Remove undefined fields to satisfy Firestore validation
+      const raw = { ...data, requestedAt: now } as Record<string, any>;
+      const payload = Object.entries(raw).reduce((acc, [k, v]) => {
+        if (v !== undefined) (acc as any)[k] = v;
+        return acc;
+      }, {} as Record<string, any>);
+
+      const docRef = await db.collection(this.withdrawalsCollection).add(payload);
+      return { id: docRef.id, ...(payload as any) } as any;
+    } catch (error) {
+      console.error('Error creating withdrawal:', error);
+      throw error;
+    }
+  }
+
+  async getWithdrawals(userId: string): Promise<import('../withdrawals/entities/withdrawal.entity').Withdrawal[]> {
+    try {
+      const snapshot = await this.getFirestore()
+        .collection(this.withdrawalsCollection)
+        .where('userId', '==', userId)
+        .orderBy('requestedAt', 'desc')
+        .get();
+      return snapshot.docs.map((d) => ({ id: d.id, ...(d.data() as any) })) as any;
+    } catch (error) {
+      console.error('Error getting withdrawals:', error);
+      return [] as any;
+    }
   }
 
   // Create an exit entry for a single closed position

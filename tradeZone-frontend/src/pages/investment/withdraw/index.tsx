@@ -5,6 +5,9 @@ import FloatingNav, { type MobileTab } from '../../../layouts/FloatingNav';
 import { useSettings } from '../../../contexts/SettingsContext';
 import { usePermissions } from '../../../hooks/usePermissions';
 import { useNavigate } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
+import type { AppDispatch, RootState } from '../../../redux/store';
+import { fetchWithdrawals, createWithdrawal } from '../../../redux/thunks/withdrawals/withdrawalsThunks';
 
 interface OnlineUser {
   userId: string;
@@ -12,10 +15,11 @@ interface OnlineUser {
   socketId: string;
 }
 
+// Deprecated local type kept for context; using API DTO via Redux now
 interface WithdrawalRecord {
   id: string;
   amount: number;
-  timestamp: string;
+  requestedAt: string;
   description?: string;
 }
 
@@ -35,8 +39,10 @@ const Withdraw = memo(function Withdraw() {
   const [isMobile, setIsMobile] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<MobileTab>('chart');
   const [selectedTimeFilter, setSelectedTimeFilter] = useState<TimeFilter>('1M');
+  const dispatch = useDispatch<AppDispatch>();
   const [withdrawAmount, setWithdrawAmount] = useState<string>('');
-  const [withdrawals, setWithdrawals] = useState<WithdrawalRecord[]>([]);
+  const [description, setDescription] = useState<string>('');
+  const { items: withdrawals, loading, creating, error } = useSelector((s: RootState) => s.withdrawals);
 
   // Redirect if no permission
   useEffect(() => {
@@ -56,201 +62,10 @@ const Withdraw = memo(function Withdraw() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Initialize mock withdrawals
+  // Load withdrawals from API
   useEffect(() => {
-    const mockWithdrawals: WithdrawalRecord[] = [
-      // Recent withdrawals (January 2024)
-      {
-        id: '1',
-        amount: 8500,
-        timestamp: '2024-01-20 14:30',
-        description: 'Investment profits withdrawal'
-      },
-      {
-        id: '2',
-        amount: 3200,
-        timestamp: '2024-01-18 09:15',
-        description: 'Monthly salary supplement'
-      },
-      {
-        id: '3',
-        amount: 5000,
-        timestamp: '2024-01-15 16:45',
-        description: 'Emergency medical expenses'
-      },
-      {
-        id: '4',
-        amount: 2750,
-        timestamp: '2024-01-12 11:20',
-        description: 'Car repair payment'
-      },
-      {
-        id: '5',
-        amount: 1800,
-        timestamp: '2024-01-08 13:45',
-        description: 'Credit card payment'
-      },
-      {
-        id: '6',
-        amount: 4200,
-        timestamp: '2024-01-05 10:30',
-        description: 'Home improvement'
-      },
-      {
-        id: '7',
-        amount: 6500,
-        timestamp: '2024-01-02 16:20',
-        description: 'New year expenses'
-      },
-      
-      // December 2023 withdrawals
-      {
-        id: '8',
-        amount: 7200,
-        timestamp: '2023-12-28 10:15',
-        description: 'Year-end bonus withdrawal'
-      },
-      {
-        id: '9',
-        amount: 3800,
-        timestamp: '2023-12-25 15:45',
-        description: 'Christmas celebrations'
-      },
-      {
-        id: '10',
-        amount: 2200,
-        timestamp: '2023-12-20 09:30',
-        description: 'Holiday shopping'
-      },
-      {
-        id: '11',
-        amount: 5500,
-        timestamp: '2023-12-15 14:20',
-        description: 'Insurance payment'
-      },
-      {
-        id: '12',
-        amount: 2900,
-        timestamp: '2023-12-10 11:45',
-        description: 'Property tax payment'
-      },
-      {
-        id: '13',
-        amount: 1500,
-        timestamp: '2023-12-05 16:30',
-        description: 'Utility bills'
-      },
-      
-      // November 2023 withdrawals
-      {
-        id: '14',
-        amount: 4800,
-        timestamp: '2023-11-28 12:15',
-        description: 'Black Friday purchases'
-      },
-      {
-        id: '15',
-        amount: 3300,
-        timestamp: '2023-11-22 09:45',
-        description: 'Thanksgiving expenses'
-      },
-      {
-        id: '16',
-        amount: 2100,
-        timestamp: '2023-11-18 14:30',
-        description: 'Healthcare costs'
-      },
-      {
-        id: '17',
-        amount: 6200,
-        timestamp: '2023-11-12 10:20',
-        description: 'Business investment'
-      },
-      {
-        id: '18',
-        amount: 1750,
-        timestamp: '2023-11-08 15:15',
-        description: 'Education expenses'
-      },
-      {
-        id: '19',
-        amount: 4100,
-        timestamp: '2023-11-03 13:45',
-        description: 'Travel booking'
-      },
-      
-      // October 2023 withdrawals
-      {
-        id: '20',
-        amount: 5800,
-        timestamp: '2023-10-30 11:30',
-        description: 'Halloween party expenses'
-      },
-      {
-        id: '21',
-        amount: 2400,
-        timestamp: '2023-10-25 16:20',
-        description: 'Monthly groceries'
-      },
-      {
-        id: '22',
-        amount: 7500,
-        timestamp: '2023-10-20 09:15',
-        description: 'Investment rebalancing'
-      },
-      {
-        id: '23',
-        amount: 3600,
-        timestamp: '2023-10-15 14:45',
-        description: 'Home maintenance'
-      },
-      {
-        id: '24',
-        amount: 2800,
-        timestamp: '2023-10-10 12:30',
-        description: 'Electronics purchase'
-      },
-      {
-        id: '25',
-        amount: 4400,
-        timestamp: '2023-10-05 10:45',
-        description: 'Quarterly expenses'
-      },
-      
-      // September 2023 withdrawals
-      {
-        id: '26',
-        amount: 6800,
-        timestamp: '2023-09-28 15:30',
-        description: 'Back to school expenses'
-      },
-      {
-        id: '27',
-        amount: 3200,
-        timestamp: '2023-09-22 11:15',
-        description: 'Professional development'
-      },
-      {
-        id: '28',
-        amount: 5100,
-        timestamp: '2023-09-18 09:45',
-        description: 'Family vacation'
-      },
-      {
-        id: '29',
-        amount: 2700,
-        timestamp: '2023-09-12 14:20',
-        description: 'Gym membership'
-      },
-      {
-        id: '30',
-        amount: 4900,
-        timestamp: '2023-09-08 16:45',
-        description: 'Wedding gift'
-      }
-    ];
-    setWithdrawals(mockWithdrawals);
-  }, []);
+    dispatch(fetchWithdrawals());
+  }, [dispatch]);
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
@@ -284,7 +99,7 @@ const Withdraw = memo(function Withdraw() {
       // Calculate total withdrawals up to this date
       const dateStr = date.toISOString().split('T')[0];
       const withdrawalsUpToDate = withdrawals.filter(w => 
-        new Date(w.timestamp) <= date
+        new Date((w as any).requestedAt) <= date
       );
       const totalAmount = withdrawalsUpToDate.reduce((sum, w) => sum + w.amount, 0);
       
@@ -379,31 +194,23 @@ const Withdraw = memo(function Withdraw() {
     );
   };
 
-  const handleWithdrawSubmit = (e: React.FormEvent) => {
+  const handleWithdrawSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!withdrawAmount || parseFloat(withdrawAmount) <= 0) {
+    const amount = parseFloat(withdrawAmount);
+    if (!withdrawAmount || amount <= 0) {
       alert('Please enter a valid withdrawal amount');
       return;
     }
-
-    const newWithdrawal: WithdrawalRecord = {
-      id: Date.now().toString(),
-      amount: parseFloat(withdrawAmount),
-      timestamp: new Date().toLocaleString(),
-      description: 'Bank withdrawal'
-    };
-
-    setWithdrawals(prev => [newWithdrawal, ...prev]);
+    await dispatch(createWithdrawal({ amount, description: description || undefined })).unwrap();
     setWithdrawAmount('');
-    alert('Withdrawal recorded successfully!');
+    setDescription('');
   };
 
 
 
   // Filter withdrawals based on timeframe
   const filteredWithdrawals = withdrawals.filter(withdrawal => {
-    const withdrawalDate = new Date(withdrawal.timestamp);
+  const withdrawalDate = new Date((withdrawal as any).requestedAt);
     const now = new Date();
     let cutoffDate = new Date();
 
@@ -451,9 +258,8 @@ const Withdraw = memo(function Withdraw() {
             </button>
           ))}
         </div>
-      </div>
-
-      {/* Total Withdrawals Summary */}
+  </div>
+  {/* Total Withdrawals Summary */}
       <div className={`p-6 rounded-2xl backdrop-blur-lg border mb-8 ${
         isDarkMode 
           ? 'bg-gray-800/30 border-gray-700/50 shadow-xl shadow-gray-900/20' 
@@ -533,6 +339,23 @@ const Withdraw = memo(function Withdraw() {
               </div>
             </div>
 
+            <div>
+              <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                Description (optional)
+              </label>
+              <input
+                type="text"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Reason for withdrawal"
+                className={`w-full px-4 py-3 rounded-xl border backdrop-blur-sm ${
+                  isDarkMode 
+                    ? 'bg-gray-700/50 border-gray-600/50 text-white placeholder-gray-400' 
+                    : 'bg-white/70 border-gray-300/50 text-gray-900 placeholder-gray-500'
+                } focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all`}
+              />
+            </div>
+
             <button
               type="submit"
               disabled={!withdrawAmount || parseFloat(withdrawAmount) <= 0}
@@ -540,6 +363,9 @@ const Withdraw = memo(function Withdraw() {
             >
               Submit Withdrawal Request
             </button>
+            {error && (
+              <p className={`text-sm ${isDarkMode ? 'text-red-400' : 'text-red-600'}`}>{error}</p>
+            )}
           </form>
         </div>
 
@@ -567,7 +393,7 @@ const Withdraw = memo(function Withdraw() {
                     <div>
                       <p className="text-xl font-bold">${withdrawal.amount.toLocaleString()}</p>
                       <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                        {withdrawal.timestamp}
+                        {(withdrawal as any).requestedAt}
                       </p>
                     </div>
                     <div className="w-3 h-3 rounded-full bg-red-400"></div>
@@ -600,31 +426,7 @@ const Withdraw = memo(function Withdraw() {
     </div>
   );
 
-  if (isMobile) {
-    return (
-      <div 
-        className={`${isDarkMode ? 'bg-gray-900' : 'bg-gray-100'} flex flex-col fixed inset-0 overflow-hidden`}
-        style={{ 
-          height: '100svh',
-          minHeight: '100vh',
-          maxHeight: '100vh',
-          width: '100vw',
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          paddingBottom: '0px',
-          margin: '0px'
-        }}
-      >
-        <div className="flex-1 overflow-hidden" style={{ height: '100vh' }}>
-          {content}
-        </div>
-        <FloatingNav activeTab={activeTab} onTabChange={handleTabChange} />
-      </div>
-    );
-  }
+  // Mobile wrapper simplified to use the same layout as desktop
 
   return (
     <div className={`h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-100'} flex flex-col`}>
