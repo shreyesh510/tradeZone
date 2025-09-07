@@ -19,4 +19,12 @@ export const withdrawalsApi = {
     const res = await api.post('/withdrawals', data);
     return res.data;
   },
+  async update(id: string, payload: Partial<{ amount: number; description?: string; method?: string }>) {
+    const res = await api.patch<{ success: boolean }>(`/withdrawals/${id}`, payload);
+    return res.data;
+  },
+  async remove(id: string) {
+    const res = await api.delete<{ success: boolean }>(`/withdrawals/${id}`);
+    return res.data;
+  }
 };

@@ -525,7 +525,10 @@ export class FirebaseDatabaseService {
       }, {} as Record<string, any>);
 
       const docRef = await db.collection(this.withdrawalsCollection).add(payload);
-      return { id: docRef.id, ...(payload as any) } as any;
+      // Normalize dates to ISO for API consumers
+      const requestedAt = this.serializeDate(payload.requestedAt);
+      const completedAt = this.serializeDate(payload.completedAt);
+      return { id: docRef.id, ...(payload as any), requestedAt, completedAt } as any;
     } catch (error) {
       console.error('Error creating withdrawal:', error);
       throw error;
@@ -534,15 +537,89 @@ export class FirebaseDatabaseService {
 
   async getWithdrawals(userId: string): Promise<import('../withdrawals/entities/withdrawal.entity').Withdrawal[]> {
     try {
+      // Fetch by userId then sort in memory to avoid requiring a Firestore composite index
       const snapshot = await this.getFirestore()
         .collection(this.withdrawalsCollection)
         .where('userId', '==', userId)
-        .orderBy('requestedAt', 'desc')
         .get();
-      return snapshot.docs.map((d) => ({ id: d.id, ...(d.data() as any) })) as any;
+      const items = snapshot.docs.map((d) => {
+        const data = d.data() as any;
+        // Normalize Firestore Timestamp/Date to ISO strings
+        const requestedAt = this.serializeDate(data.requestedAt);
+        const completedAt = this.serializeDate(data.completedAt);
+        return { id: d.id, ...data, requestedAt, completedAt };
+      }) as any[];
+      return items.sort((a, b) => {
+        const aTime = a.requestedAt ? new Date(a.requestedAt as any).getTime() : 0;
+        const bTime = b.requestedAt ? new Date(b.requestedAt as any).getTime() : 0;
+        return bTime - aTime;
+      }) as any;
     } catch (error) {
       console.error('Error getting withdrawals:', error);
       return [] as any;
+    }
+  }
+
+  private serializeDate(value: any): string | undefined {
+    if (!value) return undefined;
+    // Firebase Admin Timestamp instance
+    const adminAny: any = value as any;
+    if (adminAny && typeof adminAny.toDate === 'function') {
+      try {
+        return adminAny.toDate().toISOString();
+      } catch {}
+    }
+    // Shape from JSON ({ _seconds, _nanoseconds })
+    if (typeof adminAny === 'object' && ('_seconds' in adminAny || 'seconds' in adminAny)) {
+      const seconds = adminAny._seconds ?? adminAny.seconds ?? 0;
+      const nanos = adminAny._nanoseconds ?? adminAny.nanoseconds ?? 0;
+      const ms = seconds * 1000 + Math.floor(nanos / 1e6);
+      return new Date(ms).toISOString();
+    }
+    if (value instanceof Date) return value.toISOString();
+    // Try parsing if string/number
+    try {
+      const d = new Date(value);
+      if (!isNaN(d.getTime())) return d.toISOString();
+    } catch {}
+    return undefined;
+  }
+
+  async updateWithdrawal(userId: string, id: string, data: Partial<import('../withdrawals/entities/withdrawal.entity').Withdrawal>): Promise<boolean> {
+    try {
+      const db = this.getFirestore();
+      const ref = db.collection(this.withdrawalsCollection).doc(id);
+      const snap = await ref.get();
+      if (!snap.exists) return false;
+      const existing = snap.data() as any;
+      if (!existing || existing.userId !== userId) return false; // ownership check
+
+      const raw = { ...data, updatedAt: new Date() } as Record<string, any>;
+      const payload = Object.entries(raw).reduce((acc, [k, v]) => {
+        if (v !== undefined) (acc as any)[k] = v;
+        return acc;
+      }, {} as Record<string, any>);
+      await ref.update(payload);
+      return true;
+    } catch (error) {
+      console.error('Error updating withdrawal:', error);
+      return false;
+    }
+  }
+
+  async deleteWithdrawal(userId: string, id: string): Promise<boolean> {
+    try {
+      const db = this.getFirestore();
+      const ref = db.collection(this.withdrawalsCollection).doc(id);
+      const snap = await ref.get();
+      if (!snap.exists) return false;
+      const existing = snap.data() as any;
+      if (!existing || existing.userId !== userId) return false; // ownership check
+      await ref.delete();
+      return true;
+    } catch (error) {
+      console.error('Error deleting withdrawal:', error);
+      return false;
     }
   }
 

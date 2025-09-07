@@ -21,4 +21,12 @@ export class WithdrawalsService {
   async list(userId: string): Promise<Withdrawal[]> {
     return await this.db.getWithdrawals(userId);
   }
+
+  async update(userId: string, id: string, data: Partial<Withdrawal>): Promise<boolean> {
+    return await this.db.updateWithdrawal(userId, id, data);
+  }
+
+  async remove(userId: string, id: string): Promise<boolean> {
+    return await this.db.deleteWithdrawal(userId, id);
+  }
 }

@@ -22,3 +22,27 @@ export const createWithdrawal = createAsyncThunk<WithdrawalDto, { amount: number
     }
   },
 );
+
+export const updateWithdrawal = createAsyncThunk<{ id: string; success: boolean; patch: Partial<WithdrawalDto> }, { id: string; patch: Partial<WithdrawalDto> }, { rejectValue: string }>(
+  'withdrawals/update',
+  async ({ id, patch }, { rejectWithValue }) => {
+    try {
+      const res = await withdrawalsApi.update(id, patch);
+      return { id, success: res.success, patch };
+    } catch (err: any) {
+      return rejectWithValue(err?.response?.data?.message || err.message || 'Failed to update withdrawal');
+    }
+  }
+);
+
+export const deleteWithdrawal = createAsyncThunk<{ id: string; success: boolean }, { id: string }, { rejectValue: string }>(
+  'withdrawals/delete',
+  async ({ id }, { rejectWithValue }) => {
+    try {
+      const res = await withdrawalsApi.remove(id);
+      return { id, success: res.success };
+    } catch (err: any) {
+      return rejectWithValue(err?.response?.data?.message || err.message || 'Failed to delete withdrawal');
+    }
+  }
+);

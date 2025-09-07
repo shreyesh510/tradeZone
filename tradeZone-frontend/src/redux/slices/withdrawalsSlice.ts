@@ -1,5 +1,5 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
-import { fetchWithdrawals, createWithdrawal } from '../thunks/withdrawals/withdrawalsThunks';
+import { fetchWithdrawals, createWithdrawal, updateWithdrawal, deleteWithdrawal } from '../thunks/withdrawals/withdrawalsThunks';
 import type { WithdrawalDto } from '../../services/withdrawalsApi';
 
 interface WithdrawalsState {
@@ -45,6 +45,17 @@ const withdrawalsSlice = createSlice({
       .addCase(createWithdrawal.rejected, (state, action) => {
         state.creating = false;
         state.error = action.payload as string ?? 'Failed to create withdrawal';
+      })
+      .addCase(updateWithdrawal.fulfilled, (state, action) => {
+        if (!action.payload.success) return;
+        const idx = state.items.findIndex((w) => w.id === action.payload.id);
+        if (idx >= 0) {
+          state.items[idx] = { ...state.items[idx], ...(action.payload.patch as any) } as any;
+        }
+      })
+      .addCase(deleteWithdrawal.fulfilled, (state, action) => {
+        if (!action.payload.success) return;
+        state.items = state.items.filter((w) => w.id !== action.payload.id);
       });
   },
 });

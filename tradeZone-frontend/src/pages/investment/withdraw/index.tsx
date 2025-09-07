@@ -7,7 +7,9 @@ import { usePermissions } from '../../../hooks/usePermissions';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '../../../redux/store';
-import { fetchWithdrawals, createWithdrawal } from '../../../redux/thunks/withdrawals/withdrawalsThunks';
+import { fetchWithdrawals, createWithdrawal, updateWithdrawal, deleteWithdrawal } from '../../../redux/thunks/withdrawals/withdrawalsThunks';
+import ConfirmModal from '../../../components/ConfirmModal';
+import EditWithdrawalModal from '../../../components/EditWithdrawalModal';
 
 interface OnlineUser {
   userId: string;
@@ -43,6 +45,8 @@ const Withdraw = memo(function Withdraw() {
   const [withdrawAmount, setWithdrawAmount] = useState<string>('');
   const [description, setDescription] = useState<string>('');
   const { items: withdrawals, loading, creating, error } = useSelector((s: RootState) => s.withdrawals);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [editId, setEditId] = useState<string | null>(null);
 
   // Redirect if no permission
   useEffect(() => {
@@ -65,6 +69,22 @@ const Withdraw = memo(function Withdraw() {
   // Load withdrawals from API
   useEffect(() => {
     dispatch(fetchWithdrawals());
+  }, [dispatch]);
+
+  // Refetch when window gains focus or page becomes visible
+  useEffect(() => {
+    const onFocus = () => dispatch(fetchWithdrawals());
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        dispatch(fetchWithdrawals());
+      }
+    };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [dispatch]);
 
   const toggleSidebar = () => {
@@ -298,6 +318,16 @@ const Withdraw = memo(function Withdraw() {
                 {filteredWithdrawals.length} Withdrawals
               </span>
             </div>
+            <button
+              type="button"
+              onClick={() => dispatch(fetchWithdrawals())}
+              disabled={loading}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
+                loading ? 'bg-gray-400 text-white cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white'
+              }`}
+            >
+              {loading ? 'Loading…' : 'Refresh'}
+            </button>
           </div>
         </div>
         <div className="h-80">
@@ -408,9 +438,18 @@ const Withdraw = memo(function Withdraw() {
                   )}
                   
                   <div className="flex justify-between items-center">
-                    <span className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                      Bank Transfer
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        className={`px-2 py-1 text-xs rounded-md ${isDarkMode ? 'bg-blue-600 text-white' : 'bg-blue-600 text-white'}`}
+                        onClick={() => setEditId(withdrawal.id)}
+                      >Edit</button>
+                      <button
+                        type="button"
+                        className={`px-2 py-1 text-xs rounded-md ${isDarkMode ? 'bg-red-600 text-white' : 'bg-red-600 text-white'}`}
+                        onClick={() => setConfirmDeleteId(withdrawal.id)}
+                      >Delete</button>
+                    </div>
                     <span className={`px-2 py-1 rounded-lg text-xs font-medium ${
                       isDarkMode ? 'bg-red-500/20 text-red-400' : 'bg-red-100 text-red-700'
                     }`}>
@@ -439,6 +478,39 @@ const Withdraw = memo(function Withdraw() {
       <div className="flex-1 flex min-h-0 overflow-hidden">
         {content}
       </div>
+
+      {/* Delete confirm modal */}
+      <ConfirmModal
+        open={!!confirmDeleteId}
+        title="Delete withdrawal?"
+        message="This action cannot be undone."
+        isDarkMode={isDarkMode}
+        onCancel={() => setConfirmDeleteId(null)}
+        onConfirm={() => {
+          if (confirmDeleteId) {
+            dispatch(deleteWithdrawal({ id: confirmDeleteId }));
+          }
+          setConfirmDeleteId(null);
+        }}
+      />
+
+      {/* Edit modal */}
+      <EditWithdrawalModal
+        open={!!editId}
+        isDarkMode={isDarkMode}
+        initial={{
+          amount: editId ? (withdrawals.find(w => w.id === editId)?.amount ?? 0) : 0,
+          method: editId ? withdrawals.find(w => w.id === editId)?.method : undefined,
+          description: editId ? withdrawals.find(w => w.id === editId)?.description : undefined,
+        }}
+        onCancel={() => setEditId(null)}
+        onSave={(patch) => {
+          if (editId) {
+            dispatch(updateWithdrawal({ id: editId, patch: patch as any }));
+          }
+          setEditId(null);
+        }}
+      />
     </div>
   );
 });
