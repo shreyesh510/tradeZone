@@ -39,6 +39,7 @@ export const loginUser = createAsyncThunk(
       const response = await authApi.login(credentials);
       
       // Store tokens and permissions in localStorage
+      localStorage.setItem('token', response.token);
       localStorage.setItem('testToken', response.testToken);
       localStorage.setItem('user', JSON.stringify(response.user));
       if (response.user.permissions) {
@@ -59,6 +60,7 @@ export const registerUser = createAsyncThunk(
       const response = await authApi.register(userData);
       
       // Store tokens and permissions in localStorage
+      localStorage.setItem('token', response.token);
       localStorage.setItem('testToken', response.testToken);
       localStorage.setItem('user', JSON.stringify(response.user));
       if (response.user.permissions) {
@@ -76,6 +78,7 @@ export const logoutUser = createAsyncThunk(
   'auth/logout',
   async () => {
     // Clear all stored data
+    localStorage.removeItem('token');
     localStorage.removeItem('testToken');
     localStorage.removeItem('user');
     localStorage.removeItem('permissions');
@@ -91,18 +94,16 @@ const authSlice = createSlice({
       state.error = null;
     },
     initializeAuth: (state) => {
+      const token = localStorage.getItem('token');
       const testToken = localStorage.getItem('testToken');
       const user = localStorage.getItem('user');
       const permissions = localStorage.getItem('permissions');
       
-      console.log('🔄 Initializing auth from localStorage:', { 
-        testToken: !!testToken, 
-        user: !!user, 
-        permissions: !!permissions 
-      });
+  // Initialize from localStorage if present
       
-      if (testToken && user) {
+      if ((token || testToken) && user) {
         try {
+          state.token = token;
           state.testToken = testToken;
           const userData = JSON.parse(user);
           
@@ -115,16 +116,17 @@ const authSlice = createSlice({
           
           state.user = userData;
           state.isAuthenticated = true;
-          console.log('✅ Auth initialized successfully:', state.user);
+          // Auth initialized successfully
         } catch (error) {
           console.error('❌ Error parsing user data:', error);
           // Clear invalid data
+          localStorage.removeItem('token');
           localStorage.removeItem('testToken');
           localStorage.removeItem('user');
           localStorage.removeItem('permissions');
         }
       } else {
-        console.log('❌ No valid credentials found in localStorage');
+  // No valid credentials found in localStorage
       }
     },
   },

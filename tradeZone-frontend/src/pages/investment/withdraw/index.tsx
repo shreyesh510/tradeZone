@@ -5,6 +5,11 @@ import FloatingNav, { type MobileTab } from '../../../layouts/FloatingNav';
 import { useSettings } from '../../../contexts/SettingsContext';
 import { usePermissions } from '../../../hooks/usePermissions';
 import { useNavigate } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
+import type { AppDispatch, RootState } from '../../../redux/store';
+import { fetchWithdrawals, createWithdrawal, updateWithdrawal, deleteWithdrawal } from '../../../redux/thunks/withdrawals/withdrawalsThunks';
+import ConfirmModal from '../../../components/ConfirmModal';
+import EditWithdrawalModal from '../../../components/EditWithdrawalModal';
 
 interface OnlineUser {
   userId: string;
@@ -12,10 +17,11 @@ interface OnlineUser {
   socketId: string;
 }
 
+// Deprecated local type kept for context; using API DTO via Redux now
 interface WithdrawalRecord {
   id: string;
   amount: number;
-  timestamp: string;
+  requestedAt: string;
   description?: string;
 }
 
@@ -35,8 +41,12 @@ const Withdraw = memo(function Withdraw() {
   const [isMobile, setIsMobile] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<MobileTab>('chart');
   const [selectedTimeFilter, setSelectedTimeFilter] = useState<TimeFilter>('1M');
+  const dispatch = useDispatch<AppDispatch>();
   const [withdrawAmount, setWithdrawAmount] = useState<string>('');
-  const [withdrawals, setWithdrawals] = useState<WithdrawalRecord[]>([]);
+  const [description, setDescription] = useState<string>('');
+  const { items: withdrawals, loading, creating, error } = useSelector((s: RootState) => s.withdrawals);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [editId, setEditId] = useState<string | null>(null);
 
   // Redirect if no permission
   useEffect(() => {
@@ -56,201 +66,26 @@ const Withdraw = memo(function Withdraw() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Initialize mock withdrawals
+  // Load withdrawals from API
   useEffect(() => {
-    const mockWithdrawals: WithdrawalRecord[] = [
-      // Recent withdrawals (January 2024)
-      {
-        id: '1',
-        amount: 8500,
-        timestamp: '2024-01-20 14:30',
-        description: 'Investment profits withdrawal'
-      },
-      {
-        id: '2',
-        amount: 3200,
-        timestamp: '2024-01-18 09:15',
-        description: 'Monthly salary supplement'
-      },
-      {
-        id: '3',
-        amount: 5000,
-        timestamp: '2024-01-15 16:45',
-        description: 'Emergency medical expenses'
-      },
-      {
-        id: '4',
-        amount: 2750,
-        timestamp: '2024-01-12 11:20',
-        description: 'Car repair payment'
-      },
-      {
-        id: '5',
-        amount: 1800,
-        timestamp: '2024-01-08 13:45',
-        description: 'Credit card payment'
-      },
-      {
-        id: '6',
-        amount: 4200,
-        timestamp: '2024-01-05 10:30',
-        description: 'Home improvement'
-      },
-      {
-        id: '7',
-        amount: 6500,
-        timestamp: '2024-01-02 16:20',
-        description: 'New year expenses'
-      },
-      
-      // December 2023 withdrawals
-      {
-        id: '8',
-        amount: 7200,
-        timestamp: '2023-12-28 10:15',
-        description: 'Year-end bonus withdrawal'
-      },
-      {
-        id: '9',
-        amount: 3800,
-        timestamp: '2023-12-25 15:45',
-        description: 'Christmas celebrations'
-      },
-      {
-        id: '10',
-        amount: 2200,
-        timestamp: '2023-12-20 09:30',
-        description: 'Holiday shopping'
-      },
-      {
-        id: '11',
-        amount: 5500,
-        timestamp: '2023-12-15 14:20',
-        description: 'Insurance payment'
-      },
-      {
-        id: '12',
-        amount: 2900,
-        timestamp: '2023-12-10 11:45',
-        description: 'Property tax payment'
-      },
-      {
-        id: '13',
-        amount: 1500,
-        timestamp: '2023-12-05 16:30',
-        description: 'Utility bills'
-      },
-      
-      // November 2023 withdrawals
-      {
-        id: '14',
-        amount: 4800,
-        timestamp: '2023-11-28 12:15',
-        description: 'Black Friday purchases'
-      },
-      {
-        id: '15',
-        amount: 3300,
-        timestamp: '2023-11-22 09:45',
-        description: 'Thanksgiving expenses'
-      },
-      {
-        id: '16',
-        amount: 2100,
-        timestamp: '2023-11-18 14:30',
-        description: 'Healthcare costs'
-      },
-      {
-        id: '17',
-        amount: 6200,
-        timestamp: '2023-11-12 10:20',
-        description: 'Business investment'
-      },
-      {
-        id: '18',
-        amount: 1750,
-        timestamp: '2023-11-08 15:15',
-        description: 'Education expenses'
-      },
-      {
-        id: '19',
-        amount: 4100,
-        timestamp: '2023-11-03 13:45',
-        description: 'Travel booking'
-      },
-      
-      // October 2023 withdrawals
-      {
-        id: '20',
-        amount: 5800,
-        timestamp: '2023-10-30 11:30',
-        description: 'Halloween party expenses'
-      },
-      {
-        id: '21',
-        amount: 2400,
-        timestamp: '2023-10-25 16:20',
-        description: 'Monthly groceries'
-      },
-      {
-        id: '22',
-        amount: 7500,
-        timestamp: '2023-10-20 09:15',
-        description: 'Investment rebalancing'
-      },
-      {
-        id: '23',
-        amount: 3600,
-        timestamp: '2023-10-15 14:45',
-        description: 'Home maintenance'
-      },
-      {
-        id: '24',
-        amount: 2800,
-        timestamp: '2023-10-10 12:30',
-        description: 'Electronics purchase'
-      },
-      {
-        id: '25',
-        amount: 4400,
-        timestamp: '2023-10-05 10:45',
-        description: 'Quarterly expenses'
-      },
-      
-      // September 2023 withdrawals
-      {
-        id: '26',
-        amount: 6800,
-        timestamp: '2023-09-28 15:30',
-        description: 'Back to school expenses'
-      },
-      {
-        id: '27',
-        amount: 3200,
-        timestamp: '2023-09-22 11:15',
-        description: 'Professional development'
-      },
-      {
-        id: '28',
-        amount: 5100,
-        timestamp: '2023-09-18 09:45',
-        description: 'Family vacation'
-      },
-      {
-        id: '29',
-        amount: 2700,
-        timestamp: '2023-09-12 14:20',
-        description: 'Gym membership'
-      },
-      {
-        id: '30',
-        amount: 4900,
-        timestamp: '2023-09-08 16:45',
-        description: 'Wedding gift'
+    dispatch(fetchWithdrawals());
+  }, [dispatch]);
+
+  // Refetch when window gains focus or page becomes visible
+  useEffect(() => {
+    const onFocus = () => dispatch(fetchWithdrawals());
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        dispatch(fetchWithdrawals());
       }
-    ];
-    setWithdrawals(mockWithdrawals);
-  }, []);
+    };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [dispatch]);
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
@@ -284,7 +119,7 @@ const Withdraw = memo(function Withdraw() {
       // Calculate total withdrawals up to this date
       const dateStr = date.toISOString().split('T')[0];
       const withdrawalsUpToDate = withdrawals.filter(w => 
-        new Date(w.timestamp) <= date
+        new Date((w as any).requestedAt) <= date
       );
       const totalAmount = withdrawalsUpToDate.reduce((sum, w) => sum + w.amount, 0);
       
@@ -379,31 +214,23 @@ const Withdraw = memo(function Withdraw() {
     );
   };
 
-  const handleWithdrawSubmit = (e: React.FormEvent) => {
+  const handleWithdrawSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!withdrawAmount || parseFloat(withdrawAmount) <= 0) {
+    const amount = parseFloat(withdrawAmount);
+    if (!withdrawAmount || amount <= 0) {
       alert('Please enter a valid withdrawal amount');
       return;
     }
-
-    const newWithdrawal: WithdrawalRecord = {
-      id: Date.now().toString(),
-      amount: parseFloat(withdrawAmount),
-      timestamp: new Date().toLocaleString(),
-      description: 'Bank withdrawal'
-    };
-
-    setWithdrawals(prev => [newWithdrawal, ...prev]);
+    await dispatch(createWithdrawal({ amount, description: description || undefined })).unwrap();
     setWithdrawAmount('');
-    alert('Withdrawal recorded successfully!');
+    setDescription('');
   };
 
 
 
   // Filter withdrawals based on timeframe
   const filteredWithdrawals = withdrawals.filter(withdrawal => {
-    const withdrawalDate = new Date(withdrawal.timestamp);
+  const withdrawalDate = new Date((withdrawal as any).requestedAt);
     const now = new Date();
     let cutoffDate = new Date();
 
@@ -423,50 +250,36 @@ const Withdraw = memo(function Withdraw() {
 
   const content = (
     <div className={`flex-1 p-6 overflow-y-auto ${
-      isDarkMode 
-        ? 'bg-gradient-to-br from-gray-900 via-slate-900 to-black text-white' 
-        : 'bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 text-gray-900'
+      isDarkMode ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-900'
     }`}>
-      {/* Header with futuristic glow */}
-      <div className="mb-8">
-        <h1 className={`text-4xl font-bold bg-gradient-to-r ${
-          isDarkMode 
-            ? 'from-cyan-400 via-purple-400 to-pink-400' 
-            : 'from-blue-600 via-purple-600 to-indigo-600'
-        } bg-clip-text text-transparent mb-2`}>
+      {/* Header */}
+      <div className="mb-6">
+        <h1 className={`text-xl font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
           Withdraw Funds
         </h1>
-        <div className={`h-1 w-32 bg-gradient-to-r ${
-          isDarkMode 
-            ? 'from-cyan-400 via-purple-400 to-pink-400' 
-            : 'from-blue-600 via-purple-600 to-indigo-600'
-        } rounded-full`}></div>
       </div>
 
       {/* Time Filter Buttons */}
-      <div className="mb-8">
+      <div className="mb-6">
         <div className="flex flex-wrap gap-2">
           {(['1W', '1M', '6M', '1Y', '5Y'] as TimeFilter[]).map(filter => (
             <button
               key={filter}
               onClick={() => setSelectedTimeFilter(filter)}
-              className={`px-4 py-2 rounded-xl font-medium transition-all duration-300 ${
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                 selectedTimeFilter === filter
-                  ? isDarkMode
-                    ? 'bg-gradient-to-r from-cyan-500 to-purple-500 text-white shadow-lg shadow-cyan-500/25'
-                    : 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg shadow-blue-500/25'
+                  ? 'bg-blue-600 text-white'
                   : isDarkMode
-                  ? 'bg-gray-800/50 text-gray-300 hover:bg-gray-700/70 border border-gray-700/50'
-                  : 'bg-white/70 text-gray-700 hover:bg-white/90 border border-gray-200/50'
-              } backdrop-blur-sm`}
+                  ? 'bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-700'
+                  : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+              }`}
             >
               {filter}
             </button>
           ))}
         </div>
-      </div>
-
-      {/* Total Withdrawals Summary */}
+  </div>
+  {/* Total Withdrawals Summary */}
       <div className={`p-6 rounded-2xl backdrop-blur-lg border mb-8 ${
         isDarkMode 
           ? 'bg-gray-800/30 border-gray-700/50 shadow-xl shadow-gray-900/20' 
@@ -477,7 +290,7 @@ const Withdraw = memo(function Withdraw() {
             <h2 className={`text-lg font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
               Total Withdrawals ({selectedTimeFilter})
             </h2>
-            <p className="text-4xl font-bold text-transparent bg-gradient-to-r from-red-400 to-pink-400 bg-clip-text">
+            <p className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
               ${totalWithdrawals.toLocaleString()}
             </p>
           </div>
@@ -496,7 +309,7 @@ const Withdraw = memo(function Withdraw() {
           : 'bg-white/60 border-white/20 shadow-xl shadow-gray-900/10'
       }`}>
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold">Withdrawal History</h2>
+          <h2 className="text-lg font-semibold">Withdrawal History</h2>
           <div className="flex items-center space-x-4">
             <div className={`px-3 py-1 rounded-lg ${
               isDarkMode ? 'bg-red-500/20 text-red-400' : 'bg-red-100 text-red-700'
@@ -505,6 +318,16 @@ const Withdraw = memo(function Withdraw() {
                 {filteredWithdrawals.length} Withdrawals
               </span>
             </div>
+            <button
+              type="button"
+              onClick={() => dispatch(fetchWithdrawals())}
+              disabled={loading}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
+                loading ? 'bg-gray-400 text-white cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white'
+              }`}
+            >
+              {loading ? 'Loading…' : 'Refresh'}
+            </button>
           </div>
         </div>
         <div className="h-80">
@@ -519,7 +342,7 @@ const Withdraw = memo(function Withdraw() {
             ? 'bg-gray-800/30 border-gray-700/50 shadow-xl shadow-gray-900/20' 
             : 'bg-white/60 border-white/20 shadow-xl shadow-gray-900/10'
         }`}>
-          <h2 className="text-2xl font-bold mb-6">New Withdrawal</h2>
+          <h2 className="text-lg font-semibold mb-4">New Withdrawal</h2>
           
           <form onSubmit={handleWithdrawSubmit} className="space-y-6">
             <div>
@@ -546,6 +369,23 @@ const Withdraw = memo(function Withdraw() {
               </div>
             </div>
 
+            <div>
+              <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                Description (optional)
+              </label>
+              <input
+                type="text"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Reason for withdrawal"
+                className={`w-full px-4 py-3 rounded-xl border backdrop-blur-sm ${
+                  isDarkMode 
+                    ? 'bg-gray-700/50 border-gray-600/50 text-white placeholder-gray-400' 
+                    : 'bg-white/70 border-gray-300/50 text-gray-900 placeholder-gray-500'
+                } focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all`}
+              />
+            </div>
+
             <button
               type="submit"
               disabled={!withdrawAmount || parseFloat(withdrawAmount) <= 0}
@@ -553,6 +393,9 @@ const Withdraw = memo(function Withdraw() {
             >
               Submit Withdrawal Request
             </button>
+            {error && (
+              <p className={`text-sm ${isDarkMode ? 'text-red-400' : 'text-red-600'}`}>{error}</p>
+            )}
           </form>
         </div>
 
@@ -562,7 +405,7 @@ const Withdraw = memo(function Withdraw() {
             ? 'bg-gray-800/30 border-gray-700/50 shadow-xl shadow-gray-900/20' 
             : 'bg-white/60 border-white/20 shadow-xl shadow-gray-900/10'
         }`}>
-          <h2 className="text-2xl font-bold mb-6">Recent Withdrawals</h2>
+          <h2 className="text-lg font-semibold mb-4">Recent Withdrawals</h2>
           
           <div className="space-y-4 max-h-96 overflow-y-auto">
             {filteredWithdrawals.length === 0 ? (
@@ -580,7 +423,7 @@ const Withdraw = memo(function Withdraw() {
                     <div>
                       <p className="text-xl font-bold">${withdrawal.amount.toLocaleString()}</p>
                       <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                        {withdrawal.timestamp}
+                        {(withdrawal as any).requestedAt}
                       </p>
                     </div>
                     <div className="w-3 h-3 rounded-full bg-red-400"></div>
@@ -595,9 +438,18 @@ const Withdraw = memo(function Withdraw() {
                   )}
                   
                   <div className="flex justify-between items-center">
-                    <span className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                      Bank Transfer
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        className={`px-2 py-1 text-xs rounded-md ${isDarkMode ? 'bg-blue-600 text-white' : 'bg-blue-600 text-white'}`}
+                        onClick={() => setEditId(withdrawal.id)}
+                      >Edit</button>
+                      <button
+                        type="button"
+                        className={`px-2 py-1 text-xs rounded-md ${isDarkMode ? 'bg-red-600 text-white' : 'bg-red-600 text-white'}`}
+                        onClick={() => setConfirmDeleteId(withdrawal.id)}
+                      >Delete</button>
+                    </div>
                     <span className={`px-2 py-1 rounded-lg text-xs font-medium ${
                       isDarkMode ? 'bg-red-500/20 text-red-400' : 'bg-red-100 text-red-700'
                     }`}>
@@ -613,33 +465,7 @@ const Withdraw = memo(function Withdraw() {
     </div>
   );
 
-  if (isMobile) {
-    return (
-      <div 
-        className={`${isDarkMode ? 'bg-gray-900' : 'bg-gray-100'} flex flex-col fixed inset-0 overflow-hidden`}
-        style={{ 
-          height: '100svh',
-          minHeight: '100vh',
-          maxHeight: '100vh',
-          width: '100vw',
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          paddingBottom: '0px',
-          margin: '0px'
-        }}
-      >
-        <div className="flex-1 overflow-hidden" style={{ height: 'calc(100vh - 80px)' }}>
-          {content}
-        </div>
-        <div className="flex-shrink-0" style={{ height: '80px' }}>
-          <FloatingNav activeTab={activeTab} onTabChange={handleTabChange} />
-        </div>
-      </div>
-    );
-  }
+  // Mobile wrapper simplified to use the same layout as desktop
 
   return (
     <div className={`h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-100'} flex flex-col`}>
@@ -652,6 +478,39 @@ const Withdraw = memo(function Withdraw() {
       <div className="flex-1 flex min-h-0 overflow-hidden">
         {content}
       </div>
+
+      {/* Delete confirm modal */}
+      <ConfirmModal
+        open={!!confirmDeleteId}
+        title="Delete withdrawal?"
+        message="This action cannot be undone."
+        isDarkMode={isDarkMode}
+        onCancel={() => setConfirmDeleteId(null)}
+        onConfirm={() => {
+          if (confirmDeleteId) {
+            dispatch(deleteWithdrawal({ id: confirmDeleteId }));
+          }
+          setConfirmDeleteId(null);
+        }}
+      />
+
+      {/* Edit modal */}
+      <EditWithdrawalModal
+        open={!!editId}
+        isDarkMode={isDarkMode}
+        initial={{
+          amount: editId ? (withdrawals.find(w => w.id === editId)?.amount ?? 0) : 0,
+          method: editId ? withdrawals.find(w => w.id === editId)?.method : undefined,
+          description: editId ? withdrawals.find(w => w.id === editId)?.description : undefined,
+        }}
+        onCancel={() => setEditId(null)}
+        onSave={(patch) => {
+          if (editId) {
+            dispatch(updateWithdrawal({ id: editId, patch: patch as any }));
+          }
+          setEditId(null);
+        }}
+      />
     </div>
   );
 });

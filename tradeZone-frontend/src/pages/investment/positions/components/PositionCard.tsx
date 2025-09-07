@@ -1,15 +1,19 @@
 import { memo } from 'react';
+import { getLotSize } from '../../../../utils/lotSize';
 
 interface Position {
   id: string;
   symbol: string;
   side: 'buy' | 'sell';
   entryPrice: number;
-  currentPrice: number;
+  currentPrice?: number;
   lots: number;
   investedAmount: number;
   platform: 'Delta Exchange' | 'Groww';
+  leverage: number;
   timestamp: string;
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
 }
 
 interface PositionCardProps {
@@ -18,16 +22,64 @@ interface PositionCardProps {
 }
 
 const PositionCard = memo<PositionCardProps>(({ position, isDarkMode }) => {
-  // Calculate P&L for a position
+  // Calculate P&L for a position (use lot-size-based qty; fallback when unknown)
   const calculatePnL = (position: Position) => {
-    const priceDiff = position.side === 'buy' 
-      ? position.currentPrice - position.entryPrice
-      : position.entryPrice - position.currentPrice;
-    
-    const pnl = priceDiff * position.lots;
-    const pnlPercent = (pnl / position.investedAmount) * 100;
-    
+    const current = position.currentPrice ?? position.entryPrice;
+    const priceDiff = position.side === 'buy'
+      ? current - position.entryPrice
+      : position.entryPrice - current;
+
+    const lotSize = getLotSize(position.symbol);
+    let qty = 0;
+    let investedUsd = 0;
+
+    if (lotSize > 0) {
+      qty = (position.lots || 0) * lotSize;
+      const notionalAtEntry = position.entryPrice * qty;
+      const lev = position.leverage || 1;
+      investedUsd = lev > 0 ? notionalAtEntry / lev : notionalAtEntry;
+    } else {
+      investedUsd = position.investedAmount || 0;
+      const lev = position.leverage || 1;
+      const notional = investedUsd * lev;
+      qty = position.entryPrice > 0 ? notional / position.entryPrice : 0;
+    }
+
+    const pnl = priceDiff * qty;
+    const pnlPercent = investedUsd > 0 ? (pnl / investedUsd) * 100 : 0;
     return { pnl, pnlPercent };
+  };
+
+  // Format date for display
+  const formatDate = (dateStr: string | Date | undefined) => {
+    if (!dateStr) return 'N/A';
+    
+    try {
+      // Handle Firebase timestamp objects that might be serialized as objects with seconds and nanoseconds
+      if (typeof dateStr === 'object' && dateStr !== null && 'seconds' in dateStr) {
+        // @ts-ignore - Firebase Timestamp format
+        return new Date(dateStr.seconds * 1000).toLocaleString();
+      }
+      
+      // Handle standard date strings or Date objects
+      const date = typeof dateStr === 'string' ? new Date(dateStr) : dateStr;
+      if (isNaN(date.getTime())) {
+        // If not a valid date object, use the string as is
+        return typeof dateStr === 'string' ? dateStr : 'Invalid Date';
+      }
+      
+      // Format the date as a nice readable string
+      return date.toLocaleString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (e) {
+      console.error('Error formatting date:', e);
+      return typeof dateStr === 'string' ? dateStr : 'Error';
+    }
   };
 
   const { pnl, pnlPercent } = calculatePnL(position);
@@ -74,21 +126,7 @@ const PositionCard = memo<PositionCardProps>(({ position, isDarkMode }) => {
         </div>
       </div>
 
-      {/* Price Information */}
-      <div className="space-y-3 mb-4">
-        <div className="flex justify-between">
-          <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Entry Price:</span>
-          <span className="font-medium">${position.entryPrice.toLocaleString()}</span>
-        </div>
-        <div className="flex justify-between">
-          <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Current Price:</span>
-          <span className="font-medium">${position.currentPrice.toLocaleString()}</span>
-        </div>
-        <div className="flex justify-between">
-          <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Invested Amount:</span>
-          <span className="font-medium">${position.investedAmount.toLocaleString()}</span>
-        </div>
-      </div>
+  {/* Price Information removed per request */}
 
       {/* P&L Display */}
       <div className={`p-4 rounded-xl ${
@@ -126,12 +164,7 @@ const PositionCard = memo<PositionCardProps>(({ position, isDarkMode }) => {
         </div>
       </div>
 
-      {/* Timestamp */}
-      <div className="mt-4 text-center">
-        <p className={`text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>
-          Added: {position.timestamp}
-        </p>
-      </div>
+  {/* Timestamp removed per request */}
 
       {/* Action Buttons */}
       <div className="mt-4 flex space-x-2">

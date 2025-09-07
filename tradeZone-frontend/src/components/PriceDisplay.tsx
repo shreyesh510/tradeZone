@@ -14,15 +14,8 @@ const PriceDisplay = memo(function PriceDisplay({ isDarkMode }: PriceDisplayProp
 
   // Fetch price on component mount and set up interval
   useEffect(() => {
-    // Fetch immediately on mount
-    dispatch(fetchDogecoinPrice());
-    
-    // Update price every 30 seconds
-    const interval = setInterval(() => {
-      dispatch(fetchDogecoinPrice());
-    }, 30000);
-    
-    return () => clearInterval(interval);
+  // External price fetching disabled; no periodic updates
+  dispatch(fetchDogecoinPrice());
   }, [dispatch]);
 
   const formatPrice = (price: number) => {
@@ -46,7 +39,7 @@ const PriceDisplay = memo(function PriceDisplay({ isDarkMode }: PriceDisplayProp
       ) : currentPrice !== null ? (
         <>
           <div className={`text-xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-            ${formatPrice(currentPrice)}
+            {formatPrice(currentPrice)}
           </div>
           {priceChange !== null && (
             <div className={`text-sm font-medium ${

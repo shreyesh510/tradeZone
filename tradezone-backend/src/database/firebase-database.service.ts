@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { FirebaseConfig } from '../config/firebase.config';
 import * as admin from 'firebase-admin';
 import { Permission, UserPermissions, DEFAULT_USER_PERMISSIONS } from '../auth/entities/permission.entity';
+import { Position } from '../positions/entities/position.entity';
 
 export interface User {
   id: string;
@@ -20,6 +21,12 @@ export class FirebaseDatabaseService {
   private firestore: admin.firestore.Firestore;
   private usersCollection = 'users';
   private permissionsCollection = 'permissions';
+  private positionsCollection = 'positions';
+  private exitPositionsCollection = 'exit_positions';
+  private withdrawalsCollection = 'withdrawals';
+  private depositsCollection = 'deposits';
+  private walletsCollection = 'wallets';
+  private walletHistoryCollection = 'walletHistory';
 
   constructor(private firebaseConfig: FirebaseConfig) {
     // Firestore will be initialized in onModuleInit
@@ -121,7 +128,7 @@ export class FirebaseDatabaseService {
       const usersSnapshot = await this.getFirestore().collection(this.usersCollection).get();
       
       if (usersSnapshot.empty) {
-        console.log('📝 Initializing sample users...');
+  // Initializing sample users...
         
         const sampleUsers = [
           {
@@ -144,7 +151,7 @@ export class FirebaseDatabaseService {
           await this.createUser(user);
         }
         
-        console.log('✅ Sample users initialized successfully');
+  // Sample users initialized successfully
       }
     } catch (error) {
       console.error('Error initializing sample data:', error);
@@ -166,7 +173,7 @@ export class FirebaseDatabaseService {
         ...permissionData,
       };
 
-      console.log(`✅ Created permissions for user ${userId}`);
+  // Permissions created for user
       return permission;
     } catch (error) {
       console.error('Error creating user permissions:', error);
@@ -183,7 +190,7 @@ export class FirebaseDatabaseService {
         .get();
 
       if (snapshot.empty) {
-        console.log(`No permissions found for user ${userId}, creating default permissions`);
+  // No permissions found; creating default permissions
         return await this.createUserPermissions(userId);
       }
 
@@ -226,7 +233,7 @@ export class FirebaseDatabaseService {
         .doc(existingPermission._id)
         .update(updateData);
 
-      console.log(`✅ Updated permissions for user ${userId}`);
+  // Updated permissions for user
       
       return {
         ...existingPermission,
@@ -251,7 +258,7 @@ export class FirebaseDatabaseService {
       });
 
       await batch.commit();
-      console.log(`✅ Deleted permissions for user ${userId}`);
+  // Deleted permissions for user
     } catch (error) {
       console.error('Error deleting user permissions:', error);
       throw error;
@@ -268,6 +275,692 @@ export class FirebaseDatabaseService {
     } catch (error) {
       console.error('Error getting all permissions:', error);
       throw error;
+    }
+  }
+
+  // Position operations
+  async getPositions(userId: string): Promise<Position[]> {
+    try {
+  // Fetching positions for user
+      
+      const snapshot = await this.getFirestore()
+        .collection(this.positionsCollection)
+        .where('userId', '==', userId)
+        .get();
+      
+  // Firestore query returned documents
+      
+      const positions = snapshot.docs.map(doc => {
+        const data = doc.data();
+  // Mapping position document
+        return {
+          id: doc.id,
+          ...data
+        };
+      }) as Position[];
+      
+  // Mapped positions
+      
+      // Sort by createdAt in JavaScript instead of Firestore
+      const sortedPositions = positions.sort((a, b) => {
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return dateB - dateA; // Descending order
+      });
+      
+  // Returning sorted positions
+      return sortedPositions;
+    } catch (error) {
+      console.error('❌ Error getting positions:', error);
+      return [];
+    }
+  }
+
+  async getPositionsBySymbol(userId: string, symbol: string): Promise<Position[]> {
+    try {
+      const sym = (symbol || '').toUpperCase();
+      const snapshot = await this.getFirestore()
+        .collection(this.positionsCollection)
+        .where('userId', '==', userId)
+        .where('symbol', '==', sym)
+        .get();
+
+      const positions = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Position[];
+
+      // Sort by createdAt desc (fallback to 0)
+      return positions.sort((a, b) => {
+        const aTime = a.createdAt ? new Date(a.createdAt as any).getTime() : 0;
+        const bTime = b.createdAt ? new Date(b.createdAt as any).getTime() : 0;
+        return bTime - aTime;
+      });
+    } catch (error) {
+      console.error('Error getting positions by symbol:', error);
+      return [];
+    }
+  }
+
+  async getPositionById(positionId: string): Promise<Position | null> {
+    try {
+      const doc = await this.getFirestore()
+        .collection(this.positionsCollection)
+        .doc(positionId)
+        .get();
+
+      if (!doc.exists) {
+        return null;
+      }
+
+      return {
+        id: doc.id,
+        ...doc.data()
+      } as Position;
+    } catch (error) {
+      console.error('Error getting position by ID:', error);
+      return null;
+    }
+  }
+
+  async createPosition(positionData: Omit<Position, 'id'>): Promise<Position> {
+    try {
+      // Use serverTimestamp() for Firestore timestamps
+      const now = new Date();
+      const docRef = await this.getFirestore().collection(this.positionsCollection).add({
+        ...positionData,
+        createdAt: now,
+        updatedAt: now
+      });
+
+      return {
+        id: docRef.id,
+        ...positionData,
+        createdAt: now,
+        updatedAt: now
+      };
+    } catch (error) {
+      console.error('Error creating position:', error);
+      throw error;
+    }
+  }
+
+  async updatePosition(positionId: string, positionData: Partial<Position>): Promise<void> {
+    try {
+      await this.getFirestore()
+        .collection(this.positionsCollection)
+        .doc(positionId)
+        .update({
+          ...positionData,
+          updatedAt: new Date()
+        });
+    } catch (error) {
+      console.error('Error updating position:', error);
+      throw error;
+    }
+  }
+
+  async deletePosition(positionId: string): Promise<void> {
+    try {
+      await this.getFirestore()
+        .collection(this.positionsCollection)
+        .doc(positionId)
+        .delete();
+    } catch (error) {
+      console.error('Error deleting position:', error);
+      throw error;
+    }
+  }
+
+  // New: get all open positions across all users (for cron jobs)
+  async getAllOpenPositions(): Promise<Position[]> {
+    try {
+      const snapshot = await this.getFirestore()
+        .collection(this.positionsCollection)
+        .where('status', '==', 'open')
+        .get();
+
+      return snapshot.docs.map((doc) => ({ id: doc.id, ...(doc.data() as any) })) as Position[];
+    } catch (error) {
+      console.error('Error getting all open positions:', error);
+      return [];
+    }
+  }
+
+  // New: batch update currentPrice by symbol for open positions
+  async updatePositionsCurrentPriceBySymbol(symbol: string, price: number): Promise<number> {
+    const sym = (symbol || '').toUpperCase();
+    if (!sym || !(price > 0)) return 0;
+    try {
+      const db = this.getFirestore();
+      const snapshot = await db
+        .collection(this.positionsCollection)
+        .where('symbol', '==', sym)
+        .where('status', '==', 'open')
+        .get();
+
+      if (snapshot.empty) return 0;
+      const batch = db.batch();
+      let count = 0;
+      const now = new Date();
+      snapshot.docs.forEach((doc) => {
+        batch.update(doc.ref, { currentPrice: price, updatedAt: now });
+        count += 1;
+      });
+      await batch.commit();
+      return count;
+    } catch (error) {
+      console.error('Error updating currentPrice by symbol:', error);
+      return 0;
+    }
+  }
+  async getOpenPositions(userId: string): Promise<Position[]> {
+    try {
+      const snapshot = await this.getFirestore()
+        .collection(this.positionsCollection)
+        .where('userId', '==', userId)
+        .where('status', '==', 'open')
+        .orderBy('createdAt', 'desc')
+        .get();
+      
+      return snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Position[];
+    } catch (error) {
+      console.error('Error getting open positions:', error);
+      return [];
+    }
+  }
+
+  async getClosedPositions(userId: string): Promise<Position[]> {
+    try {
+      const snapshot = await this.getFirestore()
+        .collection(this.positionsCollection)
+        .where('userId', '==', userId)
+        .where('status', '==', 'closed')
+        .orderBy('closedAt', 'desc')
+        .get();
+      
+      return snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Position[];
+    } catch (error) {
+      console.error('Error getting closed positions:', error);
+      return [];
+    }
+  }
+
+  async createPositionsBatch(positions: Array<Omit<Position, 'id'>>): Promise<Position[]> {
+    if (!positions || positions.length === 0) return [];
+
+    const db = this.getFirestore();
+    const batch = db.batch();
+    const created: Position[] = [];
+
+    for (const p of positions) {
+      const docRef = db.collection(this.positionsCollection).doc();
+      const now = new Date();
+      const data = {
+        ...p,
+        createdAt: p.createdAt ?? now,
+        updatedAt: p.updatedAt ?? now,
+      } as any;
+      batch.set(docRef, data);
+      created.push({ id: docRef.id, ...(data as any) } as Position);
+    }
+
+    await batch.commit();
+    return created;
+  }
+
+  // Withdrawals operations
+  async createWithdrawal(data: Omit<import('../withdrawals/entities/withdrawal.entity').Withdrawal, 'id'>): Promise<import('../withdrawals/entities/withdrawal.entity').Withdrawal> {
+    try {
+      const db = this.getFirestore();
+      const now = data.requestedAt ?? new Date();
+      // Remove undefined fields to satisfy Firestore validation
+      const raw = { ...data, requestedAt: now } as Record<string, any>;
+      const payload = Object.entries(raw).reduce((acc, [k, v]) => {
+        if (v !== undefined) (acc as any)[k] = v;
+        return acc;
+      }, {} as Record<string, any>);
+
+      const docRef = await db.collection(this.withdrawalsCollection).add(payload);
+      // Normalize dates to ISO for API consumers
+      const requestedAt = this.serializeDate(payload.requestedAt);
+      const completedAt = this.serializeDate(payload.completedAt);
+      return { id: docRef.id, ...(payload as any), requestedAt, completedAt } as any;
+    } catch (error) {
+      console.error('Error creating withdrawal:', error);
+      throw error;
+    }
+  }
+
+  async getWithdrawals(userId: string): Promise<import('../withdrawals/entities/withdrawal.entity').Withdrawal[]> {
+    try {
+      // Fetch by userId then sort in memory to avoid requiring a Firestore composite index
+      const snapshot = await this.getFirestore()
+        .collection(this.withdrawalsCollection)
+        .where('userId', '==', userId)
+        .get();
+      const items = snapshot.docs.map((d) => {
+        const data = d.data() as any;
+        // Normalize Firestore Timestamp/Date to ISO strings
+        const requestedAt = this.serializeDate(data.requestedAt);
+        const completedAt = this.serializeDate(data.completedAt);
+        return { id: d.id, ...data, requestedAt, completedAt };
+      }) as any[];
+      return items.sort((a, b) => {
+        const aTime = a.requestedAt ? new Date(a.requestedAt as any).getTime() : 0;
+        const bTime = b.requestedAt ? new Date(b.requestedAt as any).getTime() : 0;
+        return bTime - aTime;
+      }) as any;
+    } catch (error) {
+      console.error('Error getting withdrawals:', error);
+      return [] as any;
+    }
+  }
+
+  // Deposits operations
+  async createDeposit(data: Omit<import('../deposits/entities/deposit.entity').Deposit, 'id'>): Promise<import('../deposits/entities/deposit.entity').Deposit> {
+    try {
+      const db = this.getFirestore();
+      const now = data.requestedAt ?? new Date();
+      const raw = { ...data, requestedAt: now } as Record<string, any>;
+      const payload = Object.entries(raw).reduce((acc, [k, v]) => {
+        if (v !== undefined) (acc as any)[k] = v;
+        return acc;
+      }, {} as Record<string, any>);
+      const docRef = await db.collection(this.depositsCollection).add(payload);
+      const requestedAt = this.serializeDate(payload.requestedAt);
+      const completedAt = this.serializeDate(payload.completedAt);
+      return { id: docRef.id, ...(payload as any), requestedAt, completedAt } as any;
+    } catch (error) {
+      console.error('Error creating deposit:', error);
+      throw error;
+    }
+  }
+
+  async getDeposits(userId: string): Promise<import('../deposits/entities/deposit.entity').Deposit[]> {
+    try {
+      const snapshot = await this.getFirestore()
+        .collection(this.depositsCollection)
+        .where('userId', '==', userId)
+        .get();
+      const items = snapshot.docs.map((d) => {
+        const data = d.data() as any;
+        const requestedAt = this.serializeDate(data.requestedAt);
+        const completedAt = this.serializeDate(data.completedAt);
+        return { id: d.id, ...data, requestedAt, completedAt };
+      }) as any[];
+      return items.sort((a, b) => {
+        const aTime = a.requestedAt ? new Date(a.requestedAt as any).getTime() : 0;
+        const bTime = b.requestedAt ? new Date(b.requestedAt as any).getTime() : 0;
+        return bTime - aTime;
+      }) as any;
+    } catch (error) {
+      console.error('Error getting deposits:', error);
+      return [] as any;
+    }
+  }
+
+  async updateDeposit(userId: string, id: string, data: Partial<import('../deposits/entities/deposit.entity').Deposit>): Promise<boolean> {
+    try {
+      const db = this.getFirestore();
+      const ref = db.collection(this.depositsCollection).doc(id);
+      const snap = await ref.get();
+      if (!snap.exists) return false;
+      const existing = snap.data() as any;
+      if (!existing || existing.userId !== userId) return false;
+      const raw = { ...data, updatedAt: new Date() } as Record<string, any>;
+      const payload = Object.entries(raw).reduce((acc, [k, v]) => {
+        if (v !== undefined) (acc as any)[k] = v;
+        return acc;
+      }, {} as Record<string, any>);
+      await ref.update(payload);
+      return true;
+    } catch (error) {
+      console.error('Error updating deposit:', error);
+      return false;
+    }
+  }
+
+  async deleteDeposit(userId: string, id: string): Promise<boolean> {
+    try {
+      const db = this.getFirestore();
+      const ref = db.collection(this.depositsCollection).doc(id);
+      const snap = await ref.get();
+      if (!snap.exists) return false;
+      const existing = snap.data() as any;
+      if (!existing || existing.userId !== userId) return false;
+      await ref.delete();
+      return true;
+    } catch (error) {
+      console.error('Error deleting deposit:', error);
+      return false;
+    }
+  }
+
+  private serializeDate(value: any): string | undefined {
+    if (!value) return undefined;
+    // Firebase Admin Timestamp instance
+    const adminAny: any = value as any;
+    if (adminAny && typeof adminAny.toDate === 'function') {
+      try {
+        return adminAny.toDate().toISOString();
+      } catch {}
+    }
+    // Shape from JSON ({ _seconds, _nanoseconds })
+    if (typeof adminAny === 'object' && ('_seconds' in adminAny || 'seconds' in adminAny)) {
+      const seconds = adminAny._seconds ?? adminAny.seconds ?? 0;
+      const nanos = adminAny._nanoseconds ?? adminAny.nanoseconds ?? 0;
+      const ms = seconds * 1000 + Math.floor(nanos / 1e6);
+      return new Date(ms).toISOString();
+    }
+    if (value instanceof Date) return value.toISOString();
+    // Try parsing if string/number
+    try {
+      const d = new Date(value);
+      if (!isNaN(d.getTime())) return d.toISOString();
+    } catch {}
+    return undefined;
+  }
+
+  async updateWithdrawal(userId: string, id: string, data: Partial<import('../withdrawals/entities/withdrawal.entity').Withdrawal>): Promise<boolean> {
+    try {
+      const db = this.getFirestore();
+      const ref = db.collection(this.withdrawalsCollection).doc(id);
+      const snap = await ref.get();
+      if (!snap.exists) return false;
+      const existing = snap.data() as any;
+      if (!existing || existing.userId !== userId) return false; // ownership check
+
+      const raw = { ...data, updatedAt: new Date() } as Record<string, any>;
+      const payload = Object.entries(raw).reduce((acc, [k, v]) => {
+        if (v !== undefined) (acc as any)[k] = v;
+        return acc;
+      }, {} as Record<string, any>);
+      await ref.update(payload);
+      return true;
+    } catch (error) {
+      console.error('Error updating withdrawal:', error);
+      return false;
+    }
+  }
+
+  async deleteWithdrawal(userId: string, id: string): Promise<boolean> {
+    try {
+      const db = this.getFirestore();
+      const ref = db.collection(this.withdrawalsCollection).doc(id);
+      const snap = await ref.get();
+      if (!snap.exists) return false;
+      const existing = snap.data() as any;
+      if (!existing || existing.userId !== userId) return false; // ownership check
+      await ref.delete();
+      return true;
+    } catch (error) {
+      console.error('Error deleting withdrawal:', error);
+      return false;
+    }
+  }
+
+  // Wallets operations
+  async createWallet(data: Omit<import('../wallets/entities/wallet.entity').Wallet, 'id'>): Promise<import('../wallets/entities/wallet.entity').Wallet> {
+    try {
+      const db = this.getFirestore();
+      const now = data.createdAt ?? new Date();
+      const raw = { ...data, createdAt: now, updatedAt: now } as Record<string, any>;
+      const payload = Object.entries(raw).reduce((acc, [k, v]) => {
+        if (v !== undefined) (acc as any)[k] = v;
+        return acc;
+      }, {} as Record<string, any>);
+      const docRef = await db.collection(this.walletsCollection).add(payload);
+      // Log to walletHistory on create
+      try {
+        await db.collection(this.walletHistoryCollection).add({
+          userId: payload.userId,
+          walletId: docRef.id,
+          action: 'create',
+          data: payload,
+          createdAt: now,
+        });
+      } catch (e) {
+        console.error('Error logging wallet history (create):', e);
+      }
+      const createdAt = this.serializeDate(payload.createdAt);
+      const updatedAt = this.serializeDate(payload.updatedAt);
+      return { id: docRef.id, ...(payload as any), createdAt, updatedAt } as any;
+    } catch (error) {
+      console.error('Error creating wallet:', error);
+      throw error;
+    }
+  }
+
+  async getWallets(userId: string): Promise<import('../wallets/entities/wallet.entity').Wallet[]> {
+    try {
+      const snapshot = await this.getFirestore()
+        .collection(this.walletsCollection)
+        .where('userId', '==', userId)
+        .get();
+      const items = snapshot.docs.map((d) => {
+        const data = d.data() as any;
+        const createdAt = this.serializeDate(data.createdAt);
+        const updatedAt = this.serializeDate(data.updatedAt);
+        return { id: d.id, ...data, createdAt, updatedAt };
+      }) as any[];
+      return items.sort((a, b) => {
+        const aTime = a.createdAt ? new Date(a.createdAt as any).getTime() : 0;
+        const bTime = b.createdAt ? new Date(b.createdAt as any).getTime() : 0;
+        return bTime - aTime;
+      }) as any;
+    } catch (error) {
+      console.error('Error getting wallets:', error);
+      return [] as any;
+    }
+  }
+
+  async updateWallet(userId: string, id: string, data: Partial<import('../wallets/entities/wallet.entity').Wallet>): Promise<boolean> {
+    try {
+      const db = this.getFirestore();
+      const ref = db.collection(this.walletsCollection).doc(id);
+      const snap = await ref.get();
+      if (!snap.exists) return false;
+      const existing = snap.data() as any;
+      if (!existing || existing.userId !== userId) return false;
+      const raw = { ...data, updatedAt: new Date() } as Record<string, any>;
+      const payload = Object.entries(raw).reduce((acc, [k, v]) => {
+        if (v !== undefined) (acc as any)[k] = v;
+        return acc;
+      }, {} as Record<string, any>);
+      await ref.update(payload);
+      // Log to walletHistory on update
+      try {
+        await db.collection(this.walletHistoryCollection).add({
+          userId,
+          walletId: id,
+          action: 'update',
+          data: payload,
+          createdAt: new Date(),
+        });
+      } catch (e) {
+        console.error('Error logging wallet history (update):', e);
+      }
+      return true;
+    } catch (error) {
+      console.error('Error updating wallet:', error);
+      return false;
+    }
+  }
+
+  async deleteWallet(userId: string, id: string): Promise<boolean> {
+    try {
+      const db = this.getFirestore();
+      const ref = db.collection(this.walletsCollection).doc(id);
+      const snap = await ref.get();
+      if (!snap.exists) return false;
+      const existing = snap.data() as any;
+      if (!existing || existing.userId !== userId) return false;
+      await ref.delete();
+      return true;
+    } catch (error) {
+      console.error('Error deleting wallet:', error);
+      return false;
+    }
+  }
+
+  // Wallet history retrieval
+  async getWalletHistory(userId: string, limit?: number): Promise<any[]> {
+    try {
+      const snap = await this.getFirestore()
+        .collection(this.walletHistoryCollection)
+        .where('userId', '==', userId)
+        .get();
+      const items = snap.docs.map((d) => {
+        const data = d.data() as any;
+        const createdAt = this.serializeDate(data.createdAt);
+        return { id: d.id, ...data, createdAt };
+      });
+      const sorted = items.sort((a, b) => {
+        const aT = a.createdAt ? new Date(a.createdAt as any).getTime() : 0;
+        const bT = b.createdAt ? new Date(b.createdAt as any).getTime() : 0;
+        return bT - aT;
+      });
+      return typeof limit === 'number' && limit > 0 ? sorted.slice(0, limit) : sorted;
+    } catch (error) {
+      console.error('Error fetching wallet history:', error);
+      return [];
+    }
+  }
+
+  // Create an exit entry for a single closed position
+  async createExitEntrySingle(params: {
+    userId: string;
+    position: Position;
+    pnl: number;
+    closedAt?: Date;
+  }): Promise<string | null> {
+    try {
+      const { userId, position, pnl, closedAt } = params;
+      const now = new Date();
+      const payload = {
+        type: 'single',
+        userId,
+        positionId: position.id,
+        symbol: (position.symbol || '').toUpperCase(),
+        pnl: Number(pnl) || 0,
+        lots: position.lots,
+        side: position.side,
+        entryPrice: position.entryPrice,
+        investedAmount: position.investedAmount,
+        platform: (position as any).platform,
+        leverage: (position as any).leverage,
+        createdAt: now,
+        closedAt: closedAt ?? now,
+      } as any;
+      const docRef = await this.getFirestore().collection(this.exitPositionsCollection).add(payload);
+      return docRef.id;
+    } catch (error) {
+      console.error('Error creating single exit entry:', error);
+      return null;
+    }
+  }
+
+  // Create a bulk exit entry for closing all
+  async createExitEntryBulk(params: {
+    userId: string;
+    symbols: string[];
+    totalPnl: number;
+    positionsBreakdown?: Array<{ symbol: string; pnl: number }>;
+    closedAt?: Date;
+  }): Promise<string | null> {
+    try {
+      const { userId, symbols, totalPnl, closedAt } = params;
+      const now = new Date();
+      const payload = {
+        type: 'bulk',
+        userId,
+        symbols: (symbols || []).map((s) => (s || '').toUpperCase()),
+        totalPnl: Number(totalPnl) || 0,
+        positions: (params.positionsBreakdown || []).map((x) => ({
+          symbol: (x.symbol || '').toUpperCase(),
+          pnl: Number(x.pnl) || 0,
+        })),
+        createdAt: now,
+        closedAt: closedAt ?? now,
+      } as any;
+      const docRef = await this.getFirestore().collection(this.exitPositionsCollection).add(payload);
+      return docRef.id;
+    } catch (error) {
+      console.error('Error creating bulk exit entry:', error);
+      return null;
+    }
+  }
+
+  // Close all open positions for a specific user; returns number of updated docs
+  async closeAllOpenPositionsForUser(userId: string): Promise<number> {
+    try {
+      const db = this.getFirestore();
+      const snapshot = await db
+        .collection(this.positionsCollection)
+        .where('userId', '==', userId)
+        .where('status', '==', 'open')
+        .get();
+
+      if (snapshot.empty) return 0;
+
+      const now = new Date();
+      let count = 0;
+      // Firestore batch limit is 500 operations; chunk updates to 400 per batch for safety
+      const chunkSize = 400;
+      for (let i = 0; i < snapshot.docs.length; i += chunkSize) {
+        const chunk = snapshot.docs.slice(i, i + chunkSize);
+        const batch = db.batch();
+        chunk.forEach((doc) => {
+          batch.update(doc.ref, { status: 'closed', closedAt: now, updatedAt: now });
+          count += 1;
+        });
+        await batch.commit();
+      }
+      return count;
+    } catch (error) {
+      console.error('Error closing all open positions for user:', error);
+      return 0;
+    }
+  }
+
+  // Close all open positions for a specific user and symbol; returns number of updated docs
+  async closeOpenPositionsBySymbolForUser(userId: string, symbol: string): Promise<number> {
+    const sym = (symbol || '').toUpperCase();
+    if (!userId || !sym) return 0;
+    try {
+      const db = this.getFirestore();
+      const snapshot = await db
+        .collection(this.positionsCollection)
+        .where('userId', '==', userId)
+        .where('symbol', '==', sym)
+        .where('status', '==', 'open')
+        .get();
+
+      if (snapshot.empty) return 0;
+
+      const now = new Date();
+      let count = 0;
+      const chunkSize = 400;
+      for (let i = 0; i < snapshot.docs.length; i += chunkSize) {
+        const chunk = snapshot.docs.slice(i, i + chunkSize);
+        const batch = db.batch();
+        chunk.forEach((doc) => {
+          batch.update(doc.ref, { status: 'closed', closedAt: now, updatedAt: now });
+          count += 1;
+        });
+        await batch.commit();
+      }
+      return count;
+    } catch (error) {
+      console.error('Error closing positions by symbol for user:', error);
+      return 0;
     }
   }
 }

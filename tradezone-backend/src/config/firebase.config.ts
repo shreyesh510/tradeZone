@@ -45,6 +45,14 @@ export class FirebaseConfig implements OnModuleInit {
       });
 
       console.log('🔥 Firebase Admin SDK initialized successfully');
+
+      // Ensure Firestore ignores undefined values to prevent validation errors on optional fields
+      try {
+        admin.firestore(this.firebaseApp).settings({ ignoreUndefinedProperties: true } as any);
+        console.log('🔥 Firestore settings applied: ignoreUndefinedProperties = true');
+      } catch (e) {
+        console.warn('⚠️ Could not apply Firestore settings for ignoreUndefinedProperties:', e);
+      }
     } catch (error) {
       console.error('❌ Error initializing Firebase:', error);
       throw error;

@@ -5,6 +5,11 @@ import FloatingNav, { type MobileTab } from '../../../layouts/FloatingNav';
 import { useSettings } from '../../../contexts/SettingsContext';
 import { usePermissions } from '../../../hooks/usePermissions';
 import { useNavigate } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
+import type { AppDispatch, RootState } from '../../../redux/store';
+import { fetchDeposits, createDeposit, updateDeposit, deleteDeposit } from '../../../redux/thunks/deposits/depositsThunks';
+import ConfirmModal from '../../../components/ConfirmModal';
+import EditDepositModal from '../../../components/EditDepositModal';
 
 interface OnlineUser {
   userId: string;
@@ -12,12 +17,9 @@ interface OnlineUser {
   socketId: string;
 }
 
-interface DepositRecord {
-  id: string;
-  amount: number;
-  timestamp: string;
-  description?: string;
-}
+// Using API DTO via Redux now
+// interface kept for local computations if needed
+interface DepositRecord { id: string; amount: number; requestedAt: string; description?: string; method?: string; }
 
 interface ChartDataPoint {
   date: string;
@@ -35,8 +37,12 @@ const Deposit = memo(function Deposit() {
   const [isMobile, setIsMobile] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<MobileTab>('chart');
   const [selectedTimeFilter, setSelectedTimeFilter] = useState<TimeFilter>('1M');
+  const dispatch = useDispatch<AppDispatch>();
   const [depositAmount, setDepositAmount] = useState<string>('');
-  const [deposits, setDeposits] = useState<DepositRecord[]>([]);
+  const [description, setDescription] = useState<string>('');
+  const { items: deposits, loading, creating, error } = useSelector((s: RootState) => s.deposits);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [editId, setEditId] = useState<string | null>(null);
 
   // Redirect if no permission
   useEffect(() => {
@@ -56,261 +62,26 @@ const Deposit = memo(function Deposit() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Initialize mock deposits
+  // Load deposits from API
   useEffect(() => {
-    const mockDeposits: DepositRecord[] = [
-      // Recent deposits (January 2024)
-      {
-        id: '1',
-        amount: 15000,
-        timestamp: '2024-01-22 10:30',
-        description: 'Quarterly investment bonus'
-      },
-      {
-        id: '2',
-        amount: 8500,
-        timestamp: '2024-01-20 14:15',
-        description: 'Crypto trading profits'
-      },
-      {
-        id: '3',
-        amount: 12000,
-        timestamp: '2024-01-18 09:45',
-        description: 'Stock dividend reinvestment'
-      },
-      {
-        id: '4',
-        amount: 6200,
-        timestamp: '2024-01-15 16:30',
-        description: 'Monthly salary allocation'
-      },
-      {
-        id: '5',
-        amount: 4800,
-        timestamp: '2024-01-12 11:20',
-        description: 'Side business income'
-      },
-      {
-        id: '6',
-        amount: 9500,
-        timestamp: '2024-01-10 13:45',
-        description: 'Tax refund investment'
-      },
-      {
-        id: '7',
-        amount: 7200,
-        timestamp: '2024-01-08 15:15',
-        description: 'Freelance project payment'
-      },
-      {
-        id: '8',
-        amount: 5500,
-        timestamp: '2024-01-05 10:30',
-        description: 'Investment portfolio rebalancing'
-      },
-      {
-        id: '9',
-        amount: 11000,
-        timestamp: '2024-01-02 14:45',
-        description: 'New year investment goal'
-      },
-      
-      // December 2023 deposits
-      {
-        id: '10',
-        amount: 13500,
-        timestamp: '2023-12-30 09:15',
-        description: 'Year-end bonus deposit'
-      },
-      {
-        id: '11',
-        amount: 6800,
-        timestamp: '2023-12-28 16:20',
-        description: 'Christmas gift money'
-      },
-      {
-        id: '12',
-        amount: 8200,
-        timestamp: '2023-12-25 11:45',
-        description: 'Holiday savings transfer'
-      },
-      {
-        id: '13',
-        amount: 4500,
-        timestamp: '2023-12-22 14:30',
-        description: 'Consulting income'
-      },
-      {
-        id: '14',
-        amount: 9800,
-        timestamp: '2023-12-20 10:15',
-        description: 'Rental property income'
-      },
-      {
-        id: '15',
-        amount: 5700,
-        timestamp: '2023-12-18 15:45',
-        description: 'Online course sales'
-      },
-      {
-        id: '16',
-        amount: 7500,
-        timestamp: '2023-12-15 12:30',
-        description: 'Insurance payout investment'
-      },
-      {
-        id: '17',
-        amount: 3400,
-        timestamp: '2023-12-12 09:20',
-        description: 'Cashback rewards'
-      },
-      {
-        id: '18',
-        amount: 12500,
-        timestamp: '2023-12-10 16:15',
-        description: 'Investment grade bonds maturity'
-      },
-      
-      // November 2023 deposits
-      {
-        id: '19',
-        amount: 6600,
-        timestamp: '2023-11-28 13:45',
-        description: 'Black Friday trading gains'
-      },
-      {
-        id: '20',
-        amount: 8900,
-        timestamp: '2023-11-25 10:30',
-        description: 'Thanksgiving investment tradition'
-      },
-      {
-        id: '21',
-        amount: 4200,
-        timestamp: '2023-11-22 14:20',
-        description: 'Affiliate marketing income'
-      },
-      {
-        id: '22',
-        amount: 11200,
-        timestamp: '2023-11-20 11:15',
-        description: 'Stock options exercise'
-      },
-      {
-        id: '23',
-        amount: 5800,
-        timestamp: '2023-11-18 15:30',
-        description: 'Peer-to-peer lending returns'
-      },
-      {
-        id: '24',
-        amount: 7900,
-        timestamp: '2023-11-15 09:45',
-        description: 'E-commerce business profits'
-      },
-      {
-        id: '25',
-        amount: 3600,
-        timestamp: '2023-11-12 16:45',
-        description: 'Investment challenge winnings'
-      },
-      {
-        id: '26',
-        amount: 9300,
-        timestamp: '2023-11-10 12:20',
-        description: 'Real estate flip proceeds'
-      },
-      {
-        id: '27',
-        amount: 6100,
-        timestamp: '2023-11-08 14:15',
-        description: 'Cryptocurrency mining rewards'
-      },
-      {
-        id: '28',
-        amount: 8400,
-        timestamp: '2023-11-05 10:45',
-        description: 'Monthly investment automation'
-      },
-      
-      // October 2023 deposits
-      {
-        id: '29',
-        amount: 7700,
-        timestamp: '2023-10-30 13:30',
-        description: 'Halloween trading bonuses'
-      },
-      {
-        id: '30',
-        amount: 5200,
-        timestamp: '2023-10-28 11:20',
-        description: 'Quarterly performance bonus'
-      },
-      {
-        id: '31',
-        amount: 10500,
-        timestamp: '2023-10-25 15:45',
-        description: 'Investment fund distribution'
-      },
-      {
-        id: '32',
-        amount: 4900,
-        timestamp: '2023-10-22 09:15',
-        description: 'Patent royalty payment'
-      },
-      {
-        id: '33',
-        amount: 8600,
-        timestamp: '2023-10-20 14:30',
-        description: 'Mutual fund redemption'
-      },
-      {
-        id: '34',
-        amount: 6300,
-        timestamp: '2023-10-18 16:20',
-        description: 'Dividend reinvestment program'
-      },
-      {
-        id: '35',
-        amount: 9100,
-        timestamp: '2023-10-15 12:45',
-        description: 'Business partnership profits'
-      },
-      
-      // September 2023 deposits
-      {
-        id: '36',
-        amount: 7800,
-        timestamp: '2023-09-30 10:30',
-        description: 'Quarter-end investment surge'
-      },
-      {
-        id: '37',
-        amount: 5500,
-        timestamp: '2023-09-28 14:15',
-        description: 'Back-to-school savings transfer'
-      },
-      {
-        id: '38',
-        amount: 11800,
-        timestamp: '2023-09-25 11:45',
-        description: 'Annual performance incentive'
-      },
-      {
-        id: '39',
-        amount: 4700,
-        timestamp: '2023-09-22 15:30',
-        description: 'Investment education completion bonus'
-      },
-      {
-        id: '40',
-        amount: 8800,
-        timestamp: '2023-09-20 09:20',
-        description: 'Commodities trading profits'
+    dispatch(fetchDeposits());
+  }, [dispatch]);
+
+  // Refetch when window gains focus or page becomes visible
+  useEffect(() => {
+    const onFocus = () => dispatch(fetchDeposits());
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        dispatch(fetchDeposits());
       }
-    ];
-    setDeposits(mockDeposits);
-  }, []);
+    };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [dispatch]);
 
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
@@ -343,8 +114,8 @@ const Deposit = memo(function Deposit() {
       
       // Calculate total deposits up to this date
       const dateStr = date.toISOString().split('T')[0];
-      const depositsUpToDate = deposits.filter(d => 
-        new Date(d.timestamp) <= date
+      const depositsUpToDate = deposits.filter((d: any) => 
+        new Date(d.requestedAt) <= date
       );
       const totalAmount = depositsUpToDate.reduce((sum, d) => sum + d.amount, 0);
       
@@ -439,31 +210,23 @@ const Deposit = memo(function Deposit() {
     );
   };
 
-  const handleDepositSubmit = (e: React.FormEvent) => {
+  const handleDepositSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!depositAmount || parseFloat(depositAmount) <= 0) {
+    const amount = parseFloat(depositAmount);
+    if (!depositAmount || amount <= 0) {
       alert('Please enter a valid deposit amount');
       return;
     }
-
-    const newDeposit: DepositRecord = {
-      id: Date.now().toString(),
-      amount: parseFloat(depositAmount),
-      timestamp: new Date().toLocaleString(),
-      description: 'Bank deposit'
-    };
-
-    setDeposits(prev => [newDeposit, ...prev]);
+    await dispatch(createDeposit({ amount, description: description || undefined })).unwrap();
     setDepositAmount('');
-    alert('Deposit recorded successfully!');
+    setDescription('');
   };
 
 
 
   // Filter deposits based on timeframe
-  const filteredDeposits = deposits.filter(deposit => {
-    const depositDate = new Date(deposit.timestamp);
+  const filteredDeposits = deposits.filter((deposit: any) => {
+    const depositDate = new Date(deposit.requestedAt);
     const now = new Date();
     let cutoffDate = new Date();
 
@@ -478,47 +241,33 @@ const Deposit = memo(function Deposit() {
     return depositDate >= cutoffDate;
   });
 
-  const totalDeposits = filteredDeposits
-    .reduce((sum, d) => sum + d.amount, 0);
+  const totalDeposits = filteredDeposits.reduce((sum: number, d: any) => sum + d.amount, 0);
 
   const content = (
     <div className={`flex-1 p-6 overflow-y-auto ${
-      isDarkMode 
-        ? 'bg-gradient-to-br from-gray-900 via-slate-900 to-black text-white' 
-        : 'bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 text-gray-900'
+      isDarkMode ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-900'
     }`}>
-      {/* Header with futuristic glow */}
-      <div className="mb-8">
-        <h1 className={`text-4xl font-bold bg-gradient-to-r ${
-          isDarkMode 
-            ? 'from-cyan-400 via-purple-400 to-pink-400' 
-            : 'from-blue-600 via-purple-600 to-indigo-600'
-        } bg-clip-text text-transparent mb-2`}>
+      {/* Header */}
+      <div className="mb-6">
+        <h1 className={`text-xl font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
           Deposit Funds
         </h1>
-        <div className={`h-1 w-32 bg-gradient-to-r ${
-          isDarkMode 
-            ? 'from-cyan-400 via-purple-400 to-pink-400' 
-            : 'from-blue-600 via-purple-600 to-indigo-600'
-        } rounded-full`}></div>
       </div>
 
       {/* Time Filter Buttons */}
-      <div className="mb-8">
+      <div className="mb-6">
         <div className="flex flex-wrap gap-2">
           {(['1W', '1M', '6M', '1Y', '5Y'] as TimeFilter[]).map(filter => (
             <button
               key={filter}
               onClick={() => setSelectedTimeFilter(filter)}
-              className={`px-4 py-2 rounded-xl font-medium transition-all duration-300 ${
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                 selectedTimeFilter === filter
-                  ? isDarkMode
-                    ? 'bg-gradient-to-r from-cyan-500 to-purple-500 text-white shadow-lg shadow-cyan-500/25'
-                    : 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg shadow-blue-500/25'
+                  ? 'bg-blue-600 text-white'
                   : isDarkMode
-                  ? 'bg-gray-800/50 text-gray-300 hover:bg-gray-700/70 border border-gray-700/50'
-                  : 'bg-white/70 text-gray-700 hover:bg-white/90 border border-gray-200/50'
-              } backdrop-blur-sm`}
+                  ? 'bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-700'
+                  : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+              }`}
             >
               {filter}
             </button>
@@ -537,7 +286,7 @@ const Deposit = memo(function Deposit() {
             <h2 className={`text-lg font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
               Total Deposits ({selectedTimeFilter})
             </h2>
-            <p className="text-4xl font-bold text-transparent bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text">
+            <p className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
               ${totalDeposits.toLocaleString()}
             </p>
           </div>
@@ -556,7 +305,7 @@ const Deposit = memo(function Deposit() {
           : 'bg-white/60 border-white/20 shadow-xl shadow-gray-900/10'
       }`}>
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold">Deposit History</h2>
+          <h2 className="text-lg font-semibold">Deposit History</h2>
           <div className="flex items-center space-x-4">
             <div className={`px-3 py-1 rounded-lg ${
               isDarkMode ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-700'
@@ -565,6 +314,16 @@ const Deposit = memo(function Deposit() {
                 {filteredDeposits.length} Deposits
               </span>
             </div>
+            <button
+              type="button"
+              onClick={() => dispatch(fetchDeposits())}
+              disabled={loading}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
+                loading ? 'bg-gray-400 text-white cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white'
+              }`}
+            >
+              {loading ? 'Loading…' : 'Refresh'}
+            </button>
           </div>
         </div>
         <div className="h-80">
@@ -579,7 +338,7 @@ const Deposit = memo(function Deposit() {
             ? 'bg-gray-800/30 border-gray-700/50 shadow-xl shadow-gray-900/20' 
             : 'bg-white/60 border-white/20 shadow-xl shadow-gray-900/10'
         }`}>
-          <h2 className="text-2xl font-bold mb-6">New Deposit</h2>
+          <h2 className="text-lg font-semibold mb-4">New Deposit</h2>
           
           <form onSubmit={handleDepositSubmit} className="space-y-6">
             <div>
@@ -606,6 +365,23 @@ const Deposit = memo(function Deposit() {
               </div>
             </div>
 
+            <div>
+              <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                Description (optional)
+              </label>
+              <input
+                type="text"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Reason for deposit"
+                className={`w-full px-4 py-3 rounded-xl border backdrop-blur-sm ${
+                  isDarkMode 
+                    ? 'bg-gray-700/50 border-gray-600/50 text-white placeholder-gray-400' 
+                    : 'bg-white/70 border-gray-300/50 text-gray-900 placeholder-gray-500'
+                } focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all`}
+              />
+            </div>
+
             <button
               type="submit"
               disabled={!depositAmount || parseFloat(depositAmount) <= 0}
@@ -613,6 +389,9 @@ const Deposit = memo(function Deposit() {
             >
               Submit Deposit Request
             </button>
+            {error && (
+              <p className={`text-sm ${isDarkMode ? 'text-red-400' : 'text-red-600'}`}>{error}</p>
+            )}
           </form>
         </div>
 
@@ -622,7 +401,7 @@ const Deposit = memo(function Deposit() {
             ? 'bg-gray-800/30 border-gray-700/50 shadow-xl shadow-gray-900/20' 
             : 'bg-white/60 border-white/20 shadow-xl shadow-gray-900/10'
         }`}>
-          <h2 className="text-2xl font-bold mb-6">Recent Deposits</h2>
+          <h2 className="text-lg font-semibold mb-4">Recent Deposits</h2>
           
           <div className="space-y-4 max-h-96 overflow-y-auto">
             {filteredDeposits.length === 0 ? (
@@ -630,7 +409,7 @@ const Deposit = memo(function Deposit() {
                 <p>No deposits in selected timeframe</p>
               </div>
             ) : (
-              filteredDeposits.map(deposit => (
+              filteredDeposits.map((deposit: any) => (
                 <div key={deposit.id} className={`p-4 rounded-xl border transition-all duration-300 hover:scale-105 ${
                   isDarkMode 
                     ? 'bg-gray-700/30 border-gray-600/50 hover:bg-gray-700/50' 
@@ -640,7 +419,7 @@ const Deposit = memo(function Deposit() {
                     <div>
                       <p className="text-xl font-bold">${deposit.amount.toLocaleString()}</p>
                       <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                        {deposit.timestamp}
+                        {deposit.requestedAt}
                       </p>
                     </div>
                     <div className="w-3 h-3 rounded-full bg-green-400"></div>
@@ -655,9 +434,18 @@ const Deposit = memo(function Deposit() {
                   )}
                   
                   <div className="flex justify-between items-center">
-                    <span className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                      Bank Transfer
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        className={`px-2 py-1 text-xs rounded-md ${isDarkMode ? 'bg-blue-600 text-white' : 'bg-blue-600 text-white'}`}
+                        onClick={() => setEditId(deposit.id)}
+                      >Edit</button>
+                      <button
+                        type="button"
+                        className={`px-2 py-1 text-xs rounded-md ${isDarkMode ? 'bg-red-600 text-white' : 'bg-red-600 text-white'}`}
+                        onClick={() => setConfirmDeleteId(deposit.id)}
+                      >Delete</button>
+                    </div>
                     <span className={`px-2 py-1 rounded-lg text-xs font-medium ${
                       isDarkMode ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-700'
                     }`}>
@@ -673,34 +461,6 @@ const Deposit = memo(function Deposit() {
     </div>
   );
 
-  if (isMobile) {
-    return (
-      <div 
-        className={`${isDarkMode ? 'bg-gray-900' : 'bg-gray-100'} flex flex-col fixed inset-0 overflow-hidden`}
-        style={{ 
-          height: '100svh',
-          minHeight: '100vh',
-          maxHeight: '100vh',
-          width: '100vw',
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          paddingBottom: '0px',
-          margin: '0px'
-        }}
-      >
-        <div className="flex-1 overflow-hidden" style={{ height: 'calc(100vh - 80px)' }}>
-          {content}
-        </div>
-        <div className="flex-shrink-0" style={{ height: '80px' }}>
-          <FloatingNav activeTab={activeTab} onTabChange={handleTabChange} />
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className={`h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-100'} flex flex-col`}>
       <Header 
@@ -712,6 +472,39 @@ const Deposit = memo(function Deposit() {
       <div className="flex-1 flex min-h-0 overflow-hidden">
         {content}
       </div>
+
+      {/* Delete confirm modal */}
+      <ConfirmModal
+        open={!!confirmDeleteId}
+        title="Delete deposit?"
+        message="This action cannot be undone."
+        isDarkMode={isDarkMode}
+        onCancel={() => setConfirmDeleteId(null)}
+        onConfirm={() => {
+          if (confirmDeleteId) {
+            dispatch(deleteDeposit({ id: confirmDeleteId }));
+          }
+          setConfirmDeleteId(null);
+        }}
+      />
+
+      {/* Edit modal */}
+      <EditDepositModal
+        open={!!editId}
+        isDarkMode={isDarkMode}
+        initial={{
+          amount: editId ? (deposits.find((d: any) => d.id === editId)?.amount ?? 0) : 0,
+          method: editId ? (deposits.find((d: any) => d.id === editId)?.method) : undefined,
+          description: editId ? (deposits.find((d: any) => d.id === editId)?.description) : undefined,
+        }}
+        onCancel={() => setEditId(null)}
+        onSave={(patch) => {
+          if (editId) {
+            dispatch(updateDeposit({ id: editId, patch: patch as any }));
+          }
+          setEditId(null);
+        }}
+      />
     </div>
   );
 });

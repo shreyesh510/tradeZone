@@ -84,6 +84,18 @@ class TradingViewService {
       'DOT': 'polkadot',
       'AVAXUSD': 'avalanche-2',
       'AVAX': 'avalanche-2',
+  'LTCUSD': 'litecoin',
+  'LTC': 'litecoin',
+  'FLOKIUSD': 'floki',
+  'FLOKI': 'floki',
+  'XRPUSD': 'ripple',
+  'XRP': 'ripple',
+  'BNBUSD': 'binancecoin',
+  'BNB': 'binancecoin',
+  'ALGOUSD': 'algorand',
+  'ALGO': 'algorand',
+  'SUIUSD': 'sui',
+  'SUI': 'sui',
     };
     
     const cleanSymbol = symbol.replace('USD', '').toUpperCase();
@@ -141,32 +153,37 @@ class TradingViewService {
   async getCryptoInfo(symbol: string): Promise<CryptoInfo | null> {
     try {
       const coinId = this.symbolToCoinGeckoId(symbol);
-      const response = await fetch(
-        `${this.baseURL}/coins/${coinId}?localization=false&tickers=false&market_data=true&community_data=false&developer_data=false&sparkline=false`
-      );
+      // Prefer simple/price to avoid 404s on unknown ids like ltcusd
+      const simpleUrl = `${this.baseURL}/simple/price?ids=${encodeURIComponent(coinId)}&vs_currencies=usd&include_24hr_change=true`;
+      const response = await fetch(simpleUrl);
 
       if (!response.ok) {
-        throw new Error(`Failed to fetch crypto info: ${response.status}`);
+        throw new Error(`Failed to fetch simple price: ${response.status}`);
       }
 
       const data = await response.json();
-      
+      const entry = data?.[coinId];
+      if (!entry) {
+        throw new Error(`CoinGecko simple price missing entry for ${coinId}`);
+      }
+
+      // Map minimal fields; other metrics default to 0
       return {
-        id: data.id,
-        symbol: data.symbol?.toUpperCase() || symbol,
-        name: data.name,
-        current_price: data.market_data?.current_price?.usd || 0,
-        price_change_percentage_24h: data.market_data?.price_change_percentage_24h || 0,
-        total_volume: data.market_data?.total_volume?.usd || 0,
-        market_cap: data.market_data?.market_cap?.usd || 0,
-        market_cap_rank: data.market_cap_rank || 0,
-        circulating_supply: data.market_data?.circulating_supply || 0,
-        max_supply: data.market_data?.max_supply || 0,
-        ath: data.market_data?.ath?.usd || 0,
-        ath_change_percentage: data.market_data?.ath_change_percentage?.usd || 0,
-        atl: data.market_data?.atl?.usd || 0,
-        atl_change_percentage: data.market_data?.atl_change_percentage?.usd || 0,
-        last_updated: data.last_updated || new Date().toISOString(),
+        id: coinId,
+        symbol: symbol.toUpperCase(),
+        name: coinId,
+        current_price: Number(entry.usd) || 0,
+        price_change_percentage_24h: Number(entry.usd_24h_change ?? 0),
+        total_volume: 0,
+        market_cap: 0,
+        market_cap_rank: 0,
+        circulating_supply: 0,
+        max_supply: 0,
+        ath: 0,
+        ath_change_percentage: 0,
+        atl: 0,
+        atl_change_percentage: 0,
+        last_updated: new Date().toISOString(),
       };
     } catch (error) {
       console.error(`❌ Error fetching crypto info for ${symbol}:`, error);

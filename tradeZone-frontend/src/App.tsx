@@ -5,6 +5,7 @@ import { initializeAuth } from './redux/slices/authSlice';
 import type { AppDispatch, RootState } from './redux/store';
 import { SettingsProvider } from './contexts/SettingsContext';
 import { ToastProvider } from './contexts/ToastContext';
+import { ReactToastifyProvider } from './contexts/ReactToastifyContext';
 import { SocketProvider } from './contexts/SocketContext';
 import ToastContainer from './components/ToastContainer';
 import Login from './components/Login';
@@ -12,9 +13,11 @@ import Zone from './pages/zone';
 import Settings from './pages/settings';
 import LiveChart from './components/LiveChart';
 import Positions from './pages/investment/positions';
+import SymbolPositions from './pages/investment/positions/SymbolPositions';
 import InvestmentDashboard from './pages/investment/dashboard';
 import Withdraw from './pages/investment/withdraw';
 import Deposit from './pages/investment/deposit';
+import WalletsPage from './pages/wallets';
 import './index.css';
 
 // Protected Route Component
@@ -38,19 +41,14 @@ function App() {
     const testToken = localStorage.getItem('testToken');
     const userData = localStorage.getItem('user');
     
-    console.log('🔍 Checking localStorage:', { 
-      hasToken: !!testToken, 
-      hasUser: !!userData,
-      token: testToken ? testToken.substring(0, 20) + '...' : null,
-      user: userData ? JSON.parse(userData) : null
-    });
+  // removed debug logs
 
     if (testToken && userData) {
       // User has credentials, initialize auth state
       dispatch(initializeAuth());
-      console.log('✅ Credentials found, initializing auth...');
+  // removed debug log
     } else {
-      console.log('❌ No credentials found, user needs to login');
+  // removed debug log
     }
     
     setIsInitialized(true);
@@ -70,8 +68,9 @@ function App() {
 
   return (
     <SettingsProvider>
-      <ToastProvider>
-        <SocketProvider>
+      <ReactToastifyProvider>
+        <ToastProvider>
+          <SocketProvider>
           <Router>
             <div className="App h-full w-full overflow-hidden">
               <Routes>
@@ -116,6 +115,14 @@ function App() {
                   } 
                 />
                 <Route 
+                  path="/investment/positions/:symbol" 
+                  element={
+                    <ProtectedRoute>
+                      <SymbolPositions />
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
                   path="/investment/dashboard" 
                   element={
                     <ProtectedRoute>
@@ -141,11 +148,37 @@ function App() {
                   } 
                 />
 
+                {/* Wallets Route (under Investment) */}
+                <Route
+                  path="/investment/wallets"
+                  element={
+                    <ProtectedRoute>
+                      <WalletsPage />
+                    </ProtectedRoute>
+                  }
+                />
+
+                {/* Fallback for unknown routes to avoid blank screens */}
+                <Route
+                  path="*"
+                  element={
+                    isAuthenticated ? (
+                      <Navigate to="/zone" replace />
+                    ) : (
+                      <Navigate to="/login" replace />
+                    )
+                  }
+                />
+
                 <Route 
                   path="/" 
                   element={
                     isAuthenticated ? <Navigate to="/zone" replace /> : <Navigate to="/login" replace />
                   } 
+                />
+                <Route 
+                  path="*" 
+                  element={<Navigate to="/zone" replace />} 
                 />
               </Routes>
               
@@ -155,6 +188,7 @@ function App() {
           </Router>
         </SocketProvider>
       </ToastProvider>
+    </ReactToastifyProvider>
     </SettingsProvider>
   );
 }

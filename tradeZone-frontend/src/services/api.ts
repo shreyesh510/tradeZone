@@ -3,8 +3,6 @@ import config from '../config/env';
 
 const API_BASE_URL = config.API_BASE_URL;
 
-console.log('🔗 API Base URL:', API_BASE_URL);
-
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
@@ -16,16 +14,14 @@ const api = axios.create({
 // Request interceptor to add auth token
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('testToken');
+    // Try to get JWT token first, fallback to testToken
+    const jwtToken = localStorage.getItem('token');
+    const testToken = localStorage.getItem('testToken');
+    const token = jwtToken || testToken;
+    
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    console.log('📡 API Request:', {
-      method: config.method?.toUpperCase(),
-      url: config.url,
-      baseURL: config.baseURL,
-      hasToken: !!token
-    });
     return config;
   },
   (error) => {
@@ -37,11 +33,6 @@ api.interceptors.request.use(
 // Response interceptor to handle errors
 api.interceptors.response.use(
   (response) => {
-    console.log('✅ API Response:', {
-      status: response.status,
-      url: response.config.url,
-      data: response.data
-    });
     return response;
   },
   (error) => {
@@ -52,10 +43,11 @@ api.interceptors.response.use(
       data: error.response?.data
     });
     
-    if (error.response?.status === 401) {
-      console.log('🔒 Unauthorized, clearing tokens...');
+  if (error.response?.status === 401) {
+      localStorage.removeItem('token');
       localStorage.removeItem('testToken');
       localStorage.removeItem('user');
+      localStorage.removeItem('permissions');
       // Don't redirect for login requests to avoid page refresh
       if (!error.config?.url?.includes('/auth/login')) {
         window.location.href = '/login';

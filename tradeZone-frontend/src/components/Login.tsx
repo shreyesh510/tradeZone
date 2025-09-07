@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { loginUser, clearError } from '../redux/slices/authSlice';
 import type { AppDispatch, RootState } from '../redux/store';
 import ConnectionTest from './ConnectionTest';
+import Input from './input';
+import Button from './button';
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -81,32 +83,27 @@ const Login: React.FC = () => {
               </div>
             )}
 
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                Email Address
-              </label>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200"
-                placeholder="Enter your email"
-              />
-            </div>
+            <Input
+              type="email"
+              value={email}
+              onChange={setEmail}
+              placeholder="Enter your email"
+              label="Email Address"
+              required
+            />
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 Password
               </label>
               <div className="relative">
-                <input
-                  id="password"
+                <Input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200 pr-12"
+                  onChange={setPassword}
                   placeholder="Enter your password"
+                  required
+                  className="pr-12"
                 />
                 <button
                   type="button"
@@ -146,37 +143,26 @@ const Login: React.FC = () => {
               </div>
             </div>
 
-            <div>
-              <button
-                type="button"
-                disabled={loading}
-                onClick={handleLogin}
-                className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition duration-200"
-              >
-                {loading ? (
-                  <div className="flex items-center">
-                    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Signing in...
-                  </div>
-                ) : (
-                  'Sign in'
-                )}
-              </button>
-            </div>
+            <Button
+              type="button"
+              onClick={handleLogin}
+              disabled={loading}
+              loading={loading}
+              variant="primary"
+              className="w-full"
+            >
+              Sign in
+            </Button>
 
-            <div className="mt-4">
-              <button
-                type="button"
-                onClick={handleDemoLogin}
-                disabled={loading}
-                className="w-full py-3 px-4 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-gray-50 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition duration-200"
-              >
-                Try Demo Login
-              </button>
-            </div>
+            <Button
+              type="button"
+              onClick={handleDemoLogin}
+              disabled={loading}
+              variant="secondary"
+              className="w-full"
+            >
+              Try Demo Login
+            </Button>
 
             <div className="text-center mt-6">
               <p className="text-sm text-gray-600">
