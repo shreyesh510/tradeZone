@@ -5,7 +5,6 @@ import {
 } from '@nestjs/common';
 import { FirebaseDatabaseService } from '../database/firebase-database.service';
 import { CreatePositionDto } from './dto/create-position.dto';
-import { CreatePositionsBulkDto } from './dto/create-positions-bulk.dto';
 import { UpdatePositionDto } from './dto/update-position.dto';
 import { Position } from './entities/position.entity';
 import { MarketDataService } from './market-data.service';
@@ -245,14 +244,7 @@ export class PositionsService {
     return new Date();
   }
 
-  // Helper: default leverage by symbol for bulk imports
-  private getDefaultLeverageForSymbol(symbol: string): number {
-    const sym = (symbol || '').toUpperCase();
-  const twoHundred = new Set(['BTCUSD', 'ETHUSD']);
-  if (twoHundred.has(sym)) return 200;
-  // Requirement: all other symbols default to 100x
-  return 100;
-  }
+  // Removed bulk default leverage helper
 
   // Helper: compute cutoff date for timeframe as last N days (24h per day)
   private getTimeframeCutoff(timeframe?: '1D' | '7D' | '30D' | '90D' | 'all'): Date | null {
@@ -287,72 +279,7 @@ export class PositionsService {
     }
   }
 
-  // Bulk create with dedupe (userId + symbol + entryPrice + same-day timestamp)
-  async createBulk(
-    payload: CreatePositionsBulkDto,
-    userId: string,
-  ): Promise<{
-    created: Position[];
-    skipped: CreatePositionDto[];
-    reason?: string;
-  }> {
-    const list = (payload.positions || []).map((p) => ({ ...p }));
-    if (list.length === 0) return { created: [], skipped: [] };
-
-    // Fetch user positions once for dedupe
-    const existing = await this.findAll(userId);
-
-    // Build a set of duplicates for quick lookup
-    const keep: Omit<Position, 'id'>[] = [];
-    const skipped: CreatePositionDto[] = [];
-
-    for (const p of list) {
-      const sym = (p.symbol || '').toUpperCase();
-      const ts = this.parseToDate(p.timestamp);
-      const match = existing.find((e) => {
-        const eTs = this.parseToDate(
-          (e as any).timestamp || (e as any).createdAt,
-        );
-        return (
-          e.userId === userId &&
-          (e.symbol || '').toUpperCase() === sym &&
-          Number(e.entryPrice) === Number(p.entryPrice) &&
-          this.isSameDay(eTs, ts)
-        );
-      });
-
-      if (match) {
-        skipped.push(p);
-        continue;
-      }
-
-      keep.push({
-        ...p,
-        userId,
-        status: 'open',
-        timestamp: p.timestamp ?? new Date().toISOString(),
-        // Enforce leverage for bulk inserts based on symbol
-        // BTCUSD/ETHUSD => 200x, all others => 100x
-        leverage: this.getDefaultLeverageForSymbol(sym),
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      } as any);
-    }
-
-    if (keep.length === 0) return { created: [], skipped };
-
-    const created =
-      await this.firebaseDatabaseService.createPositionsBatch(keep);
-    // Log history: bulk-create (one entry summarizing)
-    try {
-      await this.firebaseDatabaseService.addPositionHistoryEntry({
-        userId,
-        action: 'bulk-create',
-        details: { requested: list.length, created: created.length, skipped: skipped.length },
-      });
-    } catch {}
-    return { created, skipped };
-  }
+  // Removed bulk create handler
 
   // Calculate P&L for a position
   calculatePnL(position: Position): { pnl: number; pnlPercent: number } {
@@ -485,10 +412,9 @@ export class PositionsService {
       if (typeof live === 'number' && live > 0) {
         for (const p of arr) {
           if (!p.entryPrice || p.entryPrice <= 0) continue;
-          const lev =
-            (p as any).leverage && (p as any).leverage > 0
-              ? Number((p as any).leverage)
-              : this.getDefaultLeverageForSymbol(p.symbol);
+          const lev = (p as any).leverage && (p as any).leverage > 0
+            ? Number((p as any).leverage)
+            : 1;
           let qty = 0;
           const lotSize = this.marketData.getLotSize(p.symbol) || 0;
           if (lotSize > 0) {
@@ -629,111 +555,7 @@ export class PositionsService {
     return positions;
   }
 
-  async getAllPositionsWithPnl(userId: string): Promise<
-    Array<{
-      symbol: string;
-      lots: number;
-      investedAmount: number;
-      side: 'buy' | 'sell';
-      pnl: number;
-      currentPrice: number | null;
-    }>
-  > {
-    const round = (val: number, decimals = 2) =>
-      Math.round(val * Math.pow(10, decimals)) / Math.pow(10, decimals);
-    // 1) Get open positions only
-    const openPositions = await this.getOpenPositions(userId);
-    if (openPositions.length === 0) return [];
+  // Removed deprecated getAllPositionsWithPnl
 
-    // 2) Group by symbol
-    const groups = new Map<string, Position[]>();
-    for (const pos of openPositions) {
-      const key = (pos.symbol || '').toUpperCase();
-      const arr = groups.get(key) ?? [];
-      arr.push(pos);
-      groups.set(key, arr);
-    }
-
-    // 3) Fetch live prices in one batch
-    const symbols = Array.from(groups.keys());
-    const priceMap = await this.marketData.getUsdPricesForSymbols(symbols);
-    // e.g., { BTCUSD: 10000, ETHUSD: 3200 }
-
-    // 4) Build result per symbol
-    const result: Array<any> = [];
-
-    for (const [sym, arr] of groups.entries()) {
-      const totalLots = arr.reduce((s, p) => s + (p.lots || 0), 0);
-      // Normalize invested USD per leg: prefer stored investedAmount, fallback to derived
-      const invSum = arr.reduce((s, p) => {
-        const invested = Number(p.investedAmount) || 0;
-        return s + (invested > 0 ? invested : 0);
-      }, 0);
-
-      const totalInvested = invSum; // Keep as USD, no conversion needed
-
-      // Take latest position as reference for side
-      const latest = arr[arr.length - 1];
-      const side = (latest?.side ?? 'buy') as 'buy' | 'sell';
-      const live = priceMap[sym] ?? null;
-
-      // 5) Calculate PnL by summing across all entry legs (respect lot size and leg side)
-      let pnlSum = 0;
-      if (typeof live === 'number' && live > 0) {
-        for (const p of arr) {
-          if (!p.entryPrice || p.entryPrice <= 0) continue;
-          const lotSize = this.marketData.getLotSize(p.symbol) || 0;
-          let qty = 0;
-          if (lotSize > 0) {
-            qty = (p.lots || 0) * lotSize;
-          } else {
-            // Fallback: derive qty from invested amount and leverage
-            const invested = Number(p.investedAmount) || 0;
-            const lev = (p as any).leverage || 1;
-            qty = invested > 0 && p.entryPrice > 0 ? (invested * lev) / p.entryPrice : 0;
-          }
-          const diff =
-            p.side === 'buy' ? live - p.entryPrice : p.entryPrice - live;
-          pnlSum += diff * qty;
-        }
-      }
-
-      result.push({
-        symbol: sym,
-        lots: totalLots,
-        investedAmount: round(totalInvested, 2), // now always USD
-        side,
-        pnl: round(pnlSum, 2),
-        currentPrice: round(live ?? 0, 2),
-      });
-    }
-
-    return result;
-  }
-
-  // Close all open positions for the authenticated user
-  async closeAllOpenForUser(userId: string, totalPnl?: number): Promise<number> {
-    // get symbols before closing
-    const open = await this.getOpenPositions(userId);
-    const symbols = Array.from(new Set(open.map((p) => (p.symbol || '').toUpperCase())));
-    const updatedCount = await this.firebaseDatabaseService.closeAllOpenPositionsForUser(userId);
-    if (updatedCount > 0) {
-      await this.firebaseDatabaseService.createExitEntryBulk({
-        userId,
-        symbols,
-        totalPnl: Number(totalPnl) || 0,
-        positionsBreakdown: symbols.map((s) => ({ symbol: s, pnl: Number(totalPnl) || 0 })),
-        closedAt: new Date(),
-      });
-      // Log history: close-all
-      try {
-        await this.firebaseDatabaseService.addPositionHistoryEntry({
-          userId,
-          action: 'close-all',
-          details: { count: updatedCount, symbols },
-        });
-      } catch {}
-    }
-    return updatedCount;
-  }
+  // Removed close-all service method
 }

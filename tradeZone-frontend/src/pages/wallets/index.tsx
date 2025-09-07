@@ -56,6 +56,31 @@ const WalletsPage = memo(function WalletsPage() {
     return acc;
   }, {});
 
+  // Additional grouped totals: Demat accounts and Bank accounts
+  const isBank = (platform?: string | null) => /bank/i.test(platform || '');
+  // Per request: if platform is not Bank, consider it a Demat account
+  const isDemat = (platform?: string | null) => !isBank(platform);
+
+  const dematTotalsByCurrency = wallets.reduce<Record<string, number>>((acc, w) => {
+    if (!isDemat(w.platform)) return acc;
+    const cur = (w.currency || 'USD').toUpperCase();
+    const val = typeof w.balance === 'number' ? w.balance : 0;
+    acc[cur] = (acc[cur] || 0) + val;
+    return acc;
+  }, {});
+
+  // Derived: simple USD view for Demat by converting INR totals using divisor 86
+  const dematInrTotal = dematTotalsByCurrency['INR'] || 0;
+  const dematUsdFromInr = dematInrTotal > 0 ? dematInrTotal / 86 : 0;
+
+  const bankTotalsByCurrency = wallets.reduce<Record<string, number>>((acc, w) => {
+    if (!isBank(w.platform)) return acc;
+    const cur = (w.currency || 'USD').toUpperCase();
+    const val = typeof w.balance === 'number' ? w.balance : 0;
+    acc[cur] = (acc[cur] || 0) + val;
+    return acc;
+  }, {});
+
   const submitCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
@@ -86,7 +111,9 @@ const WalletsPage = memo(function WalletsPage() {
           </div>
         </div>
 
-        {/* Total balance summary */}
+        {/* Main content area with right-side recent activity */}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          <div className="col-span-1 lg:col-span-3">
         <div className={`p-4 rounded-2xl border mb-6 ${isDark ? 'bg-gray-800/30 border-gray-700/50' : 'bg-white/60 border-white/20'}`}>
           <h2 className="text-lg font-semibold mb-2">Total Balance</h2>
           {Object.keys(totalsByCurrency).length === 0 ? (
@@ -100,9 +127,47 @@ const WalletsPage = memo(function WalletsPage() {
               ))}
             </div>
           )}
+
+          {/* Demat and Bank balances */}
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <div className="text-sm font-medium mb-2">Demat Account Balance</div>
+              {Object.keys(dematTotalsByCurrency).length === 0 ? (
+                <div className={`${isDark ? 'text-gray-400' : 'text-gray-600'} text-sm`}>0</div>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(dematTotalsByCurrency).map(([cur, amt]) => (
+                    <div key={cur} className={`px-2.5 py-1.5 rounded-md text-xs font-medium ${isDark ? 'bg-gray-700/40 text-white' : 'bg-gray-100 text-gray-900'}`}>
+                      {cur}: {amt.toLocaleString()}
+                    </div>
+                  ))}
+                  {/* Also show simple USD view from INR total */}
+                  {dematInrTotal > 0 && (
+                    <div className={`px-2.5 py-1.5 rounded-md text-xs font-medium ${isDark ? 'bg-gray-700/40 text-white' : 'bg-gray-100 text-gray-900'}`}>
+                      USD: {dematUsdFromInr.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            <div>
+              <div className="text-sm font-medium mb-2">Bank Account Balance</div>
+              {Object.keys(bankTotalsByCurrency).length === 0 ? (
+                <div className={`${isDark ? 'text-gray-400' : 'text-gray-600'} text-sm`}>0</div>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(bankTotalsByCurrency).map(([cur, amt]) => (
+                    <div key={cur} className={`px-2.5 py-1.5 rounded-md text-xs font-medium ${isDark ? 'bg-gray-700/40 text-white' : 'bg-gray-100 text-gray-900'}`}>
+                      {cur}: {amt.toLocaleString()}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
-        <div className={`p-6 rounded-2xl border mb-8 ${isDark ? 'bg-gray-800/30 border-gray-700/50' : 'bg-white/60 border-white/20'}`}>
+  <div className={`p-6 rounded-2xl border mb-8 ${isDark ? 'bg-gray-800/30 border-gray-700/50' : 'bg-white/60 border-white/20'}`}>
           <h2 className="text-lg font-semibold mb-4">Add Wallet</h2>
           <form onSubmit={submitCreate} className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <input className={`px-3 py-2 rounded-lg border ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-300'}`} placeholder="Name (e.g., Delta Main)" value={name} onChange={e => setName(e.target.value)} required />
@@ -114,6 +179,7 @@ const WalletsPage = memo(function WalletsPage() {
               <option value="">Select platform (optional)</option>
               <option value="Groww">Groww</option>
               <option value="Delta Exchange">Delta Exchange</option>
+              <option value="Bank">Bank</option>  
             </select>
             <select
               className={`px-3 py-2 rounded-lg border ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-300'}`}
@@ -157,36 +223,38 @@ const WalletsPage = memo(function WalletsPage() {
             </div>
           )}
         </div>
-
-        {/* Recent Updates below wallets as scrollable cards (scrolls with page) */}
-        <div className="pt-6">
-          <div className={`p-6 rounded-2xl border ${isDark ? 'bg-gray-800/30 border-gray-700/50' : 'bg-white/60 border-white/20'}`}>
-            <h2 className="text-lg font-semibold mb-3">Recent Updates</h2>
-            {historyLoading && <div className={`${isDark ? 'text-gray-400' : 'text-gray-600'} text-sm`}>Loading…</div>}
-            {!historyLoading && history.length === 0 && (
-              <div className={`${isDark ? 'text-gray-400' : 'text-gray-600'} text-sm`}>No history yet.</div>
-            )}
-            {!historyLoading && history.length > 0 && (
-              <div className="max-h-64 overflow-y-auto pr-2">
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                  {history.map((h) => {
-                    const w = wallets.find(x => x.id === h.walletId);
-                    return (
-                      <div key={h.id} className={`p-3 rounded-lg border ${isDark ? 'bg-gray-700/30 border-gray-600/40' : 'bg-white/70 border-gray-200/70'}`}>
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs font-medium capitalize">{h.action}</span>
-                          <span className={`text-[10px] ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>{new Date(h.createdAt).toLocaleString()}</span>
-                        </div>
-                        <div className="text-sm font-semibold">{w?.name || h.walletId}</div>
-                        <div className={`text-xs ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>{w?.platform || '—'} · {w?.currency || '—'}</div>
-                        <div className={`mt-1 text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Amount: {typeof w?.balance === 'number' ? w!.balance!.toLocaleString() : 0} {w?.currency || ''}</div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
           </div>
+
+          {/* Right side: Recent Activities */}
+          <aside className="col-span-1">
+            <div className={`p-6 rounded-2xl border ${isDark ? 'bg-gray-800/30 border-gray-700/50' : 'bg-white/60 border-white/20'} sticky top-6`}>
+              <h2 className="text-lg font-semibold mb-3">Recent Activities</h2>
+              {historyLoading && <div className={`${isDark ? 'text-gray-400' : 'text-gray-600'} text-sm`}>Loading…</div>}
+              {!historyLoading && history.length === 0 && (
+                <div className={`${isDark ? 'text-gray-400' : 'text-gray-600'} text-sm`}>No history yet.</div>
+              )}
+              {!historyLoading && history.length > 0 && (
+                <div className="max-h-[70vh] overflow-y-auto pr-2">
+                  <div className="flex flex-col gap-3">
+                    {history.map((h) => {
+                      const w = wallets.find(x => x.id === h.walletId);
+                      return (
+                        <div key={h.id} className={`p-3 rounded-lg border ${isDark ? 'bg-gray-700/30 border-gray-600/40' : 'bg-white/70 border-gray-200/70'}`}>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs font-medium capitalize">{h.action}</span>
+                            <span className={`${isDark ? 'text-gray-400' : 'text-gray-600'} text-[10px]`}>{new Date(h.createdAt).toLocaleString()}</span>
+                          </div>
+                          <div className="text-sm font-semibold">{w?.name || h.walletId}</div>
+                          <div className={`${isDark ? 'text-gray-400' : 'text-gray-600'} text-xs`}>{w?.platform || '—'} · {w?.currency || '—'}</div>
+                          <div className={`mt-1 text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>Amount: {typeof w?.balance === 'number' ? w!.balance!.toLocaleString() : 0} {w?.currency || ''}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </aside>
         </div>
       </div>
 

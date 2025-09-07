@@ -69,44 +69,30 @@ export const deletePosition = createAsyncThunk(
   }
 );
 
-// Fetch open positions only
+// Open positions only
 export const fetchOpenPositions = createAsyncThunk(
   'positions/fetchOpenPositions',
-  async (_, { rejectWithValue }) => {
+  async (_: void, { rejectWithValue }) => {
     try {
       const positions = await positionsApi.getOpenPositions();
-      return positions;
+      return positions as Position[];
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch open positions');
     }
   }
 );
 
-// Fetch closed positions only
+// Closed positions only
 export const fetchClosedPositions = createAsyncThunk(
   'positions/fetchClosedPositions',
-  async (_, { rejectWithValue }) => {
+  async (_: void, { rejectWithValue }) => {
     try {
       const positions = await positionsApi.getClosedPositions();
-      return positions;
+      return positions as Position[];
     } catch (error: any) {
       return rejectWithValue(error.response?.data?.message || 'Failed to fetch closed positions');
     }
   }
 );
 
-
-// Bulk import removed
-
-// Close all open positions for current user
-export const closeAllPositions = createAsyncThunk(
-  'positions/closeAllPositions',
-  async (pnl: number | undefined, { rejectWithValue }) => {
-    try {
-      const result = await positionsApi.closeAllPositions(pnl);
-      return result; // { updated: number }
-    } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to close all positions');
-    }
-  }
-);
+// Removed legacy close-all thunk
