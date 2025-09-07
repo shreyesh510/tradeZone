@@ -7,8 +7,6 @@ import {
   deletePosition,
   fetchOpenPositions,
   fetchClosedPositions,
-  fetchPositionsBySymbol,
-  createPositionsBulk,
   closeAllPositions,
 } from '../thunks/positions/positionsThunks';
 import type { Position, PositionLike, PositionFilters } from '../../types/position';
@@ -265,52 +263,7 @@ const positionsSlice = createSlice({
         state.closedLoading = false;
         state.error = action.payload as string;
       })
-      // Fetch positions by symbol
-      .addCase(fetchPositionsBySymbol.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
-      .addCase(fetchPositionsBySymbol.fulfilled, (state, action: PayloadAction<Position[]>) => {
-        state.loading = false;
-        state.positions = action.payload;
-        state.error = null;
-        state.lastUpdated = Date.now();
-      })
-      .addCase(fetchPositionsBySymbol.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.payload as string;
-      })
-      // Bulk create
-      .addCase(createPositionsBulk.pending, (state) => {
-        state.createLoading = true;
-        state.error = null;
-      })
-      .addCase(createPositionsBulk.fulfilled, (state, action: PayloadAction<{ created: Position[]; skipped: any[] }>) => {
-        state.createLoading = false;
-        const created = action.payload.created || [];
-        // Upsert created positions at the start
-        for (const p of created) {
-          const i = state.positions.findIndex((x) => 'id' in x && x.id === p.id);
-          if (i >= 0) {
-            (state.positions as unknown as Position[])[i] = p;
-          } else {
-            // Prepend; it's okay if positions currently contains aggregated entries
-            state.positions.unshift(p);
-          }
-          if (p.status === 'open') {
-            const oi = state.openPositions.findIndex(x => x.id === p.id);
-            if (oi >= 0) state.openPositions[oi] = p; else state.openPositions.unshift(p);
-          } else if (p.status === 'closed') {
-            const ci = state.closedPositions.findIndex(x => x.id === p.id);
-            if (ci >= 0) state.closedPositions[ci] = p; else state.closedPositions.unshift(p);
-          }
-        }
-        state.lastUpdated = Date.now();
-      })
-      .addCase(createPositionsBulk.rejected, (state, action) => {
-        state.createLoading = false;
-        state.error = action.payload as string;
-      })
+  // Bulk import removed
       // Close all positions
       .addCase(closeAllPositions.pending, (state) => {
         state.updateLoading = true;

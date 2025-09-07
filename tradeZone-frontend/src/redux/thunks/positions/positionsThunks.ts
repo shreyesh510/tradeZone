@@ -95,31 +95,8 @@ export const fetchClosedPositions = createAsyncThunk(
   }
 );
 
-// Fetch positions by symbol
-export const fetchPositionsBySymbol = createAsyncThunk(
-  'positions/fetchPositionsBySymbol',
-  async (symbol: string, { rejectWithValue }) => {
-    try {
-      const positions = await positionsApi.getPositionsBySymbol(symbol);
-      return positions as Position[];
-    } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch symbol positions');
-    }
-  }
-);
 
-// Bulk create positions with backend-side dedupe
-export const createPositionsBulk = createAsyncThunk(
-  'positions/createPositionsBulk',
-  async (positions: CreatePositionData[], { rejectWithValue }) => {
-    try {
-      const result = await positionsApi.createPositionsBulk(positions);
-      return result;
-    } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to import positions');
-    }
-  }
-);
+// Bulk import removed
 
 // Close all open positions for current user
 export const closeAllPositions = createAsyncThunk(

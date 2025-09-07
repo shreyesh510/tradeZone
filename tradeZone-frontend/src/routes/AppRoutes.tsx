@@ -4,7 +4,6 @@ import { Login, Dashboard } from '../pages';
 import ProtectedRoute from './ProtectedRoute';
 import InvestmentDashboard from '../pages/investment/dashboard';
 import InvestmentPositions from '../pages/investment/positions';
-import SymbolPositions from '../pages/investment/positions/SymbolPositions';
 import InvestmentWithdraw from '../pages/investment/withdraw';
 import InvestmentDeposit from '../pages/investment/deposit';
 import WalletsPage from '../pages/wallets';
@@ -61,14 +60,6 @@ export default function AppRoutes() {
         element={
           <ProtectedRoute>
             <InvestmentPositions />
-          </ProtectedRoute>
-        } 
-      />
-      <Route 
-        path="/investment/positions/:symbol" 
-        element={
-          <ProtectedRoute>
-            <SymbolPositions />
           </ProtectedRoute>
         } 
       />

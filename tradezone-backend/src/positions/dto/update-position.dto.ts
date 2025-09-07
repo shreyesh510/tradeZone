@@ -21,4 +21,8 @@ export class UpdatePositionDto extends PartialType(CreatePositionDto) {
 
   @IsOptional()
   closedAt?: Date;
+
+  @IsOptional()
+  @IsEnum(['main', 'longterm'])
+  account?: 'main' | 'longterm';
 }

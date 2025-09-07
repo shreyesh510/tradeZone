@@ -1,4 +1,4 @@
-import { IsString, IsNumber, IsEnum, IsOptional, Min, Max, IsPositive, IsIn } from 'class-validator';
+import { IsString, IsNumber, IsEnum, IsOptional, Min, IsPositive, IsIn } from 'class-validator';
 
 export class CreatePositionDto {
   @IsString()
@@ -11,9 +11,10 @@ export class CreatePositionDto {
   @IsPositive()
   lots: number;
 
+  @IsOptional()
   @IsNumber()
   @IsPositive()
-  entryPrice: number;
+  entryPrice?: number;
 
   @IsOptional()
   @IsNumber()
@@ -27,13 +28,18 @@ export class CreatePositionDto {
   @IsEnum(['Delta Exchange', 'Groww'])
   platform: 'Delta Exchange' | 'Groww';
 
+  @IsOptional()
   @IsNumber()
   @IsIn([20, 50, 100, 150, 200])
-  leverage: number;
+  leverage?: number;
 
   @IsOptional()
   @IsString()
   timestamp?: string;
+
+  @IsOptional()
+  @IsEnum(['main', 'longterm'])
+  account?: 'main' | 'longterm';
 
   @IsOptional()
   @IsNumber()

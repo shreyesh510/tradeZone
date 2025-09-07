@@ -22,33 +22,6 @@ interface PositionCardProps {
 }
 
 const PositionCard = memo<PositionCardProps>(({ position, isDarkMode }) => {
-  // Calculate P&L for a position (use lot-size-based qty; fallback when unknown)
-  const calculatePnL = (position: Position) => {
-    const current = position.currentPrice ?? position.entryPrice;
-    const priceDiff = position.side === 'buy'
-      ? current - position.entryPrice
-      : position.entryPrice - current;
-
-    const lotSize = getLotSize(position.symbol);
-    let qty = 0;
-    let investedUsd = 0;
-
-    if (lotSize > 0) {
-      qty = (position.lots || 0) * lotSize;
-      const notionalAtEntry = position.entryPrice * qty;
-      const lev = position.leverage || 1;
-      investedUsd = lev > 0 ? notionalAtEntry / lev : notionalAtEntry;
-    } else {
-      investedUsd = position.investedAmount || 0;
-      const lev = position.leverage || 1;
-      const notional = investedUsd * lev;
-      qty = position.entryPrice > 0 ? notional / position.entryPrice : 0;
-    }
-
-    const pnl = priceDiff * qty;
-    const pnlPercent = investedUsd > 0 ? (pnl / investedUsd) * 100 : 0;
-    return { pnl, pnlPercent };
-  };
 
   // Format date for display
   const formatDate = (dateStr: string | Date | undefined) => {
@@ -82,8 +55,6 @@ const PositionCard = memo<PositionCardProps>(({ position, isDarkMode }) => {
     }
   };
 
-  const { pnl, pnlPercent } = calculatePnL(position);
-  const isProfitable = pnl >= 0;
 
   return (
     <div 
@@ -125,46 +96,6 @@ const PositionCard = memo<PositionCardProps>(({ position, isDarkMode }) => {
           </div>
         </div>
       </div>
-
-  {/* Price Information removed per request */}
-
-      {/* P&L Display */}
-      <div className={`p-4 rounded-xl ${
-        isProfitable 
-          ? isDarkMode ? 'bg-green-500/10 border border-green-500/20' : 'bg-green-50 border border-green-200'
-          : isDarkMode ? 'bg-red-500/10 border border-red-500/20' : 'bg-red-50 border border-red-200'
-      }`}>
-        <div className="flex justify-between items-center">
-          <span className={`font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-            P&L:
-          </span>
-          <div className="text-right">
-            <p className={`text-xl font-bold ${isProfitable ? 'text-green-400' : 'text-red-400'}`}>
-              ${pnl.toFixed(2)}
-            </p>
-            <p className={`text-sm ${isProfitable ? 'text-green-400' : 'text-red-400'}`}>
-              ({pnlPercent.toFixed(2)}%)
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Progress Bar */}
-      <div className="mt-4">
-        <div className={`w-full h-2 rounded-full ${isDarkMode ? 'bg-gray-600' : 'bg-gray-200'}`}>
-          <div 
-            className={`h-2 rounded-full transition-all duration-500 ${
-              isProfitable ? 'bg-gradient-to-r from-green-400 to-emerald-500' 
-              : 'bg-gradient-to-r from-red-400 to-pink-500'
-            }`}
-            style={{ 
-              width: `${Math.min(Math.abs(pnlPercent), 100)}%` 
-            }}
-          ></div>
-        </div>
-      </div>
-
-  {/* Timestamp removed per request */}
 
       {/* Action Buttons */}
       <div className="mt-4 flex space-x-2">

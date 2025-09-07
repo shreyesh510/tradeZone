@@ -13,7 +13,6 @@ import Zone from './pages/zone';
 import Settings from './pages/settings';
 import LiveChart from './components/LiveChart';
 import Positions from './pages/investment/positions';
-import SymbolPositions from './pages/investment/positions/SymbolPositions';
 import InvestmentDashboard from './pages/investment/dashboard';
 import Withdraw from './pages/investment/withdraw';
 import Deposit from './pages/investment/deposit';
@@ -111,14 +110,6 @@ function App() {
                   element={
                     <ProtectedRoute>
                       <Positions />
-                    </ProtectedRoute>
-                  } 
-                />
-                <Route 
-                  path="/investment/positions/:symbol" 
-                  element={
-                    <ProtectedRoute>
-                      <SymbolPositions />
                     </ProtectedRoute>
                   } 
                 />

@@ -43,6 +43,11 @@ export class PositionsController {
   @Query('aggregated') aggregated?: string,
   @Query('representative') representative?: 'latest' | 'earliest',
   @Query('compact') compact?: string,
+  @Query('side') side?: 'buy' | 'sell',
+  @Query('platform') platform?: 'Delta Exchange' | 'Groww',
+  @Query('account') account?: 'main' | 'longterm',
+  @Query('timeframe') timeframe?: '1D' | '7D' | '30D' | '90D' | 'all',
+  @Query('symbol') symbol?: string,
   ) {
     console.log('🔍 Getting positions for user:', req.user.userId);
     const userId = req.user.userId;
@@ -57,6 +62,11 @@ export class PositionsController {
       aggregated,
       representative,
       compact,
+  side,
+  platform,
+  account,
+  timeframe,
+  symbol,
     });
     if (Array.isArray(result)) {
       console.log(`🔍 Found ${result.length} positions for user ${userId}`);
@@ -69,6 +79,13 @@ export class PositionsController {
   async getAll(@Request() req) {
     const userId = req.user.userId;
     return await this.positionsService.getAllPositionsWithPnl(userId);
+  }
+
+  @Get('history')
+  async history(@Request() req, @Query('limit') limit?: string) {
+    const userId = req.user.userId;
+    const n = limit ? parseInt(limit, 10) : undefined;
+    return await this.positionsService.history(userId, n);
   }
 
   @Get('open/list')

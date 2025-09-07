@@ -24,16 +24,29 @@ export class PositionsService {
     console.log('🔍 Creating position with data:', createPositionDto);
     console.log('🔍 For user ID:', userId);
 
+    const { entryPrice: _entryPriceIgnored, leverage: _levIgnored, ...rest } = createPositionDto as any;
     const positionData = {
-      ...createPositionDto,
+      ...rest,
+      account: (createPositionDto as any).account,
+  status: (createPositionDto as any).status || 'open',
       userId: userId,
       createdAt: new Date(),
       updatedAt: new Date(),
       timestamp: createPositionDto.timestamp || new Date().toISOString(),
-    };
+    } as any;
 
     const position =
       await this.firebaseDatabaseService.createPosition(positionData);
+    // Log history: create
+    try {
+      await this.firebaseDatabaseService.addPositionHistoryEntry({
+        userId,
+        action: 'create',
+        positionId: position.id,
+        symbol: position.symbol,
+  details: { ...positionData },
+      });
+    } catch {}
     console.log('✅ Position created successfully:', position.id);
     return position;
   }
@@ -133,6 +146,16 @@ export class PositionsService {
     }
 
     await this.firebaseDatabaseService.updatePosition(id, updateData);
+    // Log history: update
+    try {
+      await this.firebaseDatabaseService.addPositionHistoryEntry({
+        userId,
+        action: (updateData as any).status === 'closed' ? 'close' : 'update',
+        positionId: id,
+        symbol: existing.symbol,
+        details: { ...updatePositionDto },
+      });
+    } catch {}
 
     // Return the updated position
     const updated = await this.findOne(id, userId);
@@ -140,7 +163,7 @@ export class PositionsService {
     // If we transitioned to closed, create an exit entry
     if (existing.status !== 'closed' && updateData.status === 'closed') {
       const pnlNumber = Number((updatePositionDto as any).pnl) || 0;
-      await this.firebaseDatabaseService.createExitEntrySingle({
+  await this.firebaseDatabaseService.createExitEntrySingle({
         userId,
         position: updated,
         pnl: pnlNumber,
@@ -159,9 +182,19 @@ export class PositionsService {
 
   async remove(id: string, userId: string): Promise<void> {
     // First check if position exists and belongs to user
-    await this.findOne(id, userId);
+    const existing = await this.findOne(id, userId);
 
     await this.firebaseDatabaseService.deletePosition(id);
+    // Log history: delete
+    try {
+      await this.firebaseDatabaseService.addPositionHistoryEntry({
+        userId,
+        action: 'delete',
+        positionId: id,
+        symbol: existing.symbol,
+        details: { before: existing },
+      });
+    } catch {}
   }
 
   async getOpenPositions(userId: string): Promise<Position[]> {
@@ -178,6 +211,10 @@ export class PositionsService {
     // Normalize symbol to uppercase to match stored data
     const sym = (symbol || '').toUpperCase();
     return this.firebaseDatabaseService.getPositionsBySymbol(userId, sym);
+  }
+
+  async history(userId: string, limit?: number): Promise<any[]> {
+    return await this.firebaseDatabaseService.getPositionHistory(userId, limit);
   }
 
   // Helper: same calendar day check
@@ -215,6 +252,39 @@ export class PositionsService {
   if (twoHundred.has(sym)) return 200;
   // Requirement: all other symbols default to 100x
   return 100;
+  }
+
+  // Helper: compute cutoff date for timeframe as last N days (24h per day)
+  private getTimeframeCutoff(timeframe?: '1D' | '7D' | '30D' | '90D' | 'all'): Date | null {
+    if (!timeframe || timeframe === 'all') return null;
+    const days = timeframe === '1D' ? 1 : timeframe === '7D' ? 7 : timeframe === '30D' ? 30 : 90;
+    const ms = days * 24 * 60 * 60 * 1000;
+    return new Date(Date.now() - ms);
+  }
+
+  // Helper: best-effort conversion of various timestamp representations to Date
+  private toDate(value: any): Date | null {
+    if (!value) return null;
+    try {
+      // Firestore Timestamp-like
+      if (value && typeof value.toDate === 'function') {
+        const d = value.toDate();
+        return d instanceof Date && !isNaN(d.getTime()) ? d : null;
+      }
+      if (typeof value === 'object' && (('seconds' in value) || ('_seconds' in value))) {
+        const seconds = (value as any).seconds ?? (value as any)._seconds ?? 0;
+        const nanos = (value as any).nanoseconds ?? (value as any)._nanoseconds ?? 0;
+        const ms = seconds * 1000 + Math.floor(nanos / 1e6);
+        const d = new Date(ms);
+        return !isNaN(d.getTime()) ? d : null;
+      }
+      // Date instance or parsable string/number
+      if (value instanceof Date) return !isNaN(value.getTime()) ? value : null;
+      const d = new Date(value);
+      return !isNaN(d.getTime()) ? d : null;
+    } catch {
+      return null;
+    }
   }
 
   // Bulk create with dedupe (userId + symbol + entryPrice + same-day timestamp)
@@ -273,20 +343,30 @@ export class PositionsService {
 
     const created =
       await this.firebaseDatabaseService.createPositionsBatch(keep);
+    // Log history: bulk-create (one entry summarizing)
+    try {
+      await this.firebaseDatabaseService.addPositionHistoryEntry({
+        userId,
+        action: 'bulk-create',
+        details: { requested: list.length, created: created.length, skipped: skipped.length },
+      });
+    } catch {}
     return { created, skipped };
   }
 
   // Calculate P&L for a position
   calculatePnL(position: Position): { pnl: number; pnlPercent: number } {
-    const current = (position as any).currentPrice ?? position.entryPrice;
-    const priceDiff =
-      position.side === 'buy'
-        ? current - position.entryPrice
-        : position.entryPrice - current;
-
-    const pnl = priceDiff * position.lots;
-    const pnlPercent = (pnl / position.investedAmount) * 100;
-
+    const entry = Number(position.entryPrice ?? 0);
+    const lots = Number(position.lots ?? 0);
+    const invested = Number(position.investedAmount ?? 0);
+    const currentRaw = (position as any).currentPrice;
+    const current = typeof currentRaw === 'number' ? currentRaw : entry;
+    if (!entry || entry <= 0 || !lots) {
+      return { pnl: 0, pnlPercent: 0 };
+    }
+    const priceDiff = position.side === 'buy' ? current - entry : entry - current;
+    const pnl = priceDiff * lots;
+    const pnlPercent = invested > 0 ? (pnl / invested) * 100 : 0;
     return { pnl, pnlPercent };
   }
 
@@ -295,28 +375,27 @@ export class PositionsService {
     position: Position,
     current: number | null | undefined,
   ) {
-    const live =
-      typeof current === 'number' && current > 0
-        ? current
-        : position.entryPrice;
+    const entry = Number(position.entryPrice ?? 0);
+    if (!entry || entry <= 0) {
+      return { pnl: 0, pnlPercent: 0 };
+    }
+    const live = typeof current === 'number' && current > 0 ? current : entry;
     const priceDiff =
-      position.side === 'buy'
-        ? live - position.entryPrice
-        : position.entryPrice - live;
+      position.side === 'buy' ? live - entry : entry - live;
 
     const lotSize = this.marketData.getLotSize(position.symbol);
     let qty = 0;
-    let investedUsd = position.investedAmount || 0;
+    let investedUsd = Number(position.investedAmount || 0);
     if (lotSize > 0) {
-      qty = (position.lots || 0) * lotSize;
+      qty = (Number(position.lots) || 0) * lotSize;
       // for percent, approximate invested as entry*qty/leverage if leverage present
-      const notionalAtEntry = position.entryPrice * qty;
+      const notionalAtEntry = entry * qty;
       const lev = (position as any).leverage || 1;
       investedUsd = lev > 0 ? notionalAtEntry / lev : notionalAtEntry;
     } else {
       const lev = (position as any).leverage || 1;
       const notional = investedUsd * lev;
-      qty = position.entryPrice > 0 ? notional / position.entryPrice : 0;
+      qty = entry > 0 ? notional / entry : 0;
     }
 
     const pnl = priceDiff * qty;
@@ -372,11 +451,10 @@ export class PositionsService {
     for (const [sym, arr] of groups.entries()) {
       const totalLots = arr.reduce((s, p) => s + (p.lots || 0), 0);
       // Normalize invested USD: prefer stored investedAmount per leg, fallback to derived
-      const invSum =
-        arr.reduce((s, p) => {
-          const invested = Number(p.investedAmount) || 0;
-          if (invested > 0) return s + invested;
-        }, 0) || 0;
+      const invSum = arr.reduce((s, p) => {
+        const invested = Number(p.investedAmount) || 0;
+        return s + (invested > 0 ? invested : 0);
+      }, 0);
 
       const totalInvested = invSum; // Keep as USD, no conversion needed
       // Representative position (latest/earliest by timestamp/created/updated)
@@ -437,6 +515,7 @@ export class PositionsService {
         lots: totalLots,
         investedAmount: round(totalInvested, 2),
         platform: (rep as any)?.platform,
+  account: (rep as any)?.account,
         leverage: (rep as any)?.leverage,
         status: (rep as any)?.status,
         timestamp: (rep as any)?.timestamp,
@@ -460,6 +539,11 @@ export class PositionsService {
       aggregated?: string;
       representative?: 'latest' | 'earliest';
       compact?: string;
+  side?: 'buy' | 'sell';
+  platform?: 'Delta Exchange' | 'Groww';
+  account?: 'main' | 'longterm';
+  timeframe?: '1D' | '7D' | '30D' | '90D' | 'all';
+  symbol?: string;
     },
   ): Promise<any> {
     const wantUnique = String(query.unique).toLowerCase() === 'true';
@@ -470,21 +554,78 @@ export class PositionsService {
     if (query.status === 'open') {
       if (wantAggregated) {
         const data = await this.getOpenPositionsAggregated(userId, rep);
-        if (wantCompact) {
-          return data.map(({ pnl, currentPrice, ids, ...rest }) => rest);
+        // Apply optional filters for aggregated response
+        let filtered = data;
+        if (query.side) filtered = filtered.filter((p) => p.side === query.side);
+        if (query.platform) filtered = filtered.filter((p: any) => (p.platform || '') === query.platform);
+        if (query.account) filtered = filtered.filter((p: any) => (p.account || '') === query.account);
+  if (query.symbol) filtered = filtered.filter((p: any) => (p.symbol || '').toUpperCase() === query.symbol!.toUpperCase());
+  const cutoff = this.getTimeframeCutoff(query.timeframe);
+  if (cutoff) {
+          filtered = filtered.filter((p: any) => {
+            const t = (p as any).timestamp ?? (p as any).createdAt ?? (p as any).updatedAt;
+            const d = this.toDate(t);
+            return !!(d && d >= cutoff);
+          });
         }
-        return data;
+        if (wantCompact) {
+          return filtered.map(({ pnl, currentPrice, ids, ...rest }) => rest);
+        }
+        return filtered;
       }
-      const list = await this.getOpenPositions(userId);
+      let list = await this.getOpenPositions(userId);
+      if (query.side) list = list.filter((p) => p.side === query.side);
+      if (query.platform) list = list.filter((p: any) => (p.platform || '') === query.platform);
+      if (query.account) list = list.filter((p: any) => (p.account || '') === query.account);
+  if (query.symbol) list = list.filter((p: any) => (p.symbol || '').toUpperCase() === query.symbol!.toUpperCase());
+      {
+        const cutoff = this.getTimeframeCutoff(query.timeframe);
+        if (cutoff) {
+        list = list.filter((p: any) => {
+          const t = (p as any).timestamp ?? (p as any).createdAt ?? (p as any).updatedAt;
+          const d = this.toDate(t);
+          return !!(d && d >= cutoff);
+        });
+        }
+      }
       return wantUnique ? this.uniqueBySymbol(list) : list;
     } else if (query.status === 'closed') {
-      const list = await this.getClosedPositions(userId);
+      let list = await this.getClosedPositions(userId);
+      if (query.side) list = list.filter((p) => p.side === query.side);
+      if (query.platform) list = list.filter((p: any) => (p.platform || '') === query.platform);
+      if (query.account) list = list.filter((p: any) => (p.account || '') === query.account);
+  if (query.symbol) list = list.filter((p: any) => (p.symbol || '').toUpperCase() === query.symbol!.toUpperCase());
+      {
+        const cutoff = this.getTimeframeCutoff(query.timeframe);
+        if (cutoff) {
+        list = list.filter((p: any) => {
+          const t = (p as any).timestamp ?? (p as any).createdAt ?? (p as any).updatedAt;
+          const d = this.toDate(t);
+          return !!(d && d >= cutoff);
+        });
+        }
+      }
       return wantUnique ? this.uniqueBySymbol(list) : list;
     }
 
-    const positions = wantUnique
+    let positions = wantUnique
       ? await this.findAllUnique(userId)
       : await this.findAll(userId);
+    // Apply optional filters for generic case
+    if (query.side) positions = positions.filter((p: any) => p.side === query.side);
+    if (query.platform) positions = positions.filter((p: any) => (p.platform || '') === query.platform);
+    if (query.account) positions = positions.filter((p: any) => (p.account || '') === query.account);
+  if (query.symbol) positions = positions.filter((p: any) => (p.symbol || '').toUpperCase() === query.symbol!.toUpperCase());
+    {
+      const cutoff = this.getTimeframeCutoff(query.timeframe);
+      if (cutoff) {
+      positions = positions.filter((p: any) => {
+        const t = (p as any).timestamp ?? (p as any).createdAt ?? (p as any).updatedAt;
+        const d = this.toDate(t);
+        return !!(d && d >= cutoff);
+      });
+      }
+    }
     return positions;
   }
 
@@ -524,11 +665,10 @@ export class PositionsService {
     for (const [sym, arr] of groups.entries()) {
       const totalLots = arr.reduce((s, p) => s + (p.lots || 0), 0);
       // Normalize invested USD per leg: prefer stored investedAmount, fallback to derived
-      const invSum =
-        arr.reduce((s, p) => {
-          const invested = Number(p.investedAmount) || 0;
-          if (invested > 0) return s + invested;
-        }, 0) || 0;
+      const invSum = arr.reduce((s, p) => {
+        const invested = Number(p.investedAmount) || 0;
+        return s + (invested > 0 ? invested : 0);
+      }, 0);
 
       const totalInvested = invSum; // Keep as USD, no conversion needed
 
@@ -585,6 +725,14 @@ export class PositionsService {
         positionsBreakdown: symbols.map((s) => ({ symbol: s, pnl: Number(totalPnl) || 0 })),
         closedAt: new Date(),
       });
+      // Log history: close-all
+      try {
+        await this.firebaseDatabaseService.addPositionHistoryEntry({
+          userId,
+          action: 'close-all',
+          details: { count: updatedCount, symbols },
+        });
+      } catch {}
     }
     return updatedCount;
   }
