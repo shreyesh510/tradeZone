@@ -8,11 +8,12 @@ import { ChatModule } from './chat/chat.module';
 import { DatabaseModule } from './database/database.module';
 import { PositionsModule } from './positions/positions.module';
 import { WithdrawalsModule } from './withdrawals/withdrawals.module';
+import { DepositsModule } from './deposits/deposits.module';
 
 import { FirebaseDatabaseService } from './database/firebase-database.service';
 
 @Module({
-  imports: [AuthModule, ChatModule, DatabaseModule, PositionsModule, WithdrawalsModule],
+  imports: [AuthModule, ChatModule, DatabaseModule, PositionsModule, WithdrawalsModule, DepositsModule],
   controllers: [AppController],
   providers: [
     AppService,

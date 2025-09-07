@@ -24,6 +24,7 @@ export class FirebaseDatabaseService {
   private positionsCollection = 'positions';
   private exitPositionsCollection = 'exit_positions';
   private withdrawalsCollection = 'withdrawals';
+  private depositsCollection = 'deposits';
 
   constructor(private firebaseConfig: FirebaseConfig) {
     // Firestore will be initialized in onModuleInit
@@ -557,6 +558,86 @@ export class FirebaseDatabaseService {
     } catch (error) {
       console.error('Error getting withdrawals:', error);
       return [] as any;
+    }
+  }
+
+  // Deposits operations
+  async createDeposit(data: Omit<import('../deposits/entities/deposit.entity').Deposit, 'id'>): Promise<import('../deposits/entities/deposit.entity').Deposit> {
+    try {
+      const db = this.getFirestore();
+      const now = data.requestedAt ?? new Date();
+      const raw = { ...data, requestedAt: now } as Record<string, any>;
+      const payload = Object.entries(raw).reduce((acc, [k, v]) => {
+        if (v !== undefined) (acc as any)[k] = v;
+        return acc;
+      }, {} as Record<string, any>);
+      const docRef = await db.collection(this.depositsCollection).add(payload);
+      const requestedAt = this.serializeDate(payload.requestedAt);
+      const completedAt = this.serializeDate(payload.completedAt);
+      return { id: docRef.id, ...(payload as any), requestedAt, completedAt } as any;
+    } catch (error) {
+      console.error('Error creating deposit:', error);
+      throw error;
+    }
+  }
+
+  async getDeposits(userId: string): Promise<import('../deposits/entities/deposit.entity').Deposit[]> {
+    try {
+      const snapshot = await this.getFirestore()
+        .collection(this.depositsCollection)
+        .where('userId', '==', userId)
+        .get();
+      const items = snapshot.docs.map((d) => {
+        const data = d.data() as any;
+        const requestedAt = this.serializeDate(data.requestedAt);
+        const completedAt = this.serializeDate(data.completedAt);
+        return { id: d.id, ...data, requestedAt, completedAt };
+      }) as any[];
+      return items.sort((a, b) => {
+        const aTime = a.requestedAt ? new Date(a.requestedAt as any).getTime() : 0;
+        const bTime = b.requestedAt ? new Date(b.requestedAt as any).getTime() : 0;
+        return bTime - aTime;
+      }) as any;
+    } catch (error) {
+      console.error('Error getting deposits:', error);
+      return [] as any;
+    }
+  }
+
+  async updateDeposit(userId: string, id: string, data: Partial<import('../deposits/entities/deposit.entity').Deposit>): Promise<boolean> {
+    try {
+      const db = this.getFirestore();
+      const ref = db.collection(this.depositsCollection).doc(id);
+      const snap = await ref.get();
+      if (!snap.exists) return false;
+      const existing = snap.data() as any;
+      if (!existing || existing.userId !== userId) return false;
+      const raw = { ...data, updatedAt: new Date() } as Record<string, any>;
+      const payload = Object.entries(raw).reduce((acc, [k, v]) => {
+        if (v !== undefined) (acc as any)[k] = v;
+        return acc;
+      }, {} as Record<string, any>);
+      await ref.update(payload);
+      return true;
+    } catch (error) {
+      console.error('Error updating deposit:', error);
+      return false;
+    }
+  }
+
+  async deleteDeposit(userId: string, id: string): Promise<boolean> {
+    try {
+      const db = this.getFirestore();
+      const ref = db.collection(this.depositsCollection).doc(id);
+      const snap = await ref.get();
+      if (!snap.exists) return false;
+      const existing = snap.data() as any;
+      if (!existing || existing.userId !== userId) return false;
+      await ref.delete();
+      return true;
+    } catch (error) {
+      console.error('Error deleting deposit:', error);
+      return false;
     }
   }
 
