@@ -95,6 +95,13 @@ export class PositionsController {
     return await this.positionsService.createBulk(dto, userId);
   }
 
+  @Post('close-all')
+  async closeAll(@Request() req, @Body('pnl') pnl?: number) {
+    const userId = req.user.userId;
+    const result = await this.positionsService.closeAllOpenForUser(userId, pnl);
+    return { updated: result };
+  }
+
   // Generic ID-based routes last
   @Get(':id')
   async findOne(@Param('id') id: string, @Request() req) {

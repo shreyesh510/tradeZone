@@ -120,3 +120,16 @@ export const createPositionsBulk = createAsyncThunk(
     }
   }
 );
+
+// Close all open positions for current user
+export const closeAllPositions = createAsyncThunk(
+  'positions/closeAllPositions',
+  async (pnl: number | undefined, { rejectWithValue }) => {
+    try {
+      const result = await positionsApi.closeAllPositions(pnl);
+      return result; // { updated: number }
+    } catch (error: any) {
+      return rejectWithValue(error.response?.data?.message || 'Failed to close all positions');
+    }
+  }
+);

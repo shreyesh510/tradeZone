@@ -8,7 +8,8 @@ export const positionsApi = {
 
     // If no filters, use the new backend endpoint that includes P&L
     if (!filters || Object.keys(filters).length === 0) {
-      const url = '/positions/getAllPositionsWithPnl';
+      // Prefer open aggregated with representative=latest to include ids for per-card actions
+      const url = '/positions?status=open&aggregated=true&representative=latest';
   // removed debug log
       const response = await api.get(url);
   // removed debug logs
@@ -81,6 +82,12 @@ export const positionsApi = {
   // Bulk create positions with backend-side dedupe
   createPositionsBulk: async (positions: CreatePositionData[]): Promise<{ created: Position[]; skipped: CreatePositionData[] }> => {
     const response = await api.post('/positions/multiple', { positions });
+    return response.data;
+  },
+
+  // Close all open positions for the authenticated user
+  closeAllPositions: async (pnl?: number): Promise<{ updated: number }> => {
+    const response = await api.post('/positions/close-all', { pnl });
     return response.data;
   },
 };

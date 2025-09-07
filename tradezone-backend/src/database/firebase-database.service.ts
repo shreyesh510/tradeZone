@@ -22,6 +22,7 @@ export class FirebaseDatabaseService {
   private usersCollection = 'users';
   private permissionsCollection = 'permissions';
   private positionsCollection = 'positions';
+  private exitPositionsCollection = 'exit_positions';
 
   constructor(private firebaseConfig: FirebaseConfig) {
     // Firestore will be initialized in onModuleInit
@@ -508,5 +509,135 @@ export class FirebaseDatabaseService {
 
     await batch.commit();
     return created;
+  }
+
+  // Create an exit entry for a single closed position
+  async createExitEntrySingle(params: {
+    userId: string;
+    position: Position;
+    pnl: number;
+    closedAt?: Date;
+  }): Promise<string | null> {
+    try {
+      const { userId, position, pnl, closedAt } = params;
+      const now = new Date();
+      const payload = {
+        type: 'single',
+        userId,
+        positionId: position.id,
+        symbol: (position.symbol || '').toUpperCase(),
+        pnl: Number(pnl) || 0,
+        lots: position.lots,
+        side: position.side,
+        entryPrice: position.entryPrice,
+        investedAmount: position.investedAmount,
+        platform: (position as any).platform,
+        leverage: (position as any).leverage,
+        createdAt: now,
+        closedAt: closedAt ?? now,
+      } as any;
+      const docRef = await this.getFirestore().collection(this.exitPositionsCollection).add(payload);
+      return docRef.id;
+    } catch (error) {
+      console.error('Error creating single exit entry:', error);
+      return null;
+    }
+  }
+
+  // Create a bulk exit entry for closing all
+  async createExitEntryBulk(params: {
+    userId: string;
+    symbols: string[];
+    totalPnl: number;
+    positionsBreakdown?: Array<{ symbol: string; pnl: number }>;
+    closedAt?: Date;
+  }): Promise<string | null> {
+    try {
+      const { userId, symbols, totalPnl, closedAt } = params;
+      const now = new Date();
+      const payload = {
+        type: 'bulk',
+        userId,
+        symbols: (symbols || []).map((s) => (s || '').toUpperCase()),
+        totalPnl: Number(totalPnl) || 0,
+        positions: (params.positionsBreakdown || []).map((x) => ({
+          symbol: (x.symbol || '').toUpperCase(),
+          pnl: Number(x.pnl) || 0,
+        })),
+        createdAt: now,
+        closedAt: closedAt ?? now,
+      } as any;
+      const docRef = await this.getFirestore().collection(this.exitPositionsCollection).add(payload);
+      return docRef.id;
+    } catch (error) {
+      console.error('Error creating bulk exit entry:', error);
+      return null;
+    }
+  }
+
+  // Close all open positions for a specific user; returns number of updated docs
+  async closeAllOpenPositionsForUser(userId: string): Promise<number> {
+    try {
+      const db = this.getFirestore();
+      const snapshot = await db
+        .collection(this.positionsCollection)
+        .where('userId', '==', userId)
+        .where('status', '==', 'open')
+        .get();
+
+      if (snapshot.empty) return 0;
+
+      const now = new Date();
+      let count = 0;
+      // Firestore batch limit is 500 operations; chunk updates to 400 per batch for safety
+      const chunkSize = 400;
+      for (let i = 0; i < snapshot.docs.length; i += chunkSize) {
+        const chunk = snapshot.docs.slice(i, i + chunkSize);
+        const batch = db.batch();
+        chunk.forEach((doc) => {
+          batch.update(doc.ref, { status: 'closed', closedAt: now, updatedAt: now });
+          count += 1;
+        });
+        await batch.commit();
+      }
+      return count;
+    } catch (error) {
+      console.error('Error closing all open positions for user:', error);
+      return 0;
+    }
+  }
+
+  // Close all open positions for a specific user and symbol; returns number of updated docs
+  async closeOpenPositionsBySymbolForUser(userId: string, symbol: string): Promise<number> {
+    const sym = (symbol || '').toUpperCase();
+    if (!userId || !sym) return 0;
+    try {
+      const db = this.getFirestore();
+      const snapshot = await db
+        .collection(this.positionsCollection)
+        .where('userId', '==', userId)
+        .where('symbol', '==', sym)
+        .where('status', '==', 'open')
+        .get();
+
+      if (snapshot.empty) return 0;
+
+      const now = new Date();
+      let count = 0;
+      const chunkSize = 400;
+      for (let i = 0; i < snapshot.docs.length; i += chunkSize) {
+        const chunk = snapshot.docs.slice(i, i + chunkSize);
+        const batch = db.batch();
+        chunk.forEach((doc) => {
+          batch.update(doc.ref, { status: 'closed', closedAt: now, updatedAt: now });
+          count += 1;
+        });
+        await batch.commit();
+      }
+      return count;
+    } catch (error) {
+      console.error('Error closing positions by symbol for user:', error);
+      return 0;
+    }
   }
 }

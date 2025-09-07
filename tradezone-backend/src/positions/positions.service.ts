@@ -119,18 +119,42 @@ export class PositionsService {
     updatePositionDto: UpdatePositionDto,
     userId: string,
   ): Promise<Position> {
-    // First check if position exists and belongs to user
-    await this.findOne(id, userId);
+  // First check if position exists and belongs to user
+  const existing = await this.findOne(id, userId);
 
     const updateData = {
       ...updatePositionDto,
       updatedAt: new Date(),
     };
 
+    // Ensure closedAt is set when closing
+    if (updateData.status === 'closed' && !(updateData as any).closedAt) {
+      (updateData as any).closedAt = new Date();
+    }
+
     await this.firebaseDatabaseService.updatePosition(id, updateData);
 
     // Return the updated position
-    return await this.findOne(id, userId);
+    const updated = await this.findOne(id, userId);
+
+    // If we transitioned to closed, create an exit entry
+    if (existing.status !== 'closed' && updateData.status === 'closed') {
+      const pnlNumber = Number((updatePositionDto as any).pnl) || 0;
+      await this.firebaseDatabaseService.createExitEntrySingle({
+        userId,
+        position: updated,
+        pnl: pnlNumber,
+        closedAt: (updateData as any).closedAt,
+      });
+      // Optionally, close any other open legs for the same symbol for this user to keep state consistent
+      try {
+        await this.firebaseDatabaseService.closeOpenPositionsBySymbolForUser(userId, updated.symbol);
+      } catch (e) {
+        // non-fatal
+      }
+    }
+
+    return updated;
   }
 
   async remove(id: string, userId: string): Promise<void> {
@@ -555,5 +579,23 @@ export class PositionsService {
     }
 
     return result;
+  }
+
+  // Close all open positions for the authenticated user
+  async closeAllOpenForUser(userId: string, totalPnl?: number): Promise<number> {
+    // get symbols before closing
+    const open = await this.getOpenPositions(userId);
+    const symbols = Array.from(new Set(open.map((p) => (p.symbol || '').toUpperCase())));
+    const updatedCount = await this.firebaseDatabaseService.closeAllOpenPositionsForUser(userId);
+    if (updatedCount > 0) {
+      await this.firebaseDatabaseService.createExitEntryBulk({
+        userId,
+        symbols,
+        totalPnl: Number(totalPnl) || 0,
+        positionsBreakdown: symbols.map((s) => ({ symbol: s, pnl: Number(totalPnl) || 0 })),
+        closedAt: new Date(),
+      });
+    }
+    return updatedCount;
   }
 }

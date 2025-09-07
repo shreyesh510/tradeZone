@@ -9,7 +9,7 @@ import { usePermissions } from '../../../hooks/usePermissions';
 import type { RootState, AppDispatch } from '../../../redux/store';
 import type { Position } from '../../../types/position';
 import { fetchPositions } from '../../../redux/thunks/positions/positionsThunks';
-import { tradingViewService } from '../../../services/tradingViewService';
+// coin API removed
 
 interface OnlineUser {
   userId: string;
@@ -30,8 +30,7 @@ export default function InvestmentPositionsBySymbol() {
   const [activeTab, setActiveTab] = useState<MobileTab>('chart');
 
   const { positions, loading } = useSelector((state: RootState) => state.positions);
-  const [livePrice, setLivePrice] = useState<number | null>(null);
-  const [priceUpdatedAt, setPriceUpdatedAt] = useState<number | null>(null);
+  // live price removed
 
   // Guard: redirect if no access
   useEffect(() => {
@@ -55,23 +54,7 @@ export default function InvestmentPositionsBySymbol() {
     }
   }, [dispatch]);
 
-  // Live price fetch for the selected symbol (refresh every 30s)
-  useEffect(() => {
-    let intervalId: number | undefined;
-    const fetchLive = async () => {
-      if (!symbol) return;
-      const info = await tradingViewService.getCryptoInfo(symbol);
-      if (info && typeof info.current_price === 'number') {
-        setLivePrice(info.current_price);
-        setPriceUpdatedAt(Date.now());
-      }
-    };
-    fetchLive();
-    intervalId = window.setInterval(fetchLive, 30000);
-    return () => {
-      if (intervalId) window.clearInterval(intervalId);
-    };
-  }, [symbol]);
+  // removed CoinGecko fetching
 
   const toggleSidebar = () => setSidebarOpen((s) => !s);
   const handleTabChange = (tab: MobileTab) => setActiveTab(tab);
@@ -91,13 +74,7 @@ export default function InvestmentPositionsBySymbol() {
     return [...list].sort((a, b) => toTime(b.timestamp) - toTime(a.timestamp));
   }, [list]);
 
-  const calcPnL = (p: Position) => {
-    const current = (livePrice ?? (p as any).currentPrice ?? p.entryPrice) as number;
-    const priceDiff = p.side === 'buy' ? current - p.entryPrice : p.entryPrice - current;
-    const pnl = priceDiff * p.lots;
-    const pnlPercent = p.investedAmount ? (pnl / p.investedAmount) * 100 : 0;
-    return { pnl, pnlPercent };
-  };
+  // P&L removed on this page
 
   const content = (
     <div
@@ -132,19 +109,15 @@ export default function InvestmentPositionsBySymbol() {
                 <th className="px-4 py-3 text-left font-semibold">Side</th>
                 <th className="px-4 py-3 text-right font-semibold">Lots</th>
                 <th className="px-4 py-3 text-right font-semibold">Entry</th>
-                <th className="px-4 py-3 text-right font-semibold">Current</th>
+                {/* Current removed */}
                 <th className="px-4 py-3 text-right font-semibold">Invested</th>
-                <th className="px-4 py-3 text-right font-semibold">Fee</th>
-                <th className="px-4 py-3 text-right font-semibold">P&L</th>
-                <th className="px-4 py-3 text-right font-semibold">P&L %</th>
+                {/* Fee/P&L removed */}
                 <th className="px-4 py-3 text-left font-semibold">Status</th>
                 <th className="px-4 py-3 text-left font-semibold">Platform</th>
               </tr>
             </thead>
             <tbody className={isDarkMode ? 'divide-y divide-gray-700' : 'divide-y divide-gray-200'}>
               {sorted.map((p: Position) => {
-                const { pnl, pnlPercent } = calcPnL(p);
-                const pnlColor = pnl >= 0 ? 'text-green-400' : 'text-red-400';
                 return (
                   <tr key={p.id} className={isDarkMode ? 'hover:bg-gray-800/40' : 'hover:bg-gray-50'}>
                     <td className="px-4 py-3 whitespace-nowrap">{p.timestamp}</td>
@@ -154,19 +127,8 @@ export default function InvestmentPositionsBySymbol() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">{p.lots}</td>
-                    <td className="px-4 py-3 text-right">${p.entryPrice.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-right">
-                      {livePrice ? `$${livePrice.toLocaleString()}` : `$${((p as any).currentPrice ?? p.entryPrice).toLocaleString()}`}
-                      {priceUpdatedAt && (
-                        <span className={`ml-2 text-xs ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>
-                          updated {new Date(priceUpdatedAt).toLocaleTimeString()}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right">${p.investedAmount.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-right">{typeof (p as any).tradingFee === 'number' ? `$${(p as any).tradingFee.toFixed(4)}` : '-'}</td>
-                    <td className={`px-4 py-3 text-right font-semibold ${pnlColor}`}>${pnl.toFixed(2)}</td>
-                    <td className={`px-4 py-3 text-right ${pnlColor}`}>({pnlPercent.toFixed(2)}%)</td>
+                    <td className="px-4 py-3 text-right">{p.entryPrice.toLocaleString()}</td>
+                    <td className="px-4 py-3 text-right">{p.investedAmount.toLocaleString()}</td>
                     <td className="px-4 py-3">{p.status}</td>
                     <td className="px-4 py-3">{p.platform}</td>
                   </tr>

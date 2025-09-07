@@ -16,6 +16,7 @@ import {
   updatePosition,
   deletePosition,
 } from '../../../redux/thunks/positions/positionsThunks';
+import { closeAllPositions } from '../../../redux/thunks/positions/positionsThunks';
 import { createPositionsBulk } from '../../../redux/thunks/positions/positionsThunks';
 import { clearError } from '../../../redux/slices/positionsSlice';
 import type { Position, PositionLike, AggregatedPosition, CreatePositionData } from '../../../types/position';
@@ -57,6 +58,11 @@ const Positions = memo(function Positions() {
   const [showImportModal, setShowImportModal] = useState<boolean>(false);
   const [importedPositions, setImportedPositions] = useState<CreatePositionData[]>([]);
   const [importingPositions, setImportingPositions] = useState<boolean>(false);
+  // Close modal state
+  const [showCloseModal, setShowCloseModal] = useState<boolean>(false);
+  const [closePnL, setClosePnL] = useState<string>('');
+  const [closingOne, setClosingOne] = useState<boolean>(false);
+  const [selectedForClose, setSelectedForClose] = useState<Position | null>(null);
 
   // Redux state
   const {
@@ -405,6 +411,41 @@ const Positions = memo(function Positions() {
     }
   };
 
+  // Open close modal for a given position (only if it has an ID)
+  const openCloseModal = (position: PositionLike) => {
+    if ('id' in position) {
+      setSelectedForClose(position as Position);
+      setClosePnL('');
+      setShowCloseModal(true);
+    } else {
+      toast.info('Open the symbol detail to close specific legs, or use Close All.');
+      setSelectedForClose(null);
+      setClosePnL('');
+      setShowCloseModal(true); // still allow modal for Close All action
+    }
+  };
+
+  const submitCloseOne = async () => {
+    if (!selectedForClose?.id) return;
+    try {
+      setClosingOne(true);
+      const pnlValue = Number(closePnL);
+      await dispatch(updatePosition({
+        id: selectedForClose.id,
+        data: { status: 'closed', pnl: Number.isFinite(pnlValue) ? pnlValue : 0, closedAt: new Date() as any },
+      })).unwrap();
+      toast.success('Position closed');
+      setShowCloseModal(false);
+      setSelectedForClose(null);
+      setClosePnL('');
+      await dispatch(fetchPositions(undefined));
+    } catch (err) {
+      toast.error('Failed to close position');
+    } finally {
+      setClosingOne(false);
+    }
+  };
+
   const content = (
     <div className={`flex-1 p-6 overflow-y-auto ${
       isDarkMode ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-900'
@@ -432,6 +473,19 @@ const Positions = memo(function Positions() {
           </h1>
           {/* Action Buttons */}
           <div className="flex space-x-3">
+            {/* Close All Positions */}
+            <button
+              onClick={() => {
+                setSelectedForClose(null);
+                setClosePnL('');
+                setShowCloseModal(true);
+              }}
+              className={`px-6 py-3 rounded-lg font-medium transition-colors ${
+                isDarkMode ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-red-500 text-white hover:bg-red-600'
+              }`}
+            >
+              Close All Positions
+            </button>
             {/* Import Button */}
             <input
               type="file"
@@ -696,21 +750,12 @@ const Positions = memo(function Positions() {
               {/* Action Buttons */}
               <div className="mt-4 flex space-x-2">
                 <button 
-                  onClick={(e) => e.stopPropagation()}
-                  disabled={updateLoading}
-                  className="flex-1 py-2 px-3 text-sm rounded-lg bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-colors disabled:opacity-50"
-                >
-                  {updateLoading ? 'Updating...' : 'Modify'}
-                </button>
-                <button 
                   onClick={(e) => { 
                     e.stopPropagation(); 
-                    if ('id' in position) {
-                      dispatch(updatePosition({ id: (position as any).id, data: { status: 'closed' } }));
-                    }
+                    openCloseModal(position);
                   }}
                   disabled={updateLoading}
-                  className="flex-1 py-2 px-3 text-sm rounded-lg bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors disabled:opacity-50"
+                  className="flex-1 py-2 px-3 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-50"
                 >
                   {updateLoading ? 'Closing...' : 'Close'}
                 </button>
@@ -760,6 +805,66 @@ const Positions = memo(function Positions() {
       <div className="flex-1 flex min-h-0 overflow-hidden">
         {content}
       </div>
+
+      {/* Close Modal */}
+      {showCloseModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className={`${isDarkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900'} w-full max-w-md rounded-2xl shadow-xl overflow-hidden`}>
+            <div className={`px-6 py-4 border-b ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+              <h3 className="text-lg font-semibold">Close Position{selectedForClose ? '' : 's'}</h3>
+              <p className={`text-sm mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                Enter realized PnL for record keeping. You can close the selected position or close all.
+              </p>
+            </div>
+            <div className="px-6 py-5 space-y-4">
+              <div>
+                <label className={`block text-sm mb-1 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>PnL (USD)</label>
+                <input
+                  type="number"
+                  value={closePnL}
+                  onChange={(e) => setClosePnL(e.target.value)}
+                  placeholder="e.g. 125.50 or -42.10"
+                  className={`w-full px-3 py-2 rounded-lg border outline-none ${isDarkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
+                />
+              </div>
+              {selectedForClose && (
+                <button
+                  onClick={submitCloseOne}
+                  disabled={closingOne}
+                  className={`w-full py-2.5 rounded-lg font-medium ${closingOne ? 'opacity-60' : ''} ${isDarkMode ? 'bg-red-600 hover:bg-red-700' : 'bg-red-600 hover:bg-red-700'} text-white`}
+                >
+                  {closingOne ? 'Closing…' : `Close ${selectedForClose.symbol}`}
+                </button>
+              )}
+        {!selectedForClose && (
+                <button
+                  onClick={async () => {
+                    try {
+          const pnlValue = Number(closePnL);
+          const res: any = await dispatch(closeAllPositions(Number.isFinite(pnlValue) ? pnlValue : undefined)).unwrap();
+                      toast.success(`Closed ${res?.updated ?? 0} positions`);
+                      setShowCloseModal(false);
+                      setClosePnL('');
+                      await dispatch(fetchPositions(undefined));
+                    } catch (err) {
+                      toast.error('Failed to close all positions');
+                    }
+                  }}
+                  className={`w-full py-2.5 rounded-lg font-medium ${isDarkMode ? 'bg-red-500 hover:bg-red-600' : 'bg-red-500 hover:bg-red-600'} text-white`}
+                >
+                  Close All Positions
+                </button>
+              )}
+              <button
+                onClick={() => { setShowCloseModal(false); setSelectedForClose(null); setClosePnL(''); }}
+                className={`w-full py-2.5 rounded-lg font-medium ${isDarkMode ? 'bg-gray-700 hover:bg-gray-600 text-gray-200' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'}`}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Import Confirmation Modal */}
       {showImportModal && (
