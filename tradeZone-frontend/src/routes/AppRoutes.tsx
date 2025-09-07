@@ -7,6 +7,7 @@ import InvestmentPositions from '../pages/investment/positions';
 import SymbolPositions from '../pages/investment/positions/SymbolPositions';
 import InvestmentWithdraw from '../pages/investment/withdraw';
 import InvestmentDeposit from '../pages/investment/deposit';
+import WalletsPage from '../pages/wallets';
 
 export default function AppRoutes() {
   const isAuthenticated = useAppSelector((state: any) => state.auth.isAuthenticated);
@@ -84,6 +85,14 @@ export default function AppRoutes() {
         element={
           <ProtectedRoute>
             <InvestmentDeposit />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/wallets" 
+        element={
+          <ProtectedRoute>
+            <WalletsPage />
           </ProtectedRoute>
         } 
       />

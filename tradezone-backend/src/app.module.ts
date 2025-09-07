@@ -9,11 +9,12 @@ import { DatabaseModule } from './database/database.module';
 import { PositionsModule } from './positions/positions.module';
 import { WithdrawalsModule } from './withdrawals/withdrawals.module';
 import { DepositsModule } from './deposits/deposits.module';
+import { WalletsModule } from './wallets/wallets.module';
 
 import { FirebaseDatabaseService } from './database/firebase-database.service';
 
 @Module({
-  imports: [AuthModule, ChatModule, DatabaseModule, PositionsModule, WithdrawalsModule, DepositsModule],
+  imports: [AuthModule, ChatModule, DatabaseModule, PositionsModule, WithdrawalsModule, DepositsModule, WalletsModule],
   controllers: [AppController],
   providers: [
     AppService,

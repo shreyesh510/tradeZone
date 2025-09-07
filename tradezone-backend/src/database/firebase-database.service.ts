@@ -25,6 +25,8 @@ export class FirebaseDatabaseService {
   private exitPositionsCollection = 'exit_positions';
   private withdrawalsCollection = 'withdrawals';
   private depositsCollection = 'deposits';
+  private walletsCollection = 'wallets';
+  private walletHistoryCollection = 'walletHistory';
 
   constructor(private firebaseConfig: FirebaseConfig) {
     // Firestore will be initialized in onModuleInit
@@ -701,6 +703,134 @@ export class FirebaseDatabaseService {
     } catch (error) {
       console.error('Error deleting withdrawal:', error);
       return false;
+    }
+  }
+
+  // Wallets operations
+  async createWallet(data: Omit<import('../wallets/entities/wallet.entity').Wallet, 'id'>): Promise<import('../wallets/entities/wallet.entity').Wallet> {
+    try {
+      const db = this.getFirestore();
+      const now = data.createdAt ?? new Date();
+      const raw = { ...data, createdAt: now, updatedAt: now } as Record<string, any>;
+      const payload = Object.entries(raw).reduce((acc, [k, v]) => {
+        if (v !== undefined) (acc as any)[k] = v;
+        return acc;
+      }, {} as Record<string, any>);
+      const docRef = await db.collection(this.walletsCollection).add(payload);
+      // Log to walletHistory on create
+      try {
+        await db.collection(this.walletHistoryCollection).add({
+          userId: payload.userId,
+          walletId: docRef.id,
+          action: 'create',
+          data: payload,
+          createdAt: now,
+        });
+      } catch (e) {
+        console.error('Error logging wallet history (create):', e);
+      }
+      const createdAt = this.serializeDate(payload.createdAt);
+      const updatedAt = this.serializeDate(payload.updatedAt);
+      return { id: docRef.id, ...(payload as any), createdAt, updatedAt } as any;
+    } catch (error) {
+      console.error('Error creating wallet:', error);
+      throw error;
+    }
+  }
+
+  async getWallets(userId: string): Promise<import('../wallets/entities/wallet.entity').Wallet[]> {
+    try {
+      const snapshot = await this.getFirestore()
+        .collection(this.walletsCollection)
+        .where('userId', '==', userId)
+        .get();
+      const items = snapshot.docs.map((d) => {
+        const data = d.data() as any;
+        const createdAt = this.serializeDate(data.createdAt);
+        const updatedAt = this.serializeDate(data.updatedAt);
+        return { id: d.id, ...data, createdAt, updatedAt };
+      }) as any[];
+      return items.sort((a, b) => {
+        const aTime = a.createdAt ? new Date(a.createdAt as any).getTime() : 0;
+        const bTime = b.createdAt ? new Date(b.createdAt as any).getTime() : 0;
+        return bTime - aTime;
+      }) as any;
+    } catch (error) {
+      console.error('Error getting wallets:', error);
+      return [] as any;
+    }
+  }
+
+  async updateWallet(userId: string, id: string, data: Partial<import('../wallets/entities/wallet.entity').Wallet>): Promise<boolean> {
+    try {
+      const db = this.getFirestore();
+      const ref = db.collection(this.walletsCollection).doc(id);
+      const snap = await ref.get();
+      if (!snap.exists) return false;
+      const existing = snap.data() as any;
+      if (!existing || existing.userId !== userId) return false;
+      const raw = { ...data, updatedAt: new Date() } as Record<string, any>;
+      const payload = Object.entries(raw).reduce((acc, [k, v]) => {
+        if (v !== undefined) (acc as any)[k] = v;
+        return acc;
+      }, {} as Record<string, any>);
+      await ref.update(payload);
+      // Log to walletHistory on update
+      try {
+        await db.collection(this.walletHistoryCollection).add({
+          userId,
+          walletId: id,
+          action: 'update',
+          data: payload,
+          createdAt: new Date(),
+        });
+      } catch (e) {
+        console.error('Error logging wallet history (update):', e);
+      }
+      return true;
+    } catch (error) {
+      console.error('Error updating wallet:', error);
+      return false;
+    }
+  }
+
+  async deleteWallet(userId: string, id: string): Promise<boolean> {
+    try {
+      const db = this.getFirestore();
+      const ref = db.collection(this.walletsCollection).doc(id);
+      const snap = await ref.get();
+      if (!snap.exists) return false;
+      const existing = snap.data() as any;
+      if (!existing || existing.userId !== userId) return false;
+      await ref.delete();
+      return true;
+    } catch (error) {
+      console.error('Error deleting wallet:', error);
+      return false;
+    }
+  }
+
+  // Wallet history retrieval
+  async getWalletHistory(userId: string, limit?: number): Promise<any[]> {
+    try {
+      const snap = await this.getFirestore()
+        .collection(this.walletHistoryCollection)
+        .where('userId', '==', userId)
+        .get();
+      const items = snap.docs.map((d) => {
+        const data = d.data() as any;
+        const createdAt = this.serializeDate(data.createdAt);
+        return { id: d.id, ...data, createdAt };
+      });
+      const sorted = items.sort((a, b) => {
+        const aT = a.createdAt ? new Date(a.createdAt as any).getTime() : 0;
+        const bT = b.createdAt ? new Date(b.createdAt as any).getTime() : 0;
+        return bT - aT;
+      });
+      return typeof limit === 'number' && limit > 0 ? sorted.slice(0, limit) : sorted;
+    } catch (error) {
+      console.error('Error fetching wallet history:', error);
+      return [];
     }
   }
 

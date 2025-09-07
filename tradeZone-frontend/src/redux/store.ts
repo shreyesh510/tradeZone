@@ -5,6 +5,7 @@ import openaiReducer from './slices/openaiSlice';
 import positionsReducer from './slices/positionsSlice';
 import withdrawalsReducer from './slices/withdrawalsSlice';
 import depositsReducer from './slices/depositsSlice';
+import walletsReducer from './slices/walletsSlice';
 
 export const store = configureStore({
   reducer: {
@@ -14,6 +15,7 @@ export const store = configureStore({
     positions: positionsReducer,
   withdrawals: withdrawalsReducer,
   deposits: depositsReducer,
+  wallets: walletsReducer,
   },
 });
 

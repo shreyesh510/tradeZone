@@ -17,6 +17,7 @@ import SymbolPositions from './pages/investment/positions/SymbolPositions';
 import InvestmentDashboard from './pages/investment/dashboard';
 import Withdraw from './pages/investment/withdraw';
 import Deposit from './pages/investment/deposit';
+import WalletsPage from './pages/wallets';
 import './index.css';
 
 // Protected Route Component
@@ -147,11 +148,37 @@ function App() {
                   } 
                 />
 
+                {/* Wallets Route (under Investment) */}
+                <Route
+                  path="/investment/wallets"
+                  element={
+                    <ProtectedRoute>
+                      <WalletsPage />
+                    </ProtectedRoute>
+                  }
+                />
+
+                {/* Fallback for unknown routes to avoid blank screens */}
+                <Route
+                  path="*"
+                  element={
+                    isAuthenticated ? (
+                      <Navigate to="/zone" replace />
+                    ) : (
+                      <Navigate to="/login" replace />
+                    )
+                  }
+                />
+
                 <Route 
                   path="/" 
                   element={
                     isAuthenticated ? <Navigate to="/zone" replace /> : <Navigate to="/login" replace />
                   } 
+                />
+                <Route 
+                  path="*" 
+                  element={<Navigate to="/zone" replace />} 
                 />
               </Routes>
               
