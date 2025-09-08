@@ -873,6 +873,130 @@ export class FirebaseDatabaseService {
     }
   }
 
+  // --- Positions bulk import helpers ---
+  private base64Url(input: string): string {
+    try {
+      return Buffer.from(input).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+    } catch {
+      // Fallback simple hash
+      let h = 0;
+      for (let i = 0; i < input.length; i++) {
+        h = (h * 31 + input.charCodeAt(i)) >>> 0;
+      }
+      return h.toString(36);
+    }
+  }
+
+  private makeImportDocId(userId: string, key: string): string {
+    return `imp_${this.base64Url(`${userId}|${key}`)}`;
+  }
+
+  private normalizeDateKey(value: any): string {
+    const d = this.toDateLike(value);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  private toDateLike(value: any): Date {
+    // Similar to serialize helpers, but always returns a Date (defaults now)
+    if (!value) return new Date();
+    const anyVal: any = value;
+    if (anyVal && typeof anyVal.toDate === 'function') {
+      try { const d = anyVal.toDate(); if (d instanceof Date && !isNaN(d.getTime())) return d; } catch {}
+    }
+    if (typeof anyVal === 'object' && (('seconds' in anyVal) || ('_seconds' in anyVal))) {
+      const seconds = anyVal.seconds ?? anyVal._seconds ?? 0;
+      const nanos = anyVal.nanoseconds ?? anyVal._nanoseconds ?? 0;
+      const ms = seconds * 1000 + Math.floor(nanos / 1e6);
+      const d = new Date(ms);
+      if (!isNaN(d.getTime())) return d;
+    }
+    if (anyVal instanceof Date) return !isNaN(anyVal.getTime()) ? anyVal : new Date();
+    const parsed = new Date(anyVal);
+    return !isNaN(parsed.getTime()) ? parsed : new Date();
+  }
+
+  /**
+   * Create a position with deterministic doc id for deduping imports.
+   * If a doc with the same id exists, skip creation.
+   */
+  async createPositionImported(userId: string, data: Partial<import('../positions/entities/position.entity').Position> & { importKey: string }): Promise<{ created: boolean; id: string; }>
+  {
+    const db = this.getFirestore();
+    const id = this.makeImportDocId(userId, data.importKey);
+    const ref = db.collection(this.positionsCollection).doc(id);
+    const snap = await ref.get();
+    if (snap.exists) {
+      return { created: false, id };
+    }
+    const now = new Date();
+    const payload: Record<string, any> = {
+      userId,
+      symbol: (data.symbol || '').toString().toUpperCase(),
+      side: (data.side === 'sell' ? 'sell' : 'buy'),
+      entryPrice: Number(data.entryPrice) || 0,
+      lots: Number(data.lots) || 0,
+      investedAmount: Number(data.investedAmount ?? (Number(data.entryPrice) || 0) * (Number(data.lots) || 0)) || 0,
+      platform: (data.platform as any) || 'Delta Exchange',
+      leverage: data.leverage,
+      account: (data.account as any) || 'main',
+      timestamp: data.timestamp || now.toISOString(),
+      status: (data.status as any) || 'open',
+      createdAt: now,
+      updatedAt: now,
+      importKey: data.importKey,
+    };
+    await ref.set(payload);
+    // History (best-effort)
+    try {
+      await this.addPositionHistoryEntry({
+        userId,
+        action: 'create',
+        positionId: id,
+        symbol: payload.symbol,
+        details: { imported: true, ...payload },
+      });
+    } catch {}
+    return { created: true, id };
+  }
+
+  /**
+   * Bulk import positions with deduping. Dedupe key is built as
+   * date|symbol|account|platform|entry|lots.
+   */
+  async createPositionsBulk(userId: string, items: Array<Partial<import('../positions/entities/position.entity').Position> & { date?: any }>): Promise<{ created: number; skipped: number; ids: string[] }>
+  {
+    let created = 0;
+    let skipped = 0;
+    const ids: string[] = [];
+    for (const raw of items) {
+      const symbol = (raw.symbol || '').toString().toUpperCase();
+      if (!symbol) { skipped++; continue; }
+      const lots = Number(raw.lots) || 0;
+      const entry = Number(raw.entryPrice) || 0;
+      if (!lots || !entry) { skipped++; continue; }
+      const account = (raw.account as any) || 'main';
+      const platform = (raw.platform as any) || 'Delta Exchange';
+      const dateKey = this.normalizeDateKey(raw.date || raw.timestamp || new Date());
+      const key = `${dateKey}|${symbol}|${account}|${platform}|${entry}|${lots}`;
+      const res = await this.createPositionImported(userId, {
+        ...raw,
+        symbol,
+        lots,
+        entryPrice: entry,
+        account,
+        platform,
+        timestamp: raw.timestamp || new Date(dateKey + 'T00:00:00Z').toISOString(),
+        importKey: key,
+      } as any);
+      ids.push(res.id);
+      if (res.created) created++; else skipped++;
+    }
+    return { created, skipped, ids };
+  }
+
   async getWallets(userId: string): Promise<import('../wallets/entities/wallet.entity').Wallet[]> {
     try {
       const snapshot = await this.getFirestore()

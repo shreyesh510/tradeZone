@@ -23,6 +23,7 @@ import {
   ModifyPositionModal,
   ClosePositionModal
 } from './components';
+import ImportPositionsModal from './components/ImportPositionsModal';
 import { positionsApi } from '../../../services/positionsApi';
 
 interface OnlineUser {
@@ -50,6 +51,7 @@ const Positions = memo(function Positions() {
   const [isMobile, setIsMobile] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<MobileTab>('chart');
   const [showAddForm, setShowAddForm] = useState<boolean>(false);
+  const [showImport, setShowImport] = useState<boolean>(false);
   // Close modal state
   const [showCloseModal, setShowCloseModal] = useState<boolean>(false);
   const [closePnL, setClosePnL] = useState<string>('');
@@ -69,6 +71,7 @@ const Positions = memo(function Positions() {
     account: 'longterm' as 'all' | 'main' | 'longterm',
     platform: 'Delta Exchange' as 'all' | 'Delta Exchange' | 'Groww',
   });
+  const [search, setSearch] = useState<string>('');
 
   // Redux state
   const { positions, loading, createLoading, updateLoading, error } = useSelector((state: RootState) => state.positions);
@@ -270,8 +273,12 @@ const Positions = memo(function Positions() {
     }));
   };
 
-  // Server now applies filters; keep unique reduction only
-  const filteredPositions = uniquePositions;
+  // Server applies most filters; apply client-side search by name (symbol) for partial matches
+  const filteredPositions = useMemo(() => {
+    const q = (search || '').trim().toUpperCase();
+    if (!q) return uniquePositions;
+    return uniquePositions.filter((p: any) => (p.symbol || '').toUpperCase().includes(q));
+  }, [uniquePositions, search]);
 
   const content = (
     <div className={`flex-1 p-6 overflow-y-auto ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-900'}`}>
@@ -290,6 +297,13 @@ const Positions = memo(function Positions() {
         <div className="flex items-center justify-between">
           <h1 className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Positions</h1>
           <div className="flex space-x-3">
+            {/* Import Excel Button */}
+            <button
+              onClick={() => setShowImport(true)}
+              className={`px-6 py-3 rounded-lg font-medium transition-colors ${isDarkMode ? 'bg-purple-600 hover:bg-purple-700 text-white' : 'bg-purple-600 hover:bg-purple-700 text-white'}`}
+            >
+              Import Excel
+            </button>
             {/* Add Position Button */}
             <button
               onClick={() => setShowAddForm(!showAddForm)}
@@ -401,9 +415,23 @@ const Positions = memo(function Positions() {
             </select>
           </div>
 
+          {/* Search by Name */}
+          <div className="flex items-center space-x-2">
+            <label className={`text-xs font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+              Search:
+            </label>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by name"
+              className={`px-3 py-1 rounded-lg text-sm border ${isDarkMode ? 'bg-gray-700/50 border-gray-600/50 text-white placeholder-gray-400' : 'bg-white/70 border-gray-300/50 text-gray-900 placeholder-gray-500'}`}
+            />
+          </div>
+
           {/* Clear Filters Button */}
           <button
-            onClick={() => setFilters({ timeframe: '1D', side: 'all', account: 'longterm', platform: 'Delta Exchange' })}
+            onClick={() => { setFilters({ timeframe: '1D', side: 'all', account: 'longterm', platform: 'Delta Exchange' }); setSearch(''); }}
             className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
               isDarkMode 
                 ? 'bg-gray-700/50 text-gray-300 hover:bg-gray-600/50' 
@@ -772,6 +800,23 @@ const Positions = memo(function Positions() {
       <Header onlineUsers={onlineUsers} sidebarOpen={sidebarOpen} onSidebarToggle={toggleSidebar} />
       <Sidebar isOpen={sidebarOpen} onToggle={toggleSidebar} />
       <div className="flex-1 flex min-h-0 overflow-hidden">{content}</div>
+
+      {/* Import Modal */}
+      {showImport && (
+        <ImportPositionsModal
+          open={showImport}
+          isDarkMode={isDarkMode}
+          onClose={() => setShowImport(false)}
+          onImported={async () => {
+            const f: any = { status: 'open', timeframe: filters.timeframe };
+            if (filters.side !== 'all') f.side = filters.side;
+            if (filters.platform !== 'all') f.platform = filters.platform;
+            if (filters.account !== 'all') f.account = filters.account;
+            await dispatch(fetchPositions(f));
+            try { setActivityLoading(true); const items = await positionsApi.getHistory(20); setActivity(items || []); } finally { setActivityLoading(false); }
+          }}
+        />
+      )}
 
       {/* Close Modal */}
       {showCloseModal && (

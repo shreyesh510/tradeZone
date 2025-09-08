@@ -216,6 +216,28 @@ export class PositionsService {
     return await this.firebaseDatabaseService.getPositionHistory(userId, limit);
   }
 
+  // Bulk import positions with deduping using deterministic keys
+  async bulkImport(userId: string, items: Array<any>, defaultAccount?: 'main' | 'longterm') {
+    const normalized = Array.isArray(items) ? items.map((x) => {
+      const obj = { ...(x || {}) } as any;
+      if (!obj.account && defaultAccount) obj.account = defaultAccount;
+      // Normalize field names from typical Excel headers
+      if (obj.Symbol && !obj.symbol) obj.symbol = String(obj.Symbol);
+      if (obj.Lots && !obj.lots) obj.lots = Number(obj.Lots);
+      if ((obj.Entry || obj['Entry Price']) && !obj.entryPrice) obj.entryPrice = Number(obj.Entry ?? obj['Entry Price']);
+      if ((obj.Amount || obj.Invested || obj.Margin) && obj.investedAmount === undefined) {
+        const n = Number(obj.Amount ?? obj.Invested ?? obj.Margin);
+        if (Number.isFinite(n)) obj.investedAmount = n;
+      }
+      if (obj.Side && !obj.side) obj.side = String(obj.Side).toLowerCase() === 'sell' ? 'sell' : 'buy';
+      if (obj.Platform && !obj.platform) obj.platform = obj.Platform;
+      if (obj.Date && !obj.date) obj.date = obj.Date;
+      if (obj.Timestamp && !obj.timestamp) obj.timestamp = obj.Timestamp;
+      return obj;
+    }) : [];
+    return await this.firebaseDatabaseService.createPositionsBulk(userId, normalized);
+  }
+
   // Helper: same calendar day check
   private isSameDay(a: Date, b: Date) {
     return (
