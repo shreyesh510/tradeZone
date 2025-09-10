@@ -111,6 +111,11 @@ export class TradePnLService {
     items: CreateTradePnLDto[],
     userId: string,
   ): Promise<BulkImportResult> {
+    type ImportItemResult =
+      | { type: 'created' }
+      | { type: 'skipped' }
+      | { type: 'error'; message: string };
+
     const result: BulkImportResult = {
       created: 0,
       skipped: 0,
@@ -126,7 +131,7 @@ export class TradePnLService {
       console.log(`Processing batch ${Math.floor(i / batchSize) + 1} of ${Math.ceil(items.length / batchSize)} (${batch.length} items)`);
       
       // Process each item in the batch
-      const batchPromises = batch.map(async (item) => {
+      const batchPromises: Promise<ImportItemResult>[] = batch.map(async (item): Promise<ImportItemResult> => {
         try {
           // Skip if netPnL is zero (no realized P&L)
           if (item.netPnL === 0) {
@@ -137,15 +142,15 @@ export class TradePnLService {
           await this.create(item, userId);
           return { type: 'created' };
         } catch (error) {
-          return { 
-            type: 'error', 
-            message: `Failed to create record for ${item.date}: ${error.message}` 
+          return {
+            type: 'error',
+            message: `Failed to create record for ${item.date}: ${error?.message || 'Unknown error'}`,
           };
         }
       });
 
       // Wait for the batch to complete
-      const batchResults = await Promise.all(batchPromises);
+      const batchResults: ImportItemResult[] = await Promise.all(batchPromises);
       
       // Aggregate results
       batchResults.forEach(batchResult => {
