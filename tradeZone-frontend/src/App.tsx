@@ -17,6 +17,7 @@ import InvestmentDashboard from './pages/investment/dashboard';
 import Withdraw from './pages/investment/withdraw';
 import Deposit from './pages/investment/deposit';
 import WalletsPage from './pages/wallets';
+import TradePnL from './pages/investment/trade-pnl';
 import './index.css';
 
 // Protected Route Component
@@ -145,6 +146,16 @@ function App() {
                   element={
                     <ProtectedRoute>
                       <WalletsPage />
+                    </ProtectedRoute>
+                  }
+                />
+
+                {/* Trade P&L Route (under Investment) */}
+                <Route
+                  path="/investment/trade-pnl"
+                  element={
+                    <ProtectedRoute>
+                      <TradePnL />
                     </ProtectedRoute>
                   }
                 />

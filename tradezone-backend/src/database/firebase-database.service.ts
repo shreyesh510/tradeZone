@@ -29,6 +29,7 @@ export class FirebaseDatabaseService {
   private walletsCollection = 'wallets';
   // New collection for explicit wallet history entries
   private walletHistoryCollection = 'wallet_history';
+  private tradePnLCollection = 'tradePnL';
 
   constructor(private firebaseConfig: FirebaseConfig) {
     // Firestore will be initialized in onModuleInit
@@ -1197,6 +1198,103 @@ export class FirebaseDatabaseService {
     } catch (error) {
       console.error('Error closing positions by symbol for user:', error);
       return 0;
+    }
+  }
+
+  // Trade P&L operations
+  async createTradePnL(data: Omit<import('../trade-pnl/trade-pnl.service').TradePnL, 'id'>): Promise<import('../trade-pnl/trade-pnl.service').TradePnL> {
+    try {
+      const db = this.getFirestore();
+      const now = data.createdAt ?? new Date();
+      const raw = { ...data, createdAt: now, updatedAt: now } as Record<string, any>;
+      const payload = Object.entries(raw).reduce((acc, [k, v]) => {
+        if (v !== undefined) (acc as any)[k] = v;
+        return acc;
+      }, {} as Record<string, any>);
+      const docRef = await db.collection(this.tradePnLCollection).add(payload);
+      const createdAt = this.serializeDate(payload.createdAt);
+      const updatedAt = this.serializeDate(payload.updatedAt);
+      return { id: docRef.id, ...(payload as any), createdAt, updatedAt } as any;
+    } catch (error) {
+      console.error('Error creating trade P&L:', error);
+      throw error;
+    }
+  }
+
+  async getTradePnL(userId: string): Promise<import('../trade-pnl/trade-pnl.service').TradePnL[]> {
+    try {
+      const snapshot = await this.getFirestore()
+        .collection(this.tradePnLCollection)
+        .where('userId', '==', userId)
+        .get();
+      const items = snapshot.docs.map((d) => {
+        const data = d.data() as any;
+        const createdAt = this.serializeDate(data.createdAt);
+        const updatedAt = this.serializeDate(data.updatedAt);
+        return { id: d.id, ...data, createdAt, updatedAt };
+      }) as any[];
+      return items.sort((a, b) => {
+        const aTime = a.date ? new Date(a.date as any).getTime() : 0;
+        const bTime = b.date ? new Date(b.date as any).getTime() : 0;
+        return bTime - aTime;
+      }) as any;
+    } catch (error) {
+      console.error('Error getting trade P&L:', error);
+      return [] as any;
+    }
+  }
+
+  async updateTradePnL(userId: string, id: string, data: Partial<import('../trade-pnl/trade-pnl.service').TradePnL>): Promise<boolean> {
+    try {
+      const db = this.getFirestore();
+      const ref = db.collection(this.tradePnLCollection).doc(id);
+      const snap = await ref.get();
+      if (!snap.exists) return false;
+      const existing = snap.data() as any;
+      if (!existing || existing.userId !== userId) return false;
+      const raw = { ...data, updatedAt: new Date() } as Record<string, any>;
+      const payload = Object.entries(raw).reduce((acc, [k, v]) => {
+        if (v !== undefined) (acc as any)[k] = v;
+        return acc;
+      }, {} as Record<string, any>);
+      await ref.update(payload);
+      return true;
+    } catch (error) {
+      console.error('Error updating trade P&L:', error);
+      return false;
+    }
+  }
+
+  async deleteTradePnL(userId: string, id: string): Promise<boolean> {
+    try {
+      const db = this.getFirestore();
+      const ref = db.collection(this.tradePnLCollection).doc(id);
+      const snap = await ref.get();
+      if (!snap.exists) return false;
+      const existing = snap.data() as any;
+      if (!existing || existing.userId !== userId) return false;
+      await ref.delete();
+      return true;
+    } catch (error) {
+      console.error('Error deleting trade P&L:', error);
+      return false;
+    }
+  }
+
+  async getTradePnLById(userId: string, id: string): Promise<import('../trade-pnl/trade-pnl.service').TradePnL | null> {
+    try {
+      const db = this.getFirestore();
+      const ref = db.collection(this.tradePnLCollection).doc(id);
+      const snap = await ref.get();
+      if (!snap.exists) return null;
+      const data = snap.data() as any;
+      if (!data || data.userId !== userId) return null;
+      const createdAt = this.serializeDate(data.createdAt);
+      const updatedAt = this.serializeDate(data.updatedAt);
+      return { id: snap.id, ...data, createdAt, updatedAt } as any;
+    } catch (error) {
+      console.error('Error getting trade P&L by id:', error);
+      return null;
     }
   }
 }
