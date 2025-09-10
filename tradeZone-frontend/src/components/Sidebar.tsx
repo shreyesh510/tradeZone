@@ -63,6 +63,11 @@ const Sidebar = memo(function Sidebar({ isOpen, onToggle }: SidebarProps) {
     onToggle(); // Close sidebar after navigation
   };
 
+  const goToTradePnL = () => {
+    navigate('/investment/trade-pnl');
+    onToggle(); // Close sidebar after navigation
+  };
+
   return (
     <>
       {/* Backdrop Overlay */}
@@ -248,6 +253,23 @@ const Sidebar = memo(function Sidebar({ isOpen, onToggle }: SidebarProps) {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-2m0-4h4m0 0l-2-2m2 2l-2 2" />
                       </svg>
                       <span className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Wallets</span>
+                    </div>
+                  </button>
+
+                  {/* Trade P&L Submenu */}
+                  <button
+                    onClick={goToTradePnL}
+                    className={`flex items-center px-8 py-3 text-left transition-all duration-200 w-full ${
+                      isDarkMode 
+                        ? 'bg-transparent hover:bg-gray-700' 
+                        : 'bg-transparent hover:bg-gray-100'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                      </svg>
+                      <span className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Trade P&L</span>
                     </div>
                   </button>
                 </div>

@@ -100,7 +100,19 @@ export class PositionsController {
     return await this.positionsService.getBySymbol(userId, symbol);
   }
 
-  // Removed bulk create endpoint
+  // Bulk import endpoint: accepts JSON { account?: 'main'|'longterm', items: Array<...> }
+  @Post('multi')
+  async bulkImport(
+    @Body() body: { account?: 'main' | 'longterm'; items: Array<any> },
+    @Request() req,
+  ) {
+    const userId = req.user.userId;
+    if (!body || !Array.isArray(body.items)) {
+      return { created: 0, skipped: 0, ids: [], error: 'items array required' };
+    }
+    // Forward to service
+    return await this.positionsService.bulkImport(userId, body.items, body.account);
+  }
 
   // Removed close-all endpoint
 

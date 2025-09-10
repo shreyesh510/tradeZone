@@ -29,6 +29,7 @@ export class FirebaseDatabaseService {
   private walletsCollection = 'wallets';
   // New collection for explicit wallet history entries
   private walletHistoryCollection = 'wallet_history';
+  private tradePnLCollection = 'tradePnL';
 
   constructor(private firebaseConfig: FirebaseConfig) {
     // Firestore will be initialized in onModuleInit
@@ -855,11 +856,19 @@ export class FirebaseDatabaseService {
 
       // Record history entry
       try {
+        const snapshot = {
+          name: payload.name,
+          platform: payload.platform,
+          balance: payload.balance,
+          currency: payload.currency,
+          address: payload.address,
+          notes: payload.notes,
+        };
         await db.collection(this.walletHistoryCollection).add({
           userId: payload.userId,
           walletId: docRef.id,
           action: 'create',
-          data: { ...payload },
+          data: { next: snapshot, name: payload.name },
           createdAt: new Date(),
           updatedAt: new Date(),
         });
@@ -871,6 +880,130 @@ export class FirebaseDatabaseService {
       console.error('Error creating wallet:', error);
       throw error;
     }
+  }
+
+  // --- Positions bulk import helpers ---
+  private base64Url(input: string): string {
+    try {
+      return Buffer.from(input).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+    } catch {
+      // Fallback simple hash
+      let h = 0;
+      for (let i = 0; i < input.length; i++) {
+        h = (h * 31 + input.charCodeAt(i)) >>> 0;
+      }
+      return h.toString(36);
+    }
+  }
+
+  private makeImportDocId(userId: string, key: string): string {
+    return `imp_${this.base64Url(`${userId}|${key}`)}`;
+  }
+
+  private normalizeDateKey(value: any): string {
+    const d = this.toDateLike(value);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  private toDateLike(value: any): Date {
+    // Similar to serialize helpers, but always returns a Date (defaults now)
+    if (!value) return new Date();
+    const anyVal: any = value;
+    if (anyVal && typeof anyVal.toDate === 'function') {
+      try { const d = anyVal.toDate(); if (d instanceof Date && !isNaN(d.getTime())) return d; } catch {}
+    }
+    if (typeof anyVal === 'object' && (('seconds' in anyVal) || ('_seconds' in anyVal))) {
+      const seconds = anyVal.seconds ?? anyVal._seconds ?? 0;
+      const nanos = anyVal.nanoseconds ?? anyVal._nanoseconds ?? 0;
+      const ms = seconds * 1000 + Math.floor(nanos / 1e6);
+      const d = new Date(ms);
+      if (!isNaN(d.getTime())) return d;
+    }
+    if (anyVal instanceof Date) return !isNaN(anyVal.getTime()) ? anyVal : new Date();
+    const parsed = new Date(anyVal);
+    return !isNaN(parsed.getTime()) ? parsed : new Date();
+  }
+
+  /**
+   * Create a position with deterministic doc id for deduping imports.
+   * If a doc with the same id exists, skip creation.
+   */
+  async createPositionImported(userId: string, data: Partial<import('../positions/entities/position.entity').Position> & { importKey: string }): Promise<{ created: boolean; id: string; }>
+  {
+    const db = this.getFirestore();
+    const id = this.makeImportDocId(userId, data.importKey);
+    const ref = db.collection(this.positionsCollection).doc(id);
+    const snap = await ref.get();
+    if (snap.exists) {
+      return { created: false, id };
+    }
+    const now = new Date();
+    const payload: Record<string, any> = {
+      userId,
+      symbol: (data.symbol || '').toString().toUpperCase(),
+      side: (data.side === 'sell' ? 'sell' : 'buy'),
+      entryPrice: Number(data.entryPrice) || 0,
+      lots: Number(data.lots) || 0,
+      investedAmount: Number(data.investedAmount ?? (Number(data.entryPrice) || 0) * (Number(data.lots) || 0)) || 0,
+      platform: (data.platform as any) || 'Delta Exchange',
+      leverage: data.leverage,
+      account: (data.account as any) || 'main',
+      timestamp: data.timestamp || now.toISOString(),
+      status: (data.status as any) || 'open',
+      createdAt: now,
+      updatedAt: now,
+      importKey: data.importKey,
+    };
+    await ref.set(payload);
+    // History (best-effort)
+    try {
+      await this.addPositionHistoryEntry({
+        userId,
+        action: 'create',
+        positionId: id,
+        symbol: payload.symbol,
+        details: { imported: true, ...payload },
+      });
+    } catch {}
+    return { created: true, id };
+  }
+
+  /**
+   * Bulk import positions with deduping. Dedupe key is built as
+   * date|symbol|account|platform|entry|lots.
+   */
+  async createPositionsBulk(userId: string, items: Array<Partial<import('../positions/entities/position.entity').Position> & { date?: any }>): Promise<{ created: number; skipped: number; ids: string[] }>
+  {
+    let created = 0;
+    let skipped = 0;
+    const ids: string[] = [];
+    for (const raw of items) {
+      const symbol = (raw.symbol || '').toString().toUpperCase();
+      if (!symbol) { skipped++; continue; }
+      const lots = Number(raw.lots) || 0;
+      const entry = Number(raw.entryPrice) || 0;
+      if (!lots || !entry) { skipped++; continue; }
+      const account = (raw.account as any) || 'main';
+      const platform = (raw.platform as any) || 'Delta Exchange';
+      const dateKey = this.normalizeDateKey(raw.date || raw.timestamp || new Date());
+      const key = `${dateKey}|${symbol}|${account}|${platform}|${entry}|${lots}`;
+      const res = await this.createPositionImported(userId, {
+        ...raw,
+        symbol,
+        lots,
+        entryPrice: entry,
+        account,
+        platform,
+        timestamp: raw.timestamp || new Date(dateKey + 'T00:00:00Z').toISOString(),
+        importKey: key,
+      } as any);
+      ids.push(res.id);
+      if (res.created) created++; else skipped++;
+    }
+    return { created, skipped, ids };
   }
 
   async getWallets(userId: string): Promise<import('../wallets/entities/wallet.entity').Wallet[]> {
@@ -912,11 +1045,22 @@ export class FirebaseDatabaseService {
       await ref.update(payload);
       // Record history entry
       try {
+        const fields = ['name', 'platform', 'balance', 'currency', 'address', 'notes'] as const;
+        const prev = fields.reduce((acc, k) => ({ ...acc, [k]: existing[k] }), {} as Record<string, any>);
+        const next = fields.reduce((acc, k) => ({ ...acc, [k]: (k in payload ? (payload as any)[k] : existing[k]) }), {} as Record<string, any>);
+        const changes = fields.reduce((acc, k) => {
+          const before = prev[k];
+          const after = next[k];
+          const changed = (before ?? null) !== (after ?? null);
+          if (changed) acc[k] = { from: before, to: after };
+          return acc;
+        }, {} as Record<string, { from: any; to: any }>);
+
         await db.collection(this.walletHistoryCollection).add({
           userId: existing.userId,
           walletId: id,
           action: 'update',
-          data: { ...payload },
+          data: { name: next.name ?? existing.name, prev, next, changes },
           createdAt: new Date(),
           updatedAt: new Date(),
         });
@@ -938,6 +1082,29 @@ export class FirebaseDatabaseService {
       if (!snap.exists) return false;
       const existing = snap.data() as any;
       if (!existing || existing.userId !== userId) return false;
+
+      // Write a history entry before deleting so UI can render context after removal
+      try {
+        const snapshot = {
+          name: existing.name,
+          platform: existing.platform,
+          balance: existing.balance,
+          currency: existing.currency,
+          address: existing.address,
+          notes: existing.notes,
+        };
+        await db.collection(this.walletHistoryCollection).add({
+          userId: existing.userId,
+          walletId: id,
+          action: 'delete',
+          data: { prev: snapshot, name: existing.name },
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+      } catch (e) {
+        console.warn('Failed to write wallet_history (delete):', e);
+      }
+
       await ref.delete();
       return true;
     } catch (error) {
@@ -1073,6 +1240,103 @@ export class FirebaseDatabaseService {
     } catch (error) {
       console.error('Error closing positions by symbol for user:', error);
       return 0;
+    }
+  }
+
+  // Trade P&L operations
+  async createTradePnL(data: Omit<import('../trade-pnl/trade-pnl.service').TradePnL, 'id'>): Promise<import('../trade-pnl/trade-pnl.service').TradePnL> {
+    try {
+      const db = this.getFirestore();
+      const now = data.createdAt ?? new Date();
+      const raw = { ...data, createdAt: now, updatedAt: now } as Record<string, any>;
+      const payload = Object.entries(raw).reduce((acc, [k, v]) => {
+        if (v !== undefined) (acc as any)[k] = v;
+        return acc;
+      }, {} as Record<string, any>);
+      const docRef = await db.collection(this.tradePnLCollection).add(payload);
+      const createdAt = this.serializeDate(payload.createdAt);
+      const updatedAt = this.serializeDate(payload.updatedAt);
+      return { id: docRef.id, ...(payload as any), createdAt, updatedAt } as any;
+    } catch (error) {
+      console.error('Error creating trade P&L:', error);
+      throw error;
+    }
+  }
+
+  async getTradePnL(userId: string): Promise<import('../trade-pnl/trade-pnl.service').TradePnL[]> {
+    try {
+      const snapshot = await this.getFirestore()
+        .collection(this.tradePnLCollection)
+        .where('userId', '==', userId)
+        .get();
+      const items = snapshot.docs.map((d) => {
+        const data = d.data() as any;
+        const createdAt = this.serializeDate(data.createdAt);
+        const updatedAt = this.serializeDate(data.updatedAt);
+        return { id: d.id, ...data, createdAt, updatedAt };
+      }) as any[];
+      return items.sort((a, b) => {
+        const aTime = a.date ? new Date(a.date as any).getTime() : 0;
+        const bTime = b.date ? new Date(b.date as any).getTime() : 0;
+        return bTime - aTime;
+      }) as any;
+    } catch (error) {
+      console.error('Error getting trade P&L:', error);
+      return [] as any;
+    }
+  }
+
+  async updateTradePnL(userId: string, id: string, data: Partial<import('../trade-pnl/trade-pnl.service').TradePnL>): Promise<boolean> {
+    try {
+      const db = this.getFirestore();
+      const ref = db.collection(this.tradePnLCollection).doc(id);
+      const snap = await ref.get();
+      if (!snap.exists) return false;
+      const existing = snap.data() as any;
+      if (!existing || existing.userId !== userId) return false;
+      const raw = { ...data, updatedAt: new Date() } as Record<string, any>;
+      const payload = Object.entries(raw).reduce((acc, [k, v]) => {
+        if (v !== undefined) (acc as any)[k] = v;
+        return acc;
+      }, {} as Record<string, any>);
+      await ref.update(payload);
+      return true;
+    } catch (error) {
+      console.error('Error updating trade P&L:', error);
+      return false;
+    }
+  }
+
+  async deleteTradePnL(userId: string, id: string): Promise<boolean> {
+    try {
+      const db = this.getFirestore();
+      const ref = db.collection(this.tradePnLCollection).doc(id);
+      const snap = await ref.get();
+      if (!snap.exists) return false;
+      const existing = snap.data() as any;
+      if (!existing || existing.userId !== userId) return false;
+      await ref.delete();
+      return true;
+    } catch (error) {
+      console.error('Error deleting trade P&L:', error);
+      return false;
+    }
+  }
+
+  async getTradePnLById(userId: string, id: string): Promise<import('../trade-pnl/trade-pnl.service').TradePnL | null> {
+    try {
+      const db = this.getFirestore();
+      const ref = db.collection(this.tradePnLCollection).doc(id);
+      const snap = await ref.get();
+      if (!snap.exists) return null;
+      const data = snap.data() as any;
+      if (!data || data.userId !== userId) return null;
+      const createdAt = this.serializeDate(data.createdAt);
+      const updatedAt = this.serializeDate(data.updatedAt);
+      return { id: snap.id, ...data, createdAt, updatedAt } as any;
+    } catch (error) {
+      console.error('Error getting trade P&L by id:', error);
+      return null;
     }
   }
 }

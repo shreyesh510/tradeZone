@@ -10,11 +10,12 @@ import { PositionsModule } from './positions/positions.module';
 import { WithdrawalsModule } from './withdrawals/withdrawals.module';
 import { DepositsModule } from './deposits/deposits.module';
 import { WalletsModule } from './wallets/wallets.module';
+import { TradePnLModule } from './trade-pnl/trade-pnl.module';
 
 import { FirebaseDatabaseService } from './database/firebase-database.service';
 
 @Module({
-  imports: [AuthModule, ChatModule, DatabaseModule, PositionsModule, WithdrawalsModule, DepositsModule, WalletsModule],
+  imports: [AuthModule, ChatModule, DatabaseModule, PositionsModule, WithdrawalsModule, DepositsModule, WalletsModule, TradePnLModule],
   controllers: [AppController],
   providers: [
     AppService,

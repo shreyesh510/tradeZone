@@ -86,4 +86,10 @@ export const positionsApi = {
     const response = await api.get(`/positions/history?limit=${limit}`);
     return response.data as any[];
   },
+
+  // Bulk import positions
+  importPositions: async (items: any[], account?: 'main' | 'longterm') => {
+    const response = await api.post('/positions/multi', { items, account });
+    return response.data as { created: number; skipped: number; ids: string[] };
+  },
 };

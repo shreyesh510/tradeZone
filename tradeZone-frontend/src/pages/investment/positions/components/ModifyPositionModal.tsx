@@ -55,17 +55,16 @@ const ModifyPositionModal: React.FC<ModifyPositionModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
       {/* Overlay for dimming background */}
-      <div className="absolute inset-0 bg-black/50" aria-hidden="true"></div>
+      <div className="absolute inset-0 bg-black/60" aria-hidden="true"></div>
       
       {/* Modal panel */}
       <div 
         onClick={(e) => e.stopPropagation()}
-        className={`relative z-10 rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col border ${
+        className={`relative z-10 rounded-2xl backdrop-blur-lg border max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col ${
           isDarkMode 
-            ? 'bg-gray-800/95 border-gray-700/50' 
-            : 'bg-white/95 border-white/20'
+            ? 'bg-gray-800/30 border-gray-700/50 shadow-xl shadow-gray-900/20' 
+            : 'bg-white/60 border-white/20 shadow-xl shadow-gray-900/10'
         }`}
-        style={{ boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.7)' }}
       >
         {/* Header */}
         <div className={`p-6 border-b ${
@@ -96,7 +95,7 @@ const ModifyPositionModal: React.FC<ModifyPositionModalProps> = ({
               <select
                 value={formData.platform || position.platform}
                 onChange={(e) => handleChange('platform', e.target.value as 'Delta Exchange' | 'Groww')}
-                className={`w-full p-3 rounded-xl border backdrop-blur-sm ${
+                className={`w-full p-3 rounded-2xl border backdrop-blur-lg ${
                   isDarkMode 
                     ? 'bg-gray-700/50 border-gray-600/50 text-white' 
                     : 'bg-white/70 border-gray-300/50 text-gray-900'
@@ -119,7 +118,7 @@ const ModifyPositionModal: React.FC<ModifyPositionModalProps> = ({
                 value={formData.symbol || position.symbol}
                 onChange={(e) => handleChange('symbol', e.target.value)}
                 placeholder="Enter investment name"
-                className={`w-full p-3 rounded-xl border backdrop-blur-sm ${
+                className={`w-full p-3 rounded-2xl border backdrop-blur-lg ${
                   isDarkMode 
                     ? 'bg-gray-700/50 border-gray-600/50 text-white placeholder-gray-400' 
                     : 'bg-white/70 border-gray-300/50 text-gray-900 placeholder-gray-500'
@@ -142,7 +141,7 @@ const ModifyPositionModal: React.FC<ModifyPositionModalProps> = ({
                 placeholder="Enter lots"
                 min="0.01"
                 step="0.01"
-                className={`w-full p-3 rounded-xl border backdrop-blur-sm ${
+                className={`w-full p-3 rounded-2xl border backdrop-blur-lg ${
                   isDarkMode 
                     ? 'bg-gray-700/50 border-gray-600/50 text-white placeholder-gray-400' 
                     : 'bg-white/70 border-gray-300/50 text-gray-900 placeholder-gray-500'
@@ -164,7 +163,7 @@ const ModifyPositionModal: React.FC<ModifyPositionModalProps> = ({
                 value={formData.investedAmount || position.investedAmount}
                 onChange={(e) => handleChange('investedAmount', parseFloat(e.target.value) || 0)}
                 placeholder="Invested amount"
-                className={`w-full p-3 rounded-xl border backdrop-blur-sm ${
+                className={`w-full p-3 rounded-2xl border backdrop-blur-lg ${
                   isDarkMode 
                     ? 'bg-gray-700/50 border-gray-600/50 text-white placeholder-gray-400' 
                     : 'bg-white/70 border-gray-300/50 text-gray-900 placeholder-gray-500'
@@ -180,7 +179,7 @@ const ModifyPositionModal: React.FC<ModifyPositionModalProps> = ({
               }`}>
                 Account
               </label>
-              <div className="flex rounded-xl overflow-hidden">
+              <div className="flex rounded-2xl overflow-hidden">
                 <button
                   type="button"
                   onClick={() => setAccount('main')}
@@ -218,7 +217,7 @@ const ModifyPositionModal: React.FC<ModifyPositionModalProps> = ({
             }`}>
               Side
             </label>
-            <div className="flex rounded-xl overflow-hidden">
+            <div className="flex rounded-2xl overflow-hidden">
               <button
                 type="button"
                 onClick={() => handleChange('side', 'buy')}
@@ -256,7 +255,7 @@ const ModifyPositionModal: React.FC<ModifyPositionModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className={`px-6 py-2.5 rounded-lg font-medium transition-colors ${
+            className={`px-6 py-2.5 rounded-2xl font-medium transition-colors ${
               isDarkMode
                 ? 'bg-gray-700/50 text-gray-300 hover:bg-gray-600/50'
                 : 'bg-gray-200/50 text-gray-700 hover:bg-gray-300/50'
@@ -267,7 +266,7 @@ const ModifyPositionModal: React.FC<ModifyPositionModalProps> = ({
           <button
             type="submit"
             onClick={handleSubmit}
-            className="px-6 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-medium rounded-lg hover:from-blue-600 hover:to-blue-700 transition-all duration-300"
+            className="px-6 py-2.5 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-medium rounded-2xl hover:from-blue-600 hover:to-blue-700 transition-all duration-300"
           >
             Save Changes
           </button>
