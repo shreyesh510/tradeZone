@@ -139,7 +139,7 @@ export class TradePnLService {
         } catch (error) {
           return { 
             type: 'error', 
-            message: `Failed to create record for ${item.date}: ${error.message}` 
+            message: `Failed to create record for ${item.date}: ${error?.message || 'Unknown error'}` 
           };
         }
       });
