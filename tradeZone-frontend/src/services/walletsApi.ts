@@ -16,7 +16,7 @@ export interface WalletHistoryItem {
   id: string;
   userId: string;
   walletId: string;
-  action: 'create' | 'update';
+  action: 'create' | 'update' | 'delete';
   data: any;
   createdAt: string;
 }

@@ -856,11 +856,19 @@ export class FirebaseDatabaseService {
 
       // Record history entry
       try {
+        const snapshot = {
+          name: payload.name,
+          platform: payload.platform,
+          balance: payload.balance,
+          currency: payload.currency,
+          address: payload.address,
+          notes: payload.notes,
+        };
         await db.collection(this.walletHistoryCollection).add({
           userId: payload.userId,
           walletId: docRef.id,
           action: 'create',
-          data: { ...payload },
+          data: { next: snapshot, name: payload.name },
           createdAt: new Date(),
           updatedAt: new Date(),
         });
@@ -1037,11 +1045,22 @@ export class FirebaseDatabaseService {
       await ref.update(payload);
       // Record history entry
       try {
+        const fields = ['name', 'platform', 'balance', 'currency', 'address', 'notes'] as const;
+        const prev = fields.reduce((acc, k) => ({ ...acc, [k]: existing[k] }), {} as Record<string, any>);
+        const next = fields.reduce((acc, k) => ({ ...acc, [k]: (k in payload ? (payload as any)[k] : existing[k]) }), {} as Record<string, any>);
+        const changes = fields.reduce((acc, k) => {
+          const before = prev[k];
+          const after = next[k];
+          const changed = (before ?? null) !== (after ?? null);
+          if (changed) acc[k] = { from: before, to: after };
+          return acc;
+        }, {} as Record<string, { from: any; to: any }>);
+
         await db.collection(this.walletHistoryCollection).add({
           userId: existing.userId,
           walletId: id,
           action: 'update',
-          data: { ...payload },
+          data: { name: next.name ?? existing.name, prev, next, changes },
           createdAt: new Date(),
           updatedAt: new Date(),
         });
@@ -1063,6 +1082,29 @@ export class FirebaseDatabaseService {
       if (!snap.exists) return false;
       const existing = snap.data() as any;
       if (!existing || existing.userId !== userId) return false;
+
+      // Write a history entry before deleting so UI can render context after removal
+      try {
+        const snapshot = {
+          name: existing.name,
+          platform: existing.platform,
+          balance: existing.balance,
+          currency: existing.currency,
+          address: existing.address,
+          notes: existing.notes,
+        };
+        await db.collection(this.walletHistoryCollection).add({
+          userId: existing.userId,
+          walletId: id,
+          action: 'delete',
+          data: { prev: snapshot, name: existing.name },
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+      } catch (e) {
+        console.warn('Failed to write wallet_history (delete):', e);
+      }
+
       await ref.delete();
       return true;
     } catch (error) {
