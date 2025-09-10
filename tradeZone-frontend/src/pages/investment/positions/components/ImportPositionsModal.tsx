@@ -80,8 +80,12 @@ const ImportPositionsModal: React.FC<Props> = ({ open, isDarkMode, onClose, onIm
       throw new Error(`Unsupported file format: ${fileExtension}`);
     }
     
+    console.log('Raw rows from file:', rows);
+    
     // Enhanced column mapping for various formats including Delta Exchange
-    return rows.map((r) => {
+    const mappedItems = rows.map((r, index) => {
+      console.log(`Processing row ${index}:`, r);
+      
       // Date mapping - handle various date formats
       const dateValue = r.Time || r.Date || r.date || r.Timestamp || r.timestamp || '';
       
@@ -128,7 +132,7 @@ const ImportPositionsModal: React.FC<Props> = ({ open, isDarkMode, onClose, onIm
       // P&L mapping for closed positions
       const pnl = Number(r['Realised P&L'] || r.RealisedPnL || r.PnL || r.pnl || 0) || undefined;
       
-      return {
+      const item = {
         date: dateValue,
         symbol: symbol,
         side: side,
@@ -139,28 +143,51 @@ const ImportPositionsModal: React.FC<Props> = ({ open, isDarkMode, onClose, onIm
         account: account,
         pnl: pnl, // Include P&L for reference
       };
-    }).filter(item => 
-      // Filter out invalid rows
-      item.symbol && 
-      item.lots > 0 && 
-      item.entryPrice > 0 &&
-      (item.investedAmount || 0) > 0
-    );
+      
+      console.log(`Mapped row ${index}:`, item);
+      return item;
+    });
+    
+    console.log('All mapped items:', mappedItems);
+    
+    const filteredItems = mappedItems.filter(item => {
+      const isValid = item.symbol && 
+        item.lots > 0 && 
+        item.entryPrice > 0 &&
+        (item.investedAmount || 0) > 0;
+      
+      if (!isValid) {
+        console.log('Filtered out invalid item:', item, {
+          hasSymbol: !!item.symbol,
+          hasLots: item.lots > 0,
+          hasEntryPrice: item.entryPrice > 0,
+          hasInvestedAmount: (item.investedAmount || 0) > 0
+        });
+      }
+      
+      return isValid;
+    });
+    
+    console.log('Filtered valid items:', filteredItems);
+    return filteredItems;
   };
 
   const handleParseFile = async () => {
     try {
       setBusy(true);
       const items = await parseFile();
+      console.log('Parsed items from file:', items);
+      console.log('Number of items:', items.length);
+      
       if (!items.length) {
-        alert('No rows found in the selected file.');
+        alert('No valid rows found in the selected file. Please check the file format and ensure it contains valid position data.');
         return;
       }
       setParsedItems(items);
       setShowConfirmation(true);
     } catch (e) {
-      console.error(e);
-      alert('Import failed. Please check your file format.');
+      console.error('Import error:', e);
+      alert(`Import failed: ${e.message || 'Please check your file format.'}`);
     } finally {
       setBusy(false);
     }

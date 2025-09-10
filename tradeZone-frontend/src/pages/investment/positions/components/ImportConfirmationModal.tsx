@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface ImportItem {
   date: string;
@@ -31,7 +31,12 @@ const ImportConfirmationModal: React.FC<Props> = ({
   onConfirm,
   loading = false 
 }) => {
-  const [confirmedItems, setConfirmedItems] = useState<ImportItem[]>(items);
+  const [confirmedItems, setConfirmedItems] = useState<ImportItem[]>([]);
+
+  // Update confirmedItems when items prop changes
+  useEffect(() => {
+    setConfirmedItems(items);
+  }, [items]);
 
   if (!open) return null;
 
@@ -113,8 +118,6 @@ const ImportConfirmationModal: React.FC<Props> = ({
                     <th className="text-left py-3 px-4 font-medium">Lots</th>
                     <th className="text-left py-3 px-4 font-medium">Entry Price</th>
                     <th className="text-left py-3 px-4 font-medium">Investment</th>
-                    <th className="text-left py-3 px-4 font-medium">Platform</th>
-                    <th className="text-left py-3 px-4 font-medium">P&L</th>
                     <th className="text-center py-3 px-4 font-medium">Action</th>
                   </tr>
                 </thead>
@@ -128,7 +131,25 @@ const ImportConfirmationModal: React.FC<Props> = ({
                           : 'border-gray-200/30 hover:bg-gray-100/30'
                       }`}
                     >
-                      <td className="py-3 px-4 text-sm">{item.date || 'N/A'}</td>
+                      <td className="py-3 px-4 text-sm">
+                        {(() => {
+                          if (!item.date) return 'N/A';
+                          
+                          // Try to parse the date string
+                          let dateStr = item.date;
+                          
+                          // Handle Delta Exchange format: "2025-09-05 20:27:42.507554+05:30 IST Asia/Kolkata"
+                          if (dateStr.includes(' IST ')) {
+                            dateStr = dateStr.split(' IST ')[0]; // Remove timezone info
+                          }
+                          
+                          // Extract just the date part (YYYY-MM-DD)
+                          const datePart = dateStr.split(' ')[0];
+                          
+                          const parsedDate = new Date(datePart);
+                          return !isNaN(parsedDate.getTime()) ? parsedDate.toLocaleDateString() : datePart;
+                        })()}
+                      </td>
                       <td className="py-3 px-4 font-medium">{item.symbol}</td>
                       <td className="py-3 px-4">
                         <span className={`px-2 py-1 rounded text-xs font-medium ${
@@ -142,18 +163,6 @@ const ImportConfirmationModal: React.FC<Props> = ({
                       <td className="py-3 px-4 text-sm">{item.lots}</td>
                       <td className="py-3 px-4 text-sm">${item.entryPrice.toFixed(2)}</td>
                       <td className="py-3 px-4 text-sm">${(item.investedAmount || 0).toFixed(2)}</td>
-                      <td className="py-3 px-4 text-sm">{item.platform || 'N/A'}</td>
-                      <td className="py-3 px-4 text-sm">
-                        {item.pnl !== undefined ? (
-                          <span className={`font-medium ${
-                            item.pnl >= 0 
-                              ? (isDarkMode ? 'text-green-400' : 'text-green-600')
-                              : (isDarkMode ? 'text-red-400' : 'text-red-600')
-                          }`}>
-                            {item.pnl >= 0 ? '+' : ''}${item.pnl.toFixed(2)}
-                          </span>
-                        ) : 'N/A'}
-                      </td>
                       <td className="py-3 px-4 text-center">
                         <button
                           onClick={() => handleDeleteRow(index)}
