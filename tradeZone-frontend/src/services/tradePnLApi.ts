@@ -15,8 +15,9 @@ export interface TradePnLDto {
 }
 
 export const tradePnLApi = {
-  list: async (): Promise<TradePnLDto[]> => {
-    const res = await api.get('/trade-pnl');
+  list: async (days?: number): Promise<TradePnLDto[]> => {
+    const url = `/trade-pnl${days ? `?days=${days}` : ''}`;
+    const res = await api.get(url);
     return res.data;
   },
   
@@ -52,6 +53,13 @@ export const tradePnLApi = {
   async getStatistics(days?: number): Promise<any> {
     const url = `/trade-pnl/statistics${days ? `?days=${days}` : ''}`;
     const res = await api.get(url);
+    return res.data;
+  },
+
+  bulkImport: async (items: Array<{ date: string; profit: number; loss: number; netPnL: number; notes?: string; totalTrades?: number; winningTrades?: number; losingTrades?: number }>): Promise<{ created: number; skipped: number; errors: string[] }> => {
+    const res = await api.post('/trade-pnl/bulk-import', { items }, {
+      timeout: 60000 // 60 seconds timeout for bulk import operations
+    });
     return res.data;
   }
 };
