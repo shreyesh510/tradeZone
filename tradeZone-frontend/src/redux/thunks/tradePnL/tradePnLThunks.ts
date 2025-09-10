@@ -1,11 +1,11 @@
 import { createAsyncThunk } from '@reduxjs/toolkit';
 import { tradePnLApi, type TradePnLDto } from '../../../services/tradePnLApi';
 
-export const fetchTradePnL = createAsyncThunk<TradePnLDto[], void, { rejectValue: string }>(
+export const fetchTradePnL = createAsyncThunk<TradePnLDto[], number | undefined, { rejectValue: string }>(
   'tradePnL/fetch',
-  async (_, { rejectWithValue }) => {
+  async (days, { rejectWithValue }) => {
     try {
-      return await tradePnLApi.list();
+      return await tradePnLApi.list(days);
     } catch (err: any) {
       return rejectWithValue(err?.response?.data?.message || 'Failed to fetch trade P&L records');
     }

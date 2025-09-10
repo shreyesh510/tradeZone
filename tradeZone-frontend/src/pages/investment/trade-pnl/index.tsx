@@ -18,6 +18,7 @@ import {
 import { clearError } from '../../../redux/slices/tradePnLSlice';
 import AddTradePnLModal from './components/AddTradePnLModal';
 import EditTradePnLModal from './components/EditTradePnLModal';
+import ImportTradePnLModal from './components/ImportTradePnLModal';
 import ConfirmModal from '../../../components/ConfirmModal';
 
 interface OnlineUser {
@@ -39,12 +40,14 @@ const TradePnL = memo(function TradePnL() {
   // Modal states
   const [showAddModal, setShowAddModal] = useState<boolean>(false);
   const [showEditModal, setShowEditModal] = useState<boolean>(false);
+  const [showImportModal, setShowImportModal] = useState<boolean>(false);
   const [editingItem, setEditingItem] = useState<any>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   
   // Filter states
   const [filters, setFilters] = useState({
-    period: '30' // days for statistics
+    period: '7', // days for statistics - default 7 days
+    dataFilter: '7' // days for data filtering - default 7 days
   });
 
   // Redux state
@@ -71,8 +74,8 @@ const TradePnL = memo(function TradePnL() {
 
   // Fetch data on mount and when filters change
   useEffect(() => {
-    dispatch(fetchTradePnL());
-    dispatch(fetchTradePnLStatistics(parseInt(filters.period)));
+    dispatch(fetchTradePnL(parseInt(filters.dataFilter)));
+    dispatch(fetchTradePnLStatistics(parseInt(filters.dataFilter))); // Use same filter for statistics
   }, [dispatch, filters]);
 
   const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
@@ -111,7 +114,8 @@ const TradePnL = memo(function TradePnL() {
 
   const clearFilters = () => {
     setFilters({
-      period: '30'
+      period: '7',
+      dataFilter: '7'
     });
   };
 
@@ -126,7 +130,7 @@ const TradePnL = memo(function TradePnL() {
   }), { profit: 0, loss: 0, netPnL: 0, trades: 0, wins: 0, losses: 0 });
 
   const content = (
-    <div className={`flex-1 p-6 overflow-y-auto ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-900'}`}>
+    <div className={`flex-1 p-6 flex flex-col min-h-0 ${isDarkMode ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-900'}`}>
       {/* Error Display */}
       {error && (
         <div className="mb-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
@@ -148,18 +152,28 @@ const TradePnL = memo(function TradePnL() {
           <h1 className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
             Trade P&L Tracker
           </h1>
-          <button
-            onClick={handleAddNew}
-            disabled={creating}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
-          >
-            <div className="flex items-center space-x-2">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              <span>Add Today's P&L</span>
-            </div>
-          </button>
+          <div className="flex space-x-3">
+            {/* Import Excel Button */}
+            <button
+              onClick={() => setShowImportModal(true)}
+              className={`px-6 py-3 rounded-lg font-medium transition-colors ${isDarkMode ? 'bg-purple-600 hover:bg-purple-700 text-white' : 'bg-purple-600 hover:bg-purple-700 text-white'}`}
+            >
+              Import Excel
+            </button>
+            {/* Add Today's P&L Button */}
+            <button
+              onClick={handleAddNew}
+              disabled={creating}
+              className="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
+            >
+              <div className="flex items-center space-x-2">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                <span>Add Today's P&L</span>
+              </div>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -171,21 +185,31 @@ const TradePnL = memo(function TradePnL() {
           <h3 className={`text-lg font-semibold mb-4 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
             {statistics.period} Statistics
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             <div className="flex items-center space-x-3">
               <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-green-500 to-emerald-500">
                 <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8M3 17h6m0 0V9m0 8l8-8" />
                 </svg>
               </div>
               <div>
-                <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Net P&L</p>
-                <p className={`text-xl font-semibold ${
-                  statistics.netPnL >= 0 
-                    ? (isDarkMode ? 'text-green-400' : 'text-green-600')
-                    : (isDarkMode ? 'text-red-400' : 'text-red-600')
-                }`}>
-                  ${statistics.netPnL?.toFixed(2) || '0.00'}
+                <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Total Profit</p>
+                <p className={`text-xl font-semibold ${isDarkMode ? 'text-green-400' : 'text-green-600'}`}>
+                  ${statistics.totalProfit?.toFixed(2) || '0.00'}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-3">
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-red-500 to-rose-500">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 17H3m0 0v-8m0 8l8-8m18 6h-6m0 0V7m0 8l-8-8" />
+                </svg>
+              </div>
+              <div>
+                <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Total Loss</p>
+                <p className={`text-xl font-semibold ${isDarkMode ? 'text-red-400' : 'text-red-600'}`}>
+                  ${statistics.totalLoss?.toFixed(2) || '0.00'}
                 </p>
               </div>
             </div>
@@ -241,26 +265,25 @@ const TradePnL = memo(function TradePnL() {
       }`}>
         <div className="flex flex-wrap gap-4 items-center">
           <h3 className={`text-base font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-            Statistics:
+            Filter Period:
           </h3>
           
           <div className="flex items-center space-x-2">
-            <label className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-              Period:
-            </label>
             <select
-              value={filters.period}
-              onChange={(e) => handleFilterChange('period', e.target.value)}
+              value={filters.dataFilter}
+              onChange={(e) => handleFilterChange('dataFilter', e.target.value)}
               className={`px-3 py-2 rounded-lg text-sm border ${
                 isDarkMode 
                   ? 'bg-gray-700/50 border-gray-600/50 text-white' 
                   : 'bg-white/70 border-gray-300/50 text-gray-900'
               }`}
             >
-              <option value="7">7 Days</option>
-              <option value="30">30 Days</option>
-              <option value="90">90 Days</option>
-              <option value="365">1 Year</option>
+              <option value="1">Today</option>
+              <option value="7">Last 7 Days</option>
+              <option value="30">Last 30 Days</option>
+              <option value="90">Last 90 Days</option>
+              <option value="365">Last 1 Year</option>
+              <option value="">All Time</option>
             </select>
           </div>
 
@@ -278,7 +301,7 @@ const TradePnL = memo(function TradePnL() {
       </div>
 
       {/* Table */}
-      <div className={`rounded-2xl backdrop-blur-lg border overflow-hidden ${
+      <div className={`flex-1 rounded-2xl backdrop-blur-lg border overflow-hidden flex flex-col min-h-0 ${
         isDarkMode ? 'bg-gray-800/30 border-gray-700/50' : 'bg-white/60 border-white/20'
       }`}>
         {loading ? (
@@ -299,95 +322,96 @@ const TradePnL = memo(function TradePnL() {
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className={`${isDarkMode ? 'bg-gray-700/50' : 'bg-gray-100/50'}`}>
-                <tr>
-                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>Date</th>
-                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>P&L</th>
-                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>Trades</th>
-                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>Notes</th>
-                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>Actions</th>
-                </tr>
-              </thead>
-              <tbody className={`divide-y ${isDarkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
-                {items.map((item) => (
-                  <tr key={item.id} className={`${isDarkMode ? 'hover:bg-gray-700/30' : 'hover:bg-gray-50/50'} transition-colors`}>
-                    <td className={`px-6 py-4 whitespace-nowrap text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-900'}`}>
-                      {new Date(item.date).toLocaleDateString()}
+          <div className="flex flex-col min-h-0 flex-1">
+            <div className="overflow-auto flex-1">
+              <table className="w-full">
+                <thead className={`sticky top-0 ${isDarkMode ? 'bg-gray-700/90' : 'bg-gray-100/90'} backdrop-blur-sm`}>
+                  <tr>
+                    <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
+                      isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                    }`}>Date</th>
+                    <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
+                      isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                    }`}>P&L</th>
+                    <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
+                      isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                    }`}>Trades</th>
+                    <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
+                      isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                    }`}>Notes</th>
+                    <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
+                      isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                    }`}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody className={`divide-y ${isDarkMode ? 'divide-gray-700' : 'divide-gray-200'}`}>
+                  {items.map((item) => (
+                    <tr key={item.id} className={`${isDarkMode ? 'hover:bg-gray-700/30' : 'hover:bg-gray-50/50'} transition-colors`}>
+                      <td className={`px-6 py-4 whitespace-nowrap text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-900'}`}>
+                        {new Date(item.date).toLocaleDateString()}
+                      </td>
+                      <td className={`px-6 py-4 whitespace-nowrap text-sm font-bold ${
+                        item.netPnL >= 0 
+                          ? (isDarkMode ? 'text-green-400' : 'text-green-600')
+                          : (isDarkMode ? 'text-red-400' : 'text-red-600')
+                      }`}>
+                        {item.netPnL >= 0 ? '+' : ''}${item.netPnL.toFixed(2)}
+                      </td>
+                      <td className={`px-6 py-4 whitespace-nowrap text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                        {item.totalTrades || 0}
+                      </td>
+                      <td className={`px-6 py-4 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                        <span className="truncate block max-w-xs" title={item.notes}>
+                          {item.notes || '-'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => handleEdit(item)}
+                            className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
+                              isDarkMode 
+                                ? 'bg-blue-600/20 text-blue-400 hover:bg-blue-600/30' 
+                                : 'bg-blue-100 text-blue-600 hover:bg-blue-200'
+                            }`}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => setDeleteConfirmId(item.id)}
+                            className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
+                              isDarkMode 
+                                ? 'bg-red-600/20 text-red-400 hover:bg-red-600/30' 
+                                : 'bg-red-100 text-red-600 hover:bg-red-200'
+                            }`}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot className={`sticky bottom-0 ${isDarkMode ? 'bg-gray-800/90' : 'bg-gray-100/90'} backdrop-blur-sm font-bold border-t-2 ${isDarkMode ? 'border-gray-600' : 'border-gray-300'}`}>
+                  <tr>
+                    <td className={`px-6 py-3 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                      TOTAL
                     </td>
-                    <td className={`px-6 py-4 whitespace-nowrap text-sm font-bold ${
-                      item.netPnL >= 0 
+                    <td className={`px-6 py-3 text-sm ${
+                      totals.netPnL >= 0 
                         ? (isDarkMode ? 'text-green-400' : 'text-green-600')
                         : (isDarkMode ? 'text-red-400' : 'text-red-600')
                     }`}>
-                      {item.netPnL >= 0 ? '+' : ''}${item.netPnL.toFixed(2)}
+                      {totals.netPnL >= 0 ? '+' : ''}${totals.netPnL.toFixed(2)}
                     </td>
-                    <td className={`px-6 py-4 whitespace-nowrap text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                      {item.totalTrades || 0}
+                    <td className={`px-6 py-3 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                      {totals.trades}
                     </td>
-                    <td className={`px-6 py-4 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                      <span className="truncate block max-w-xs" title={item.notes}>
-                        {item.notes || '-'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => handleEdit(item)}
-                          className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
-                            isDarkMode 
-                              ? 'bg-blue-600/20 text-blue-400 hover:bg-blue-600/30' 
-                              : 'bg-blue-100 text-blue-600 hover:bg-blue-200'
-                          }`}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => setDeleteConfirmId(item.id)}
-                          className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
-                            isDarkMode 
-                              ? 'bg-red-600/20 text-red-400 hover:bg-red-600/30' 
-                              : 'bg-red-100 text-red-600 hover:bg-red-200'
-                          }`}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </td>
+                    <td colSpan={2}></td>
                   </tr>
-                ))}
-              </tbody>
-              {/* Totals Footer */}
-              <tfoot className={`${isDarkMode ? 'bg-gray-800/50' : 'bg-gray-100'} font-bold`}>
-                <tr>
-                  <td className={`px-6 py-3 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                    TOTAL
-                  </td>
-                  <td className={`px-6 py-3 text-sm ${
-                    totals.netPnL >= 0 
-                      ? (isDarkMode ? 'text-green-400' : 'text-green-600')
-                      : (isDarkMode ? 'text-red-400' : 'text-red-600')
-                  }`}>
-                    {totals.netPnL >= 0 ? '+' : ''}${totals.netPnL.toFixed(2)}
-                  </td>
-                  <td className={`px-6 py-3 text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
-                    {totals.trades}
-                  </td>
-                  <td colSpan={2}></td>
-                </tr>
-              </tfoot>
-            </table>
+                </tfoot>
+              </table>
+            </div>
           </div>
         )}
       </div>
@@ -446,6 +470,19 @@ const TradePnL = memo(function TradePnL() {
             } catch (error) {
               toast.error('Failed to update P&L record');
             }
+          }}
+        />
+      )}
+
+      {/* Import Modal */}
+      {showImportModal && (
+        <ImportTradePnLModal
+          open={showImportModal}
+          isDarkMode={isDarkMode}
+          onClose={() => setShowImportModal(false)}
+          onImported={async () => {
+            await dispatch(fetchTradePnL(parseInt(filters.dataFilter)));
+            await dispatch(fetchTradePnLStatistics(parseInt(filters.dataFilter)));
           }}
         />
       )}

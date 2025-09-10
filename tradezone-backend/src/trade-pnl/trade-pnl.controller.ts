@@ -13,6 +13,7 @@ import {
 import { TradePnLService } from './trade-pnl.service';
 import { CreateTradePnLDto } from './dto/create-trade-pnl.dto';
 import { UpdateTradePnLDto } from './dto/update-trade-pnl.dto';
+import { CreateTradePnLBulkDto } from './dto/create-trade-pnl-bulk.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @Controller('trade-pnl')
@@ -26,10 +27,20 @@ export class TradePnLController {
     return this.tradePnLService.create(createTradePnLDto, userId);
   }
 
-  @Get()
-  findAll(@Request() req) {
+  @Post('bulk-import')
+  async bulkImport(
+    @Body() createTradePnLBulkDto: CreateTradePnLBulkDto,
+    @Request() req,
+  ) {
     const userId = req.user.userId;
-    return this.tradePnLService.findAll(userId);
+    return this.tradePnLService.bulkImport(createTradePnLBulkDto.items, userId);
+  }
+
+  @Get()
+  findAll(@Request() req, @Query('days') days?: string) {
+    const userId = req.user.userId;
+    const daysNum = days ? parseInt(days) : undefined;
+    return this.tradePnLService.findAll(userId, daysNum);
   }
 
   @Get('statistics')
@@ -52,7 +63,11 @@ export class TradePnLController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() updateTradePnLDto: UpdateTradePnLDto, @Request() req) {
+  update(
+    @Param('id') id: string,
+    @Body() updateTradePnLDto: UpdateTradePnLDto,
+    @Request() req,
+  ) {
     const userId = req.user.userId;
     return this.tradePnLService.update(id, updateTradePnLDto, userId);
   }
