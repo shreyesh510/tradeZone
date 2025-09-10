@@ -108,7 +108,7 @@ const Positions = memo(function Positions() {
     const load = async () => {
       try {
         setActivityLoading(true);
-        const items = await positionsApi.getHistory(20);
+        const items = await positionsApi.getHistory(12);
         if (mounted) setActivity(items || []);
       } catch (e) {
         // ignore
@@ -297,12 +297,12 @@ const Positions = memo(function Positions() {
         <div className="flex items-center justify-between">
           <h1 className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Positions</h1>
           <div className="flex space-x-3">
-            {/* Import Excel Button */}
+            {/* Import File Button */}
             <button
               onClick={() => setShowImport(true)}
               className={`px-6 py-3 rounded-lg font-medium transition-colors ${isDarkMode ? 'bg-purple-600 hover:bg-purple-700 text-white' : 'bg-purple-600 hover:bg-purple-700 text-white'}`}
             >
-              Import Excel
+              Import File
             </button>
             {/* Add Position Button */}
             <button
@@ -324,24 +324,24 @@ const Positions = memo(function Positions() {
 
       {/* Filters */}
       <div
-        className={`p-4 rounded-2xl backdrop-blur-lg border mb-6 ${
+        className={`p-5 rounded-2xl backdrop-blur-lg border mb-6 ${
           isDarkMode ? 'bg-gray-800/30 border-gray-700/50 shadow-xl shadow-gray-900/20' : 'bg-white/60 border-white/20 shadow-xl shadow-gray-900/10'
         }`}
       >
-        <div className="flex flex-wrap gap-4 items-center">
-          <h3 className={`text-sm font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+        <div className="flex flex-wrap gap-5 items-center">
+          <h3 className={`text-base font-medium ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
             Filters:
           </h3>
           
           {/* Timeframe Filter */}
-          <div className="flex items-center space-x-2">
-            <label className={`text-xs font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+          <div className="flex items-center space-x-3">
+            <label className={`text-sm font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
               Timeframe:
             </label>
             <select
               value={filters.timeframe}
               onChange={(e) => handleFilterChange('timeframe', e.target.value)}
-              className={`px-3 py-1 rounded-lg text-sm border ${
+              className={`px-4 py-2 rounded-lg text-sm border ${
                 isDarkMode 
                   ? 'bg-gray-700/50 border-gray-600/50 text-white' 
                   : 'bg-white/70 border-gray-300/50 text-gray-900'
@@ -356,14 +356,14 @@ const Positions = memo(function Positions() {
           </div>
 
           {/* Side Filter */}
-          <div className="flex items-center space-x-2">
-            <label className={`text-xs font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+          <div className="flex items-center space-x-3">
+            <label className={`text-sm font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
               Side:
             </label>
             <select
               value={filters.side}
               onChange={(e) => handleFilterChange('side', e.target.value)}
-              className={`px-3 py-1 rounded-lg text-sm border ${
+              className={`px-4 py-2 rounded-lg text-sm border ${
                 isDarkMode 
                   ? 'bg-gray-700/50 border-gray-600/50 text-white' 
                   : 'bg-white/70 border-gray-300/50 text-gray-900'
@@ -376,14 +376,14 @@ const Positions = memo(function Positions() {
           </div>
 
           {/* Platform Filter */}
-          <div className="flex items-center space-x-2">
-            <label className={`text-xs font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+          <div className="flex items-center space-x-3">
+            <label className={`text-sm font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
               Platform:
             </label>
             <select
               value={filters.platform}
               onChange={(e) => handleFilterChange('platform', e.target.value)}
-              className={`px-3 py-1 rounded-lg text-sm border ${
+              className={`px-4 py-2 rounded-lg text-sm border ${
                 isDarkMode 
                   ? 'bg-gray-700/50 border-gray-600/50 text-white' 
                   : 'bg-white/70 border-gray-300/50 text-gray-900'
@@ -396,14 +396,14 @@ const Positions = memo(function Positions() {
           </div>
 
           {/* Account Filter */}
-          <div className="flex items-center space-x-2">
-            <label className={`text-xs font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+          <div className="flex items-center space-x-3">
+            <label className={`text-sm font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
               Account:
             </label>
             <select
               value={filters.account}
               onChange={(e) => handleFilterChange('account', e.target.value)}
-              className={`px-3 py-1 rounded-lg text-sm border ${
+              className={`px-4 py-2 rounded-lg text-sm border ${
                 isDarkMode 
                   ? 'bg-gray-700/50 border-gray-600/50 text-white' 
                   : 'bg-white/70 border-gray-300/50 text-gray-900'
@@ -416,8 +416,8 @@ const Positions = memo(function Positions() {
           </div>
 
           {/* Search by Name */}
-          <div className="flex items-center space-x-2">
-            <label className={`text-xs font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+          <div className="flex items-center space-x-3">
+            <label className={`text-sm font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
               Search:
             </label>
             <input
@@ -425,14 +425,14 @@ const Positions = memo(function Positions() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by name"
-              className={`px-3 py-1 rounded-lg text-sm border ${isDarkMode ? 'bg-gray-700/50 border-gray-600/50 text-white placeholder-gray-400' : 'bg-white/70 border-gray-300/50 text-gray-900 placeholder-gray-500'}`}
+              className={`px-4 py-2 rounded-lg text-sm border ${isDarkMode ? 'bg-gray-700/50 border-gray-600/50 text-white placeholder-gray-400' : 'bg-white/70 border-gray-300/50 text-gray-900 placeholder-gray-500'}`}
             />
           </div>
 
           {/* Clear Filters Button */}
           <button
             onClick={() => { setFilters({ timeframe: '1D', side: 'all', account: 'longterm', platform: 'Delta Exchange' }); setSearch(''); }}
-            className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               isDarkMode 
                 ? 'bg-gray-700/50 text-gray-300 hover:bg-gray-600/50' 
                 : 'bg-gray-200/50 text-gray-700 hover:bg-gray-300/50'
@@ -448,21 +448,64 @@ const Positions = memo(function Positions() {
         {/* Left Column - 75% - Current Functionality */}
         <div className="flex-1 lg:w-3/4">
 
-      {/* Total Investment Summary */}
+      {/* Investment Summary */}
       <div
         className={`p-6 rounded-2xl backdrop-blur-lg border mb-8 ${
           isDarkMode ? 'bg-gray-800/30 border-gray-700/50 shadow-xl shadow-gray-900/20' : 'bg-white/60 border-white/20 shadow-xl shadow-gray-900/10'
         }`}
       >
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className={`text-lg font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Total Investment (USD)</h2>
-            <p className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>${filteredPositions.reduce((s: number, p: any) => s + (p.investedAmount || 0), 0).toFixed(2)}</p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Total Symbols */}
+          <div className="flex items-center space-x-4">
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-green-500 to-emerald-500`}>
+              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+              </svg>
+            </div>
+            <div>
+              <h3 className={`text-sm font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Total Symbols</h3>
+              <p className={`text-xl font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>{filteredPositions.length}</p>
+            </div>
           </div>
-          <div className={`w-16 h-16 rounded-2xl flex items-center justify-center bg-gradient-to-br from-blue-500 to-indigo-500`}>
-            <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-3.314 0-6 1.79-6 4s2.686 4 6 4 6-1.79 6-4-2.686-4-6-4zm0-4v4m0 8v4" />
-            </svg>
+
+          {/* Total Investment */}
+          <div className="flex items-center space-x-4">
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-blue-500 to-indigo-500`}>
+              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+              </svg>
+            </div>
+            <div>
+              <h3 className={`text-sm font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Total Investment</h3>
+              <p className={`text-xl font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>${filteredPositions.reduce((s: number, p: any) => s + (p.investedAmount || 0), 0).toFixed(2)}</p>
+            </div>
+          </div>
+
+          {/* Total P&L */}
+          <div className="flex items-center space-x-4">
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br ${
+              filteredPositions.reduce((s: number, p: any) => s + (p.pnl || 0), 0) >= 0 
+                ? 'from-green-500 to-emerald-500' 
+                : 'from-red-500 to-rose-500'
+            }`}>
+              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                {filteredPositions.reduce((s: number, p: any) => s + (p.pnl || 0), 0) >= 0 ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" />
+                )}
+              </svg>
+            </div>
+            <div>
+              <h3 className={`text-sm font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Total P&L</h3>
+              <p className={`text-xl font-semibold ${
+                filteredPositions.reduce((s: number, p: any) => s + (p.pnl || 0), 0) >= 0 
+                  ? (isDarkMode ? 'text-green-400' : 'text-green-600')
+                  : (isDarkMode ? 'text-red-400' : 'text-red-600')
+              }`}>
+                {filteredPositions.reduce((s: number, p: any) => s + (p.pnl || 0), 0) >= 0 ? '+' : ''}${filteredPositions.reduce((s: number, p: any) => s + (p.pnl || 0), 0).toFixed(2)}
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -580,61 +623,80 @@ const Positions = memo(function Positions() {
 
       {/* Positions Grid */}
       {!loading && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {filteredPositions.map((position: any) => {
             return (
               <div
                 key={(position as any).id ?? (position as any).symbol}
-                className={`p-6 rounded-2xl backdrop-blur-lg border transition-all duration-300 hover:scale-105 ${
+                className={`p-5 rounded-lg border transition-all duration-200 ${
                   isDarkMode
-                    ? 'bg-gray-800/30 border-gray-700/50 shadow-xl shadow-gray-900/20 hover:bg-gray-800/40'
-                    : 'bg-white/60 border-white/20 shadow-xl shadow-gray-900/10 hover:bg-white/80'
+                    ? 'bg-gray-800 border-gray-700 hover:border-gray-600'
+                    : 'bg-white border-gray-200 hover:border-gray-300'
                 }`}
               >
                 {/* Header */}
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center space-x-3">
-                    <div
-                      className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold text-white ${
-                        'platform' in position && (position as any).platform === 'Delta Exchange'
-                          ? 'bg-gradient-to-br from-purple-500 to-pink-500'
-                          : 'bg-gradient-to-br from-blue-500 to-cyan-500'
-                      }`}
-                    >
-                      {position.symbol.substring(0, 2)}
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-bold">{position.symbol}</h3>
-                      {'platform' in position && (
-                        <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>{(position as Position).platform}</p>
-                      )}
-                    </div>
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <h3 className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+                      {position.symbol}
+                    </h3>
+                    {'platform' in position && (
+                      <p className={`text-sm mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                        {(position as Position).platform}
+                      </p>
+                    )}
                   </div>
 
-                  <div className="flex flex-col items-end space-y-1">
-                    <div
-                      className={`px-3 py-1 rounded-lg text-sm font-medium ${
-                        position.side === 'buy' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
-                      }`}
-                    >
-                      {position.side.toUpperCase()}
-                    </div>
-                    <div className={`px-3 py-1 rounded-lg text-xs font-medium ${isDarkMode ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-700'}`}>
-                      {position.lots} Lots
-                    </div>
+                  <div className={`text-sm font-medium px-2 py-1 rounded ${
+                    position.side === 'buy' 
+                      ? isDarkMode ? 'text-green-400' : 'text-green-600'
+                      : isDarkMode ? 'text-red-400' : 'text-red-600'
+                  }`}>
+                    {position.side.toUpperCase()}
                   </div>
                 </div>
 
-                {/* Invested Amount (USD) */}
-                <div className={`mt-3 px-4 py-3 rounded-xl border ${isDarkMode ? 'border-gray-700/50 bg-gray-800/30' : 'border-gray-200 bg-white/60'}`}>
+                {/* Details */}
+                <div className="space-y-2 mb-4">
                   <div className="flex justify-between items-center">
-                    <span className={`${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Invested (USD)</span>
-                    <span className={`font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>${Number(position.investedAmount || 0).toFixed(2)}</span>
+                    <span className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Lots</span>
+                    <span className={`text-sm font-medium ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}>
+                      {position.lots}
+                    </span>
                   </div>
+                  
+                  <div className="flex justify-between items-center">
+                    <span className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Invested</span>
+                    <span className={`text-sm font-medium ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}>
+                      ${Number(position.investedAmount || 0).toFixed(2)}
+                    </span>
+                  </div>
+
+                  {'account' in position && (
+                    <div className="flex justify-between items-center">
+                      <span className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>Account</span>
+                      <span className={`text-sm font-medium ${isDarkMode ? 'text-gray-200' : 'text-gray-700'}`}>
+                        {(position as any).account || 'main'}
+                      </span>
+                    </div>
+                  )}
+
+                  {'pnl' in position && position.pnl !== undefined && (
+                    <div className={`flex justify-between items-center pt-2 mt-2 border-t ${isDarkMode ? 'border-gray-700' : 'border-gray-100'}`}>
+                      <span className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>P&L</span>
+                      <span className={`text-sm font-semibold ${
+                        position.pnl >= 0 
+                          ? isDarkMode ? 'text-green-400' : 'text-green-600'
+                          : isDarkMode ? 'text-red-400' : 'text-red-600'
+                      }`}>
+                        {position.pnl >= 0 ? '+' : ''}${Number(position.pnl).toFixed(2)}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Action Buttons */}
-                <div className="mt-4 flex space-x-2">
+                <div className={`flex space-x-2 pt-3 border-t ${isDarkMode ? 'border-gray-700' : 'border-gray-100'}`}>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -644,7 +706,11 @@ const Positions = memo(function Positions() {
                         toast.info('Cannot modify aggregated positions. Please view individual positions.');
                       }
                     }}
-                    className="flex-1 py-2 px-3 text-sm rounded-lg bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 transition-colors"
+                    className={`flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors ${
+                      isDarkMode 
+                        ? 'border border-gray-600 text-gray-300 hover:bg-gray-700' 
+                        : 'border border-gray-300 text-gray-600 hover:bg-gray-50'
+                    }`}
                   >
                     Modify
                   </button>
@@ -654,7 +720,11 @@ const Positions = memo(function Positions() {
                       openCloseModal(position);
                     }}
                     disabled={updateLoading}
-                    className="flex-1 py-2 px-3 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-50"
+                    className={`flex-1 py-2 px-3 text-sm font-medium rounded-md transition-colors disabled:opacity-50 ${
+                      isDarkMode 
+                        ? 'border border-gray-600 text-gray-300 hover:bg-gray-700' 
+                        : 'border border-gray-300 text-gray-600 hover:bg-gray-50'
+                    }`}
                   >
                     {updateLoading ? 'Closing...' : 'Close'}
                   </button>
@@ -677,8 +747,8 @@ const Positions = memo(function Positions() {
               Recent Activity
             </h3>
             
-            {/* Activity List */}
-            <div className="space-y-4">
+            {/* Activity List - Scrollable with full screen height */}
+            <div className="space-y-3 max-h-[calc(100vh-280px)] overflow-y-auto pr-2" style={{ scrollbarWidth: 'thin' }}>
               {activityLoading && (
                 <div className={`p-3 rounded-lg ${isDarkMode ? 'bg-gray-700/30' : 'bg-gray-100/50'}`}>
                   <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Loading activity…</p>
@@ -757,16 +827,16 @@ const Positions = memo(function Positions() {
                 })();
 
                 return (
-                  <div key={item.id || idx} className={`p-3 rounded-lg ${isDarkMode ? 'bg-gray-700/30' : 'bg-gray-100/50'}`}>
+                  <div key={item.id || idx} className={`p-3 rounded-xl ${isDarkMode ? 'bg-gray-700/30' : 'bg-gray-100/50'} min-h-[80px] max-h-[120px] flex flex-col justify-between`}>
                     <div className="flex items-center justify-between mb-2">
-                      <span className={`text-sm font-medium ${titleColor}`}>
+                      <span className={`text-sm font-medium ${titleColor} truncate`}>
                         {title}
                       </span>
-                      <span className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'}`}>
+                      <span className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-500'} ml-2 flex-shrink-0`}>
                         {timeLabel}
                       </span>
                     </div>
-                    <p className={`text-sm ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                    <p className={`text-xs ${isDarkMode ? 'text-gray-300' : 'text-gray-700'} line-clamp-2 overflow-hidden`}>
                       {desc}
                     </p>
                   </div>
@@ -813,7 +883,7 @@ const Positions = memo(function Positions() {
             if (filters.platform !== 'all') f.platform = filters.platform;
             if (filters.account !== 'all') f.account = filters.account;
             await dispatch(fetchPositions(f));
-            try { setActivityLoading(true); const items = await positionsApi.getHistory(20); setActivity(items || []); } finally { setActivityLoading(false); }
+            try { setActivityLoading(true); const items = await positionsApi.getHistory(10); setActivity(items || []); } finally { setActivityLoading(false); }
           }}
         />
       )}
