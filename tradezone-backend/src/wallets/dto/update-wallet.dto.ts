@@ -1,9 +1,13 @@
-import { IsOptional, IsNumber, IsString } from 'class-validator';
+import { IsOptional, IsNumber, IsString, IsIn } from 'class-validator';
 
 export class UpdateWalletDto {
   @IsOptional()
   @IsString()
   name?: string;
+
+  @IsOptional()
+  @IsIn(['demat', 'bank'])
+  type?: 'demat' | 'bank';
 
   @IsOptional()
   @IsString()

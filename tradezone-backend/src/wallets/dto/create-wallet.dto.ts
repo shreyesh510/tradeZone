@@ -1,9 +1,13 @@
-import { IsNotEmpty, IsOptional, IsNumber, IsString } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsNumber, IsString, IsIn } from 'class-validator';
 
 export class CreateWalletDto {
   @IsNotEmpty()
   @IsString()
   name!: string;
+
+  @IsOptional()
+  @IsIn(['demat', 'bank'])
+  type?: 'demat' | 'bank';
 
   @IsOptional()
   @IsString()

@@ -9,7 +9,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '../../redux/store';
 import { fetchWallets, createWallet, updateWallet, deleteWallet, fetchWalletHistory } from '../../redux/thunks/wallets/walletsThunks';
 import ConfirmModal from '../../components/ConfirmModal';
-import EditDepositModal from '../../components/EditDepositModal';
+import EditWalletModal from '../../components/EditWalletModal';
 import AddWalletModal from '../../components/AddWalletModal';
 
 interface WalletCardProps {
@@ -20,7 +20,7 @@ interface WalletCardProps {
 }
 
 const WalletCard: React.FC<WalletCardProps> = ({ wallet, isDark, onEdit, onDelete }) => {
-  const isBank = /bank/i.test(wallet.platform || '');
+  const isBank = wallet.type === 'bank' || (!wallet.type && /bank/i.test(wallet.platform || ''));
   const isDemat = !isBank;
   
   const getWalletIcon = () => {
@@ -177,8 +177,8 @@ const WalletsPage = memo(function WalletsPage() {
   const isDark = settings.theme === 'dark';
 
   // Helper functions
-  const isBank = (platform?: string | null) => /bank/i.test(platform || '');
-  const isDemat = (platform?: string | null) => !isBank(platform);
+  const isBank = (wallet: any) => wallet.type === 'bank' || (!wallet.type && /bank/i.test(wallet.platform || ''));
+  const isDemat = (wallet: any) => wallet.type === 'demat' || (!wallet.type && !isBank(wallet));
 
   // Calculate totals
   const totalsByCurrency = wallets.reduce<Record<string, number>>((acc, w) => {
@@ -189,7 +189,7 @@ const WalletsPage = memo(function WalletsPage() {
   }, {});
 
   const dematTotalsByCurrency = wallets.reduce<Record<string, number>>((acc, w) => {
-    if (!isDemat(w.platform)) return acc;
+    if (!isDemat(w)) return acc;
     const cur = (w.currency || 'USD').toUpperCase();
     const val = typeof w.balance === 'number' ? w.balance : 0;
     acc[cur] = (acc[cur] || 0) + val;
@@ -197,7 +197,7 @@ const WalletsPage = memo(function WalletsPage() {
   }, {});
 
   const bankTotalsByCurrency = wallets.reduce<Record<string, number>>((acc, w) => {
-    if (!isBank(w.platform)) return acc;
+    if (!isBank(w)) return acc;
     const cur = (w.currency || 'USD').toUpperCase();
     const val = typeof w.balance === 'number' ? w.balance : 0;
     acc[cur] = (acc[cur] || 0) + val;
@@ -218,8 +218,8 @@ const WalletsPage = memo(function WalletsPage() {
     
     const matchesFilter = 
       filterType === 'all' ||
-      (filterType === 'bank' && isBank(wallet.platform)) ||
-      (filterType === 'demat' && isDemat(wallet.platform));
+      (filterType === 'bank' && isBank(wallet)) ||
+      (filterType === 'demat' && isDemat(wallet));
     
     return matchesSearch && matchesFilter;
   });
@@ -651,10 +651,18 @@ const WalletsPage = memo(function WalletsPage() {
         <AddWalletModal
           open={addOpen}
           isDarkMode={isDark}
-          onClose={() => setAddOpen(false)}
+          onCancel={() => setAddOpen(false)}
           onSave={async (data) => {
             try {
-              await dispatch(createWallet(data)).unwrap();
+              await dispatch(createWallet({
+                name: data.name,
+                type: data.type,
+                platform: data.platform,
+                currency: data.currency,
+                address: data.address,
+                balance: data.amount,
+                notes: data.description
+              })).unwrap();
               toast.success('Wallet added successfully');
               setAddOpen(false);
             } catch (error) {
@@ -665,13 +673,17 @@ const WalletsPage = memo(function WalletsPage() {
 
         {/* Edit Modal */}
         {editId && (
-          <EditDepositModal
+          <EditWalletModal
             open={!!editId}
             isDarkMode={isDark}
             initial={{
-              amount: wallets.find(w => w.id === editId)?.balance ?? 0,
-              method: wallets.find(w => w.id === editId)?.platform,
-              description: wallets.find(w => w.id === editId)?.notes,
+              name: wallets.find(w => w.id === editId)?.name ?? '',
+              type: wallets.find(w => w.id === editId)?.type,
+              balance: wallets.find(w => w.id === editId)?.balance,
+              platform: wallets.find(w => w.id === editId)?.platform,
+              currency: wallets.find(w => w.id === editId)?.currency,
+              address: wallets.find(w => w.id === editId)?.address,
+              notes: wallets.find(w => w.id === editId)?.notes,
             }}
             onCancel={() => setEditId(null)}
             onSave={async (patch) => {
