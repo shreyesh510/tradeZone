@@ -12,7 +12,7 @@ export const fetchWallets = createAsyncThunk<WalletDto[], void, { rejectValue: s
   },
 );
 
-export const createWallet = createAsyncThunk<WalletDto, { name: string; platform?: string; currency?: string; address?: string; notes?: string; balance?: number }, { rejectValue: string }>(
+export const createWallet = createAsyncThunk<WalletDto, { name: string; type?: 'demat' | 'bank'; platform?: string; currency?: string; address?: string; notes?: string; balance?: number }, { rejectValue: string }>(
   'wallets/create',
   async (payload, { rejectWithValue }) => {
     try {

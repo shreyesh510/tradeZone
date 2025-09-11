@@ -1,30 +1,39 @@
 import React, { useEffect, useState } from 'react';
 
-interface AddWalletModalProps {
+interface EditWalletModalProps {
   open: boolean;
-  onSave: (payload: { 
+  initial: { 
     name: string; 
-    type: 'demat' | 'bank'; 
-    platform?: string;
+    type?: 'demat' | 'bank';
+    balance?: number; 
+    platform?: string; 
     currency?: string;
     address?: string;
-    amount?: number; 
-    description?: string;
+    notes?: string;
+  };
+  onSave: (patch: { 
+    name?: string;
+    type?: 'demat' | 'bank';
+    balance?: number; 
+    platform?: string; 
+    currency?: string;
+    address?: string;
+    notes?: string;
   }) => void;
   onCancel: () => void;
   isDarkMode?: boolean;
 }
 
-const AddWalletModal: React.FC<AddWalletModalProps> = ({ open, onSave, onCancel, isDarkMode = false }) => {
-  const [name, setName] = useState('');
+const EditWalletModal: React.FC<EditWalletModalProps> = ({ open, initial, onSave, onCancel, isDarkMode = false }) => {
+  const [name, setName] = useState<string>('');
   const [type, setType] = useState<'demat' | 'bank'>('demat');
-  const [platform, setPlatform] = useState('');
-  const [customPlatform, setCustomPlatform] = useState('');
-  const [currency, setCurrency] = useState('INR');
-  const [customCurrency, setCustomCurrency] = useState('');
-  const [address, setAddress] = useState('');
-  const [amount, setAmount] = useState('');
-  const [description, setDescription] = useState('');
+  const [balance, setBalance] = useState<string>('');
+  const [platform, setPlatform] = useState<string>('');
+  const [customPlatform, setCustomPlatform] = useState<string>('');
+  const [currency, setCurrency] = useState<string>('');
+  const [customCurrency, setCustomCurrency] = useState<string>('');
+  const [address, setAddress] = useState<string>('');
+  const [notes, setNotes] = useState<string>('');
 
   // Common platforms for demat and bank accounts
   const platforms = type === 'demat' 
@@ -36,23 +45,34 @@ const AddWalletModal: React.FC<AddWalletModalProps> = ({ open, onSave, onCancel,
 
   useEffect(() => {
     if (open) {
-      setName('');
-      setType('demat');
-      setPlatform('');
-      setCustomPlatform('');
-      setCurrency('INR');
-      setCustomCurrency('');
-      setAddress('');
-      setAmount('');
-      setDescription('');
+      setName(initial.name ?? '');
+      setType(initial.type ?? 'demat');
+      setBalance(String(initial.balance ?? ''));
+      
+      // Set platform
+      const initPlatform = initial.platform ?? '';
+      if (initPlatform && !platforms.includes(initPlatform)) {
+        setPlatform('Other');
+        setCustomPlatform(initPlatform);
+      } else {
+        setPlatform(initPlatform || '');
+        setCustomPlatform('');
+      }
+      
+      // Set currency
+      const initCurrency = initial.currency ?? 'INR';
+      if (initCurrency && !currencies.includes(initCurrency)) {
+        setCurrency('Other');
+        setCustomCurrency(initCurrency);
+      } else {
+        setCurrency(initCurrency);
+        setCustomCurrency('');
+      }
+      
+      setAddress(initial.address ?? '');
+      setNotes(initial.notes ?? '');
     }
-  }, [open]);
-
-  // Reset platform when type changes
-  useEffect(() => {
-    setPlatform('');
-    setCustomPlatform('');
-  }, [type]);
+  }, [open, initial]);
 
   if (!open) return null;
 
@@ -60,20 +80,23 @@ const AddWalletModal: React.FC<AddWalletModalProps> = ({ open, onSave, onCancel,
   const border = isDarkMode ? 'border-gray-700' : 'border-gray-200';
 
   const handleSave = () => {
-    if (!name.trim()) return;
-    const amt = parseFloat(amount);
-    const finalPlatform = platform === 'Other' ? customPlatform.trim() : platform;
-    const finalCurrency = currency === 'Other' ? customCurrency.trim() : currency;
+    const patch: any = {};
+    if (name.trim() !== initial.name) patch.name = name.trim();
+    if (type !== initial.type) patch.type = type;
+    const bal = parseFloat(balance);
+    if (!isNaN(bal) && bal !== initial.balance) patch.balance = bal;
     
-    onSave({ 
-      name: name.trim(), 
-      type,
-      platform: finalPlatform || undefined,
-      currency: finalCurrency || undefined,
-      address: address.trim() || undefined,
-      amount: isNaN(amt) ? undefined : amt, 
-      description: description.trim() || undefined 
-    });
+    // Handle platform
+    const finalPlatform = platform === 'Other' ? customPlatform.trim() : platform;
+    if (finalPlatform !== (initial.platform || '')) patch.platform = finalPlatform;
+    
+    // Handle currency
+    const finalCurrency = currency === 'Other' ? customCurrency.trim() : currency;
+    if (finalCurrency !== (initial.currency || '')) patch.currency = finalCurrency;
+    
+    if (address.trim() !== (initial.address || '')) patch.address = address.trim();
+    if (notes.trim() !== (initial.notes || '')) patch.notes = notes.trim();
+    onSave(patch);
   };
 
   return (
@@ -81,7 +104,7 @@ const AddWalletModal: React.FC<AddWalletModalProps> = ({ open, onSave, onCancel,
       <div className="absolute inset-0 bg-black/40" aria-hidden="true" />
       <div onClick={(e) => e.stopPropagation()} className={`${bg} relative z-10 w-full max-w-md rounded-xl shadow-xl border ${border}`}>
         <div className="p-5 border-b border-gray-700/40">
-          <h3 className="text-lg font-semibold">Add Wallet</h3>
+          <h3 className="text-lg font-semibold">Edit Wallet</h3>
         </div>
         <div className="p-5 space-y-4 max-h-[60vh] overflow-y-auto">
           <div>
@@ -131,12 +154,12 @@ const AddWalletModal: React.FC<AddWalletModalProps> = ({ open, onSave, onCancel,
             )}
           </div>
           <div>
-            <label className="block text-sm mb-1">Initial Balance (optional)</label>
+            <label className="block text-sm mb-1">Balance</label>
             <input
               type="number"
               step="any"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
+              value={balance}
+              onChange={(e) => setBalance(e.target.value)}
               placeholder="0.00"
               className={`w-full px-3 py-2 rounded-lg border ${isDarkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
             />
@@ -176,11 +199,11 @@ const AddWalletModal: React.FC<AddWalletModalProps> = ({ open, onSave, onCancel,
             />
           </div>
           <div>
-            <label className="block text-sm mb-1">Description (optional)</label>
+            <label className="block text-sm mb-1">Notes (optional)</label>
             <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Note for this wallet"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Additional notes"
               rows={2}
               className={`w-full px-3 py-2 rounded-lg border ${isDarkMode ? 'bg-gray-800 border-gray-700 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
             />
@@ -190,8 +213,8 @@ const AddWalletModal: React.FC<AddWalletModalProps> = ({ open, onSave, onCancel,
           <button onClick={onCancel} className={`px-4 py-2 rounded-lg font-medium ${isDarkMode ? 'bg-gray-700 hover:bg-gray-600 text-white' : 'bg-gray-200 hover:bg-gray-300 text-gray-900'}`}>
             Cancel
           </button>
-          <button onClick={handleSave} disabled={!name.trim()} className={`px-4 py-2 rounded-lg font-medium ${!name.trim() ? 'bg-gray-400 cursor-not-allowed text-white' : 'bg-green-600 hover:bg-green-700 text-white'}`}>
-            Save
+          <button onClick={handleSave} className="px-4 py-2 rounded-lg font-medium bg-green-600 hover:bg-green-700 text-white">
+            Save Changes
           </button>
         </div>
       </div>
@@ -199,4 +222,4 @@ const AddWalletModal: React.FC<AddWalletModalProps> = ({ open, onSave, onCancel,
   );
 };
 
-export default AddWalletModal;
+export default EditWalletModal;
