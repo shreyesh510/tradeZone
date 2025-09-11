@@ -239,7 +239,7 @@ const Positions = memo(function Positions() {
       setShowCloseModal(false);
       setSelectedForClose(null);
       setClosePnL('');
-      await dispatch(fetchPositions(undefined));
+      // Removed fetchPositions call - Redux state is already updated by updatePosition.fulfilled
     } catch (err) {
       toast.error('Failed to close position');
     } finally {
@@ -258,7 +258,7 @@ const Positions = memo(function Positions() {
       toast.success('Position updated successfully');
       setShowModifyModal(false);
       setSelectedForModify(null);
-      await dispatch(fetchPositions(undefined));
+      // Removed fetchPositions call - Redux state is already updated by updatePosition.fulfilled
     } catch (error) {
       console.error('Error updating position:', error);
       toast.error('Failed to update position');

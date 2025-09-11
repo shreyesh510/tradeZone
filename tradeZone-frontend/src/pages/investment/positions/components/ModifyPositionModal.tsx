@@ -28,7 +28,7 @@ const ModifyPositionModal: React.FC<ModifyPositionModalProps> = ({
         lots: position.lots,
         investedAmount: position.investedAmount,
         platform: position.platform,
-        pnl: position.pnl,
+        pnl: position.pnl ?? 0, // Ensure pnl is always a number, default to 0 if undefined/null
       });
       setAccount(position.account || 'main');
     }
@@ -39,13 +39,15 @@ const ModifyPositionModal: React.FC<ModifyPositionModalProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     // Build the payload with all the fields we want to update
+    // Ensure pnl is always included with proper value
+    const pnlValue = formData.pnl !== undefined ? formData.pnl : (position.pnl ?? 0);
     const finalPayload: UpdatePositionData = {
       symbol: formData.symbol,
       side: formData.side,
       lots: formData.lots,
       investedAmount: formData.investedAmount,
       platform: formData.platform,
-      pnl: formData.pnl !== undefined ? formData.pnl : position.pnl,
+      pnl: pnlValue,
       account: account
     };
     console.log('Saving position with payload:', finalPayload);
@@ -192,10 +194,10 @@ const ModifyPositionModal: React.FC<ModifyPositionModalProps> = ({
               <input
                 type="number"
                 step="any"
-                value={formData.pnl !== undefined ? formData.pnl : (position.pnl || 0)}
+                value={formData.pnl !== undefined ? formData.pnl : (position.pnl ?? 0)}
                 onChange={(e) => {
                   const value = e.target.value === '' ? 0 : parseFloat(e.target.value);
-                  handleChange('pnl', value);
+                  handleChange('pnl', isNaN(value) ? 0 : value);
                 }}
                 placeholder="Current P&L (+ for profit, - for loss)"
                 className={`w-full p-3 rounded-2xl border backdrop-blur-lg ${
