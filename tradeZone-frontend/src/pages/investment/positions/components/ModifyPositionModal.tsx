@@ -28,8 +28,9 @@ const ModifyPositionModal: React.FC<ModifyPositionModalProps> = ({
         lots: position.lots,
         investedAmount: position.investedAmount,
         platform: position.platform,
+        pnl: position.pnl,
       });
-  setAccount('main');
+      setAccount(position.account || 'main');
     }
   }, [position]);
 
@@ -37,9 +38,18 @@ const ModifyPositionModal: React.FC<ModifyPositionModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Ensure we don't accidentally send removed fields
-    const { entryPrice, leverage, ...payload } = formData as any;
-    onSave(position.id, payload);
+    // Build the payload with all the fields we want to update
+    const finalPayload: UpdatePositionData = {
+      symbol: formData.symbol,
+      side: formData.side,
+      lots: formData.lots,
+      investedAmount: formData.investedAmount,
+      platform: formData.platform,
+      pnl: formData.pnl !== undefined ? formData.pnl : position.pnl,
+      account: account
+    };
+    console.log('Saving position with payload:', finalPayload);
+    onSave(position.id, finalPayload);
     onClose();
   };
 
@@ -169,6 +179,30 @@ const ModifyPositionModal: React.FC<ModifyPositionModalProps> = ({
                     : 'bg-white/70 border-gray-300/50 text-gray-900 placeholder-gray-500'
                 } focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all`}
                 required
+              />
+            </div>
+
+            {/* Current P&L */}
+            <div>
+              <label className={`block text-sm font-medium mb-2 ${
+                isDarkMode ? 'text-gray-300' : 'text-gray-700'
+              }`}>
+                Current P&L
+              </label>
+              <input
+                type="number"
+                step="any"
+                value={formData.pnl !== undefined ? formData.pnl : (position.pnl || 0)}
+                onChange={(e) => {
+                  const value = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                  handleChange('pnl', value);
+                }}
+                placeholder="Current P&L (+ for profit, - for loss)"
+                className={`w-full p-3 rounded-2xl border backdrop-blur-lg ${
+                  isDarkMode 
+                    ? 'bg-gray-700/50 border-gray-600/50 text-white placeholder-gray-400' 
+                    : 'bg-white/70 border-gray-300/50 text-gray-900 placeholder-gray-500'
+                } focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all`}
               />
             </div>
 
