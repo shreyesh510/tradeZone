@@ -41,6 +41,7 @@ const Deposit = memo(function Deposit() {
   const dispatch = useDispatch<AppDispatch>();
   const [depositAmount, setDepositAmount] = useState<string>('');
   const [description, setDescription] = useState<string>('');
+  const [platform, setPlatform] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortBy, setSortBy] = useState<'date' | 'amount'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -308,12 +309,14 @@ const Deposit = memo(function Deposit() {
     try {
       await dispatch(createDeposit({ 
         amount, 
-        description: description || undefined
+        description: description || undefined,
+        method: platform || undefined
       })).unwrap();
       
       toast.success('Deposit recorded successfully');
       setDepositAmount('');
       setDescription('');
+      setPlatform('');
       setShowQuickAmounts(false);
       setShowDepositModal(false);
     } catch (error) {
@@ -779,6 +782,7 @@ const Deposit = memo(function Deposit() {
                     setShowDepositModal(false);
                     setDepositAmount('');
                     setDescription('');
+                    setPlatform('');
                     setShowQuickAmounts(false);
                   }}
                   disabled={creating}
@@ -852,6 +856,27 @@ const Deposit = memo(function Deposit() {
                 )}
               </div>
 
+              {/* Platform */}
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  Platform
+                </label>
+                <select
+                  value={platform}
+                  onChange={(e) => setPlatform(e.target.value)}
+                  className={`w-full px-4 py-3 rounded-xl border backdrop-blur-sm ${
+                    isDarkMode 
+                      ? 'bg-gray-700/50 border-gray-600/50 text-white' 
+                      : 'bg-white/70 border-gray-300/50 text-gray-900'
+                  } focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all`}
+                >
+                  <option value="">Select Platform</option>
+                  <option value="Delta Exchange">Delta Exchange</option>
+                  <option value="Grow">Grow</option>
+                  <option value="Exness">Exness</option>
+                </select>
+              </div>
+
               {/* Notes */}
               <div>
                 <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
@@ -897,6 +922,7 @@ const Deposit = memo(function Deposit() {
                     setShowDepositModal(false);
                     setDepositAmount('');
                     setDescription('');
+                    setPlatform('');
                     setShowQuickAmounts(false);
                   }}
                   disabled={creating}

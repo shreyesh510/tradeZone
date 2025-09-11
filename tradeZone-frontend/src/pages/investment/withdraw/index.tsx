@@ -45,7 +45,7 @@ const Withdraw = memo(function Withdraw() {
   const dispatch = useDispatch<AppDispatch>();
   const [withdrawAmount, setWithdrawAmount] = useState<string>('');
   const [description, setDescription] = useState<string>('');
-  const [withdrawMethod, setWithdrawMethod] = useState<string>('bank_transfer');
+  const [platform, setPlatform] = useState<string>('');
   const [bankDetails, setBankDetails] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortBy, setSortBy] = useState<'date' | 'amount'>('date');
@@ -314,12 +314,14 @@ const Withdraw = memo(function Withdraw() {
     try {
       await dispatch(createWithdrawal({ 
         amount, 
-        description: description || undefined
+        description: description || undefined,
+        method: platform || undefined
       })).unwrap();
       
       toast.success('Withdrawal recorded successfully');
       setWithdrawAmount('');
       setDescription('');
+      setPlatform('');
       setShowQuickAmounts(false);
       setShowWithdrawModal(false);
     } catch (error) {
@@ -781,6 +783,7 @@ const Withdraw = memo(function Withdraw() {
                     setShowWithdrawModal(false);
                     setWithdrawAmount('');
                     setDescription('');
+                    setPlatform('');
                     setShowQuickAmounts(false);
                   }}
                   disabled={creating}
@@ -854,6 +857,27 @@ const Withdraw = memo(function Withdraw() {
                 )}
               </div>
 
+              {/* Platform */}
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  Platform
+                </label>
+                <select
+                  value={platform}
+                  onChange={(e) => setPlatform(e.target.value)}
+                  className={`w-full px-4 py-3 rounded-xl border backdrop-blur-sm ${
+                    isDarkMode 
+                      ? 'bg-gray-700/50 border-gray-600/50 text-white' 
+                      : 'bg-white/70 border-gray-300/50 text-gray-900'
+                  } focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all`}
+                >
+                  <option value="">Select Platform</option>
+                  <option value="Delta Exchange">Delta Exchange</option>
+                  <option value="Grow">Grow</option>
+                  <option value="Exness">Exness</option>
+                </select>
+              </div>
+
               {/* Notes */}
               <div>
                 <label className={`block text-sm font-medium mb-2 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
@@ -899,6 +923,7 @@ const Withdraw = memo(function Withdraw() {
                     setShowWithdrawModal(false);
                     setWithdrawAmount('');
                     setDescription('');
+                    setPlatform('');
                     setShowQuickAmounts(false);
                   }}
                   disabled={creating}
