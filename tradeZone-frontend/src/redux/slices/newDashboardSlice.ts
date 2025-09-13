@@ -178,4 +178,45 @@ const newDashboardSlice = createSlice({
 
 export const { setTimeframe, clearError, clearAllErrors } = newDashboardSlice.actions;
 
+// Selectors for getting data filtered by timeframe
+export const selectDashboardDataByTimeframe = (state: any, timeframe: string) => {
+  const { positions, wallets, tradePnL, transactions } = state.newDashboard;
+
+  // If data is not loaded yet, return null
+  if (!positions || !tradePnL || !transactions) {
+    return null;
+  }
+
+  return {
+    positions: {
+      summary: positions.summary, // Current totals, not filtered by timeframe
+      chartData: positions.chartData,
+      performance: positions.performance,
+    },
+    wallets: {
+      summary: wallets?.summary, // Current balances
+      chartData: wallets?.chartData,
+      recentActivity: wallets?.recentActivity,
+    },
+    tradePnL: {
+      total: tradePnL.allTimeframeTotals?.[timeframe] || tradePnL.total,
+      statistics: tradePnL.statistics,
+      chartData: tradePnL.chartData,
+      recent: tradePnL.recent,
+    },
+    transactions: {
+      deposits: {
+        ...(transactions.depositsByTimeframe?.[timeframe] || transactions.deposits),
+        recentActivity: transactions.deposits.recentActivity,
+        chartData: transactions.deposits.chartData,
+      },
+      withdrawals: {
+        ...(transactions.withdrawalsByTimeframe?.[timeframe] || transactions.withdrawals),
+        recentActivity: transactions.withdrawals.recentActivity,
+        chartData: transactions.withdrawals.chartData,
+      },
+    },
+  };
+};
+
 export default newDashboardSlice.reducer;

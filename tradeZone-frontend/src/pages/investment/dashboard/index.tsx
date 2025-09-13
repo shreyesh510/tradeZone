@@ -12,7 +12,7 @@ import { fetchDashboardSummary } from '../../../redux/thunks/dashboard/dashboard
 import { 
   fetchAllDashboardData
 } from '../../../redux/thunks/dashboard/newDashboardThunks';
-import { setTimeframe } from '../../../redux/slices/newDashboardSlice';
+import { setTimeframe, selectDashboardDataByTimeframe } from '../../../redux/slices/newDashboardSlice';
 
 interface OnlineUser {
   userId: string;
@@ -20,7 +20,7 @@ interface OnlineUser {
   socketId: string;
 }
 
-type TimeFilter = '1W' | '1M' | '1Y' | '5Y';
+type TimeFilter = '1D' | '1W' | '1M' | '3M' | '6M' | '1Y' | 'ALL';
 
 // ---- Chart Helper Types & Utilities ----
 interface TimeSeriesPoint { period: string; value: number }
@@ -68,56 +68,70 @@ const InvestmentDashboard = memo(function InvestmentDashboard() {
   const { data: oldDashboardData, loading: oldLoading, error: oldError } = useSelector((state: RootState) => state.dashboard);
   const newDashboard = useSelector((state: RootState) => state.newDashboard);
   
+  // Get data filtered by selected timeframe from cached data
+  const dashboardDataByTimeframe = useSelector((state: RootState) =>
+    selectDashboardDataByTimeframe(state, selectedTimeFilter)
+  );
+
   // Use new dashboard data if available, fallback to old
   const loading = newDashboard.loading.all || oldLoading;
   const error = newDashboard.errors.all || oldError;
 
   // Create unified data object for component consumption
-  const dashboardData = {
-    wallets: newDashboard.wallets ? {
-      dematWallet: newDashboard.wallets.summary.dematWallet,
-      bankWallet: newDashboard.wallets.summary.bankWallet,
-      recentActivity: newDashboard.wallets.recentActivity || []
-    } : oldDashboardData?.wallets || {
-      dematWallet: { balance: 0, currency: 'INR', count: 0 },
-      bankWallet: { balance: 0, currency: 'INR', count: 0 },
-      recentActivity: []
+  const dashboardData = dashboardDataByTimeframe ? {
+    wallets: {
+      dematWallet: dashboardDataByTimeframe.wallets.summary?.dematWallet || { balance: 0, currency: 'USD', count: 0 },
+      bankWallet: dashboardDataByTimeframe.wallets.summary?.bankWallet || { balance: 0, currency: 'INR', count: 0 },
+      recentActivity: dashboardDataByTimeframe.wallets.recentActivity || []
     },
-    
-    positions: newDashboard.positions ? {
-      totalInvested: newDashboard.positions.summary.totalInvested,
-      totalPnL: newDashboard.positions.summary.totalPnL
-    } : oldDashboardData?.positions || {
-      totalInvested: 0,
-      totalPnL: 0
+
+    positions: {
+      totalInvested: dashboardDataByTimeframe.positions.summary?.totalInvested || 0,
+      totalPnL: dashboardDataByTimeframe.positions.summary?.totalPnL || 0
     },
-    
-    tradePnL: newDashboard.tradePnL ? {
-      total: newDashboard.tradePnL.total || { netPnL: 0, profit: 0, loss: 0, trades: 0 },
-      statistics: newDashboard.tradePnL.statistics || {
+
+    tradePnL: {
+      total: dashboardDataByTimeframe.tradePnL.total || { netPnL: 0, profit: 0, loss: 0, trades: 0 },
+      statistics: dashboardDataByTimeframe.tradePnL.statistics || {
         netPnL: 0,
         totalTrades: 0,
         winRate: 0,
         averageDailyPnL: 0
       },
-      chartData: newDashboard.tradePnL.chartData
-    } : oldDashboardData?.tradePnL || {
+      chartData: dashboardDataByTimeframe.tradePnL.chartData || { daily: [], weekly: [], monthly: [], yearly: [] }
+    },
+
+    transactions: {
+      deposits: {
+        total: dashboardDataByTimeframe.transactions.deposits?.total || 0,
+        pending: dashboardDataByTimeframe.transactions.deposits?.pending || 0,
+        completed: dashboardDataByTimeframe.transactions.deposits?.completed || 0,
+        list: dashboardDataByTimeframe.transactions.deposits?.recentActivity || []
+      },
+      withdrawals: {
+        chartData: dashboardDataByTimeframe.transactions.withdrawals?.chartData || { daily: [], weekly: [], monthly: [], yearly: [] }
+      }
+    }
+  } : {
+    // Fallback to old dashboard data structure
+    wallets: oldDashboardData?.wallets || {
+      dematWallet: { balance: 0, currency: 'USD', count: 0 },
+      bankWallet: { balance: 0, currency: 'INR', count: 0 },
+      recentActivity: []
+    },
+
+    positions: oldDashboardData?.positions || {
+      totalInvested: 0,
+      totalPnL: 0
+    },
+
+    tradePnL: oldDashboardData?.tradePnL || {
       total: { netPnL: 0, profit: 0, loss: 0, trades: 0 },
       statistics: { netPnL: 0, totalTrades: 0, winRate: 0, averageDailyPnL: 0 },
       chartData: { daily: [], weekly: [], monthly: [], yearly: [] }
     },
-    
-    transactions: newDashboard.transactions ? {
-      deposits: {
-        total: newDashboard.transactions.deposits.total,
-        pending: newDashboard.transactions.deposits.pending,
-        completed: newDashboard.transactions.deposits.completed,
-        list: newDashboard.transactions.deposits.recentActivity || []
-      },
-      withdrawals: {
-        chartData: newDashboard.transactions.withdrawals.chartData
-      }
-    } : oldDashboardData?.transactions || {
+
+    transactions: oldDashboardData?.transactions || {
       deposits: { total: 0, pending: 0, completed: 0, list: [] },
       withdrawals: { chartData: { daily: [], weekly: [], monthly: [], yearly: [] } }
     }
@@ -141,17 +155,33 @@ const InvestmentDashboard = memo(function InvestmentDashboard() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Fetch dashboard data - using new 4-API approach
+  // Check if we need to fetch data (only fetch once, use cached data for timeframe switching)
+  const hasData = useSelector((state: RootState) => {
+    const { positions, tradePnL, transactions } = state.newDashboard;
+    return !!(positions && tradePnL && transactions);
+  });
+
+  const lastUpdated = useSelector((state: RootState) => state.newDashboard.lastUpdated);
+  const cacheTimeout = 5 * 60 * 1000; // 5 minutes
+  const isCacheValid = lastUpdated && (Date.now() - lastUpdated) < cacheTimeout;
+
+  // Fetch dashboard data only once or when cache expires
   useEffect(() => {
-    // Update timeframe in Redux
+    if (!hasData || !isCacheValid) {
+      console.log('🔄 Fetching dashboard data (cache invalid or no data)');
+      // Fetch all dashboard data with ALL timeframes at once
+      dispatch(fetchAllDashboardData('ALL'));
+
+      // Fallback: also fetch old dashboard data for now
+      dispatch(fetchDashboardSummary(365)); // Get 1 year of data
+    } else {
+      console.log('✅ Using cached dashboard data');
+    }
+  }, [dispatch, hasData, isCacheValid]);
+
+  // Update timeframe in Redux when user changes it (no API call needed)
+  useEffect(() => {
     dispatch(setTimeframe(selectedTimeFilter));
-    
-    // Fetch all dashboard data in parallel
-    dispatch(fetchAllDashboardData(selectedTimeFilter));
-    
-    // Fallback: also fetch old dashboard data for now
-    const days = selectedTimeFilter === '1W' ? 7 : selectedTimeFilter === '1M' ? 30 : selectedTimeFilter === '1Y' ? 365 : 1825;
-    dispatch(fetchDashboardSummary(days));
   }, [dispatch, selectedTimeFilter]);
 
   const toggleSidebar = () => {
@@ -234,7 +264,7 @@ const InvestmentDashboard = memo(function InvestmentDashboard() {
       <div className="mb-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex flex-wrap gap-2">
-            {(['1W', '1M', '1Y', '5Y'] as TimeFilter[]).map(filter => (
+            {(['1D', '1W', '1M', '3M', '6M', '1Y', 'ALL'] as TimeFilter[]).map(filter => (
               <button
                 key={filter}
                 onClick={() => setSelectedTimeFilter(filter)}
@@ -254,10 +284,10 @@ const InvestmentDashboard = memo(function InvestmentDashboard() {
           {/* Refresh Button */}
           <RoundedButton
             onClick={() => {
-              dispatch(fetchAllDashboardData(selectedTimeFilter));
-              // Fallback for old API during transition
-              const days = selectedTimeFilter === '1W' ? 7 : selectedTimeFilter === '1M' ? 30 : selectedTimeFilter === '1Y' ? 365 : 1825;
-              dispatch(fetchDashboardSummary(days));
+              console.log('🔄 Manually refreshing dashboard data');
+              // Force refresh all data
+              dispatch(fetchAllDashboardData('ALL'));
+              dispatch(fetchDashboardSummary(365));
             }}
             variant="purple"
             size="md"
@@ -671,12 +701,15 @@ const InvestmentDashboard = memo(function InvestmentDashboard() {
                   const getDataForTimeframe = () => {
                     const chartData = dashboardData.tradePnL?.chartData;
                     if (!chartData) return [];
-                    
+
                     switch (selectedTimeFilter) {
+                      case '1D': return (chartData as any).daily || [];
                       case '1W': return (chartData as any).daily || [];
-                      case '1M': return chartData.weekly || [];
+                      case '1M': return (chartData as any).daily || chartData.weekly || [];
+                      case '3M': return chartData.weekly || [];
+                      case '6M': return chartData.weekly || [];
                       case '1Y': return chartData.monthly || [];
-                      case '5Y': return chartData.yearly || [];
+                      case 'ALL': return chartData.yearly || [];
                       default: return chartData.weekly || [];
                     }
                   };
@@ -817,12 +850,15 @@ const InvestmentDashboard = memo(function InvestmentDashboard() {
               const getDataForTimeframe = () => {
                 const chartData = dashboardData.tradePnL?.chartData;
                 if (!chartData) return [];
-                
+
                 switch (selectedTimeFilter) {
+                  case '1D': return (chartData as any).daily || [];
                   case '1W': return (chartData as any).daily || [];
-                  case '1M': return chartData.weekly || [];
+                  case '1M': return (chartData as any).daily || chartData.weekly || [];
+                  case '3M': return chartData.weekly || [];
+                  case '6M': return chartData.weekly || [];
                   case '1Y': return chartData.monthly || [];
-                  case '5Y': return chartData.yearly || [];
+                  case 'ALL': return chartData.yearly || [];
                   default: return chartData.weekly || [];
                 }
               };
@@ -949,12 +985,15 @@ const InvestmentDashboard = memo(function InvestmentDashboard() {
                   const getWithdrawalDataForTimeframe = () => {
                     const chartData = dashboardData.transactions?.withdrawals?.chartData;
                     if (!chartData) return [];
-                    
+
                     switch (selectedTimeFilter) {
+                      case '1D': return (chartData as any).daily || [];
                       case '1W': return (chartData as any).daily || [];
-                      case '1M': return chartData.weekly || [];
+                      case '1M': return (chartData as any).daily || chartData.weekly || [];
+                      case '3M': return chartData.weekly || [];
+                      case '6M': return chartData.weekly || [];
                       case '1Y': return chartData.monthly || [];
-                      case '5Y': return chartData.yearly || [];
+                      case 'ALL': return chartData.yearly || [];
                       default: return chartData.weekly || [];
                     }
                   };
