@@ -12,7 +12,7 @@ export const fetchTradePnL = createAsyncThunk<TradePnLDto[], number | undefined,
   },
 );
 
-export const createTradePnL = createAsyncThunk<TradePnLDto, { date: string; profit: number; loss: number; netPnL: number; notes?: string; totalTrades?: number; winningTrades?: number; losingTrades?: number }, { rejectValue: string }>(
+export const createTradePnL = createAsyncThunk<TradePnLDto, { date: string; symbol?: string; side?: string; profit: number; loss: number; netPnL: number; notes?: string; totalTrades?: number; winningTrades?: number; losingTrades?: number }, { rejectValue: string }>(
   'tradePnL/create',
   async (payload, { rejectWithValue }) => {
     try {

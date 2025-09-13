@@ -5,6 +5,14 @@ export class CreateTradePnLDto {
   @IsNotEmpty()
   date: string;
 
+  @IsOptional()
+  @IsString()
+  symbol?: string;
+
+  @IsOptional()
+  @IsString()
+  datetime?: string;
+
   @IsNumber()
   @IsNotEmpty()
   profit: number;
