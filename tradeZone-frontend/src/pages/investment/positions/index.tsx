@@ -16,15 +16,8 @@ import Select from '../../../components/select';
 import Radio from '../../../components/radio';
 import RoundedButton from '../../../components/button/RoundedButton';
 // Removed ProgressBar in favor of a dropdown for leverage selection
-import { 
-  PositionCard, 
-  AddPositionForm, 
-  PositionsSummary, 
-  PositionsGrid,
-  ModifyPositionModal,
-  ClosePositionModal
-} from './components';
-import ImportPositionsModal from './components/importPositionsModal';
+import { ModifyPositionModal, ClosePositionModal } from './components';
+import { ImportPositionsModal } from './components/modal';
 import { positionsApi } from '../../../services/positionsApi';
 
 interface OnlineUser {
@@ -55,7 +48,6 @@ const Positions = memo(function Positions() {
   const [showImport, setShowImport] = useState<boolean>(false);
   // Close modal state
   const [showCloseModal, setShowCloseModal] = useState<boolean>(false);
-  const [closePnL, setClosePnL] = useState<string>('');
   const [closingOne, setClosingOne] = useState<boolean>(false);
   const [selectedForClose, setSelectedForClose] = useState<Position | null>(null);
 
@@ -225,22 +217,18 @@ const Positions = memo(function Positions() {
     }
   };
 
-  const submitCloseOne = async () => {
-    if (!selectedForClose?.id) return;
+  const handleClosePosition = async (id: string, pnl?: number) => {
     try {
       setClosingOne(true);
-      const pnlValue = Number(closePnL);
       await dispatch(
         updatePosition({
-          id: selectedForClose.id,
-          data: { status: 'closed', pnl: Number.isFinite(pnlValue) ? pnlValue : 0, closedAt: new Date() as any },
+          id,
+          data: { status: 'closed', pnl: Number.isFinite(pnl) ? pnl : 0, closedAt: new Date() as any },
         })
       ).unwrap();
       toast.success('Position closed');
       setShowCloseModal(false);
       setSelectedForClose(null);
-      setClosePnL('');
-      // Removed fetchPositions call - Redux state is already updated by updatePosition.fulfilled
     } catch (err) {
       toast.error('Failed to close position');
     } finally {
@@ -890,38 +878,17 @@ const Positions = memo(function Positions() {
         />
       )}
 
-      {/* Close Modal */}
-      {showCloseModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className={`${isDarkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900'} w-full max-w-md rounded-2xl shadow-xl overflow-hidden`}>
-            <div className={`px-6 py-4 border-b ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-              <h3 className="text-lg font-semibold">Close Position{selectedForClose ? '' : 's'}</h3>
-              <p className={`text-sm mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Enter realized PnL for record keeping. You can close the selected position or close all.</p>
-            </div>
-            <div className="px-6 py-5 space-y-4">
-              <div>
-                <label className={`block text-sm mb-1 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>PnL (USD)</label>
-                <input
-                  type="number"
-                  value={closePnL}
-                  onChange={(e) => setClosePnL(e.target.value)}
-                  placeholder="e.g. 125.50 or -42.10"
-                  className={`w-full px-3 py-2 rounded-lg border outline-none ${isDarkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
-                />
-              </div>
-              {selectedForClose && (
-                <button onClick={submitCloseOne} disabled={closingOne} className={`w-full py-2.5 rounded-lg font-medium ${closingOne ? 'opacity-60' : ''} ${isDarkMode ? 'bg-red-600 hover:bg-red-700' : 'bg-red-600 hover:bg-red-700'} text-white`}>
-                  {closingOne ? 'Closing…' : `Close ${selectedForClose.symbol}`}
-                </button>
-              )}
-              {/* Removed Close All action */}
-              <button onClick={() => { setShowCloseModal(false); setSelectedForClose(null); setClosePnL(''); }} className={`w-full py-2.5 rounded-lg font-medium ${isDarkMode ? 'bg-gray-700 hover:bg-gray-600 text-gray-200' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'}`}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Close Position Modal */}
+      <ClosePositionModal
+        position={selectedForClose}
+        isOpen={showCloseModal}
+        onClose={() => {
+          setShowCloseModal(false);
+          setSelectedForClose(null);
+        }}
+        onConfirm={handleClosePosition}
+        isDarkMode={isDarkMode}
+      />
 
       {/* Modify Modal */}
       <ModifyPositionModal

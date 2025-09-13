@@ -196,7 +196,7 @@ const ImportPositionsModal: React.FC<Props> = ({ open, isDarkMode, onClose, onIm
   const handleConfirmImport = async (confirmedItems: any[]) => {
     try {
       setBusy(true);
-      const { positionsApi } = await import('../../../../services/positionsApi');
+      const { positionsApi } = await import('../../../../../services/positionsApi');
       const res = await positionsApi.importPositions(confirmedItems, account);
       alert(`Imported: ${res.created}, Skipped (duplicates/invalid): ${res.skipped}`);
       onImported();

@@ -9,8 +9,8 @@ import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '../../../redux/store';
 import { fetchWallets, createWallet, updateWallet, deleteWallet, fetchWalletHistory } from '../../../redux/thunks/wallets/walletsThunks';
 import ConfirmModal from '../../../components/modal/confirmModal';
-import EditWalletModal from '../../../components/modal/editWalletModal';
-import AddWalletModal from '../../../components/modal/addWalletModal';
+import { AddWalletModal, EditWalletModal } from './components/modal';
+import RoundedButton from '../../../components/button/RoundedButton';
 
 interface WalletCardProps {
   wallet: any;
@@ -72,32 +72,32 @@ const WalletCard: React.FC<WalletCardProps> = ({ wallet, isDark, onEdit, onDelet
           
           {/* Actions */}
           <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
-            <button
+            <RoundedButton
               onClick={onEdit}
-              className={`p-2 rounded-lg transition-all hover:scale-110 ${
-                isDark 
-                  ? 'text-blue-400 hover:bg-blue-500/20' 
-                  : 'text-blue-600 hover:bg-blue-100'
-              }`}
-              title="Edit wallet"
+              variant="primary"
+              size="sm"
+              isDarkMode={isDark}
+              className="!px-2 !py-2"
+              icon={
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+              }
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-              </svg>
-            </button>
-            <button
+            </RoundedButton>
+            <RoundedButton
               onClick={onDelete}
-              className={`p-2 rounded-lg transition-all hover:scale-110 ${
-                isDark 
-                  ? 'text-red-400 hover:bg-red-500/20' 
-                  : 'text-red-600 hover:bg-red-100'
-              }`}
-              title="Delete wallet"
+              variant="danger"
+              size="sm"
+              isDarkMode={isDark}
+              className="!px-2 !py-2"
+              icon={
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              }
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-            </button>
+            </RoundedButton>
           </div>
         </div>
         
@@ -246,46 +246,40 @@ const WalletsPage = memo(function WalletsPage() {
             
             {/* Quick Actions */}
             <div className="flex items-center space-x-3 mt-4 md:mt-0">
-              <button
+              <RoundedButton
                 onClick={() => setAddOpen(true)}
-                className="px-4 py-2 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white font-medium rounded-xl transition-all duration-300 hover:scale-105"
-              >
-                <div className="flex items-center space-x-2">
+                variant="primary"
+                size="md"
+                isDarkMode={isDark}
+                className="bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600"
+                icon={
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                   </svg>
-                  <span>Add Wallet</span>
-                </div>
-              </button>
+                }
+              >
+                Add Wallet
+              </RoundedButton>
               
-              <button
+              <RoundedButton
                 onClick={() => { 
                   dispatch(fetchWallets()); 
                   dispatch(fetchWalletHistory()); 
                 }}
                 disabled={loading}
-                className={`px-4 py-2 rounded-xl font-medium transition-all duration-300 ${
-                  loading 
-                    ? 'bg-gray-400 text-white cursor-not-allowed' 
-                    : isDark
-                    ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                    : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
-                }`}
-              >
-                {loading ? (
-                  <div className="flex items-center space-x-2">
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                    <span>Loading...</span>
-                  </div>
+                variant="secondary"
+                size="md"
+                isDarkMode={isDark}
+                icon={loading ? (
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
                 ) : (
-                  <div className="flex items-center space-x-2">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    <span>Refresh</span>
-                  </div>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
                 )}
-              </button>
+              >
+                {loading ? 'Loading...' : 'Refresh'}
+              </RoundedButton>
               
               <div className={`px-3 py-1 rounded-lg ${
                 isDark ? 'bg-purple-500/20 text-purple-400' : 'bg-purple-100 text-purple-700'
@@ -393,42 +387,33 @@ const WalletsPage = memo(function WalletsPage() {
               <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                 {/* Type Filter */}
                 <div className="flex gap-2">
-                  <button
+                  <RoundedButton
                     onClick={() => setFilterType('all')}
-                    className={`px-4 py-2 rounded-lg font-medium transition-all text-sm ${
-                      filterType === 'all'
-                        ? 'bg-blue-600 text-white shadow-lg scale-105'
-                        : isDark
-                        ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
+                    variant={filterType === 'all' ? 'primary' : 'secondary'}
+                    size="md"
+                    isDarkMode={isDark}
+                    isActive={filterType === 'all'}
                   >
                     All Wallets
-                  </button>
-                  <button
+                  </RoundedButton>
+                  <RoundedButton
                     onClick={() => setFilterType('bank')}
-                    className={`px-4 py-2 rounded-lg font-medium transition-all text-sm ${
-                      filterType === 'bank'
-                        ? 'bg-blue-600 text-white shadow-lg scale-105'
-                        : isDark
-                        ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
+                    variant={filterType === 'bank' ? 'primary' : 'secondary'}
+                    size="md"
+                    isDarkMode={isDark}
+                    isActive={filterType === 'bank'}
                   >
                     Bank Accounts
-                  </button>
-                  <button
+                  </RoundedButton>
+                  <RoundedButton
                     onClick={() => setFilterType('demat')}
-                    className={`px-4 py-2 rounded-lg font-medium transition-all text-sm ${
-                      filterType === 'demat'
-                        ? 'bg-blue-600 text-white shadow-lg scale-105'
-                        : isDark
-                        ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
+                    variant={filterType === 'demat' ? 'primary' : 'secondary'}
+                    size="md"
+                    isDarkMode={isDark}
+                    isActive={filterType === 'demat'}
                   >
                     Demat Accounts
-                  </button>
+                  </RoundedButton>
                 </div>
 
                 {/* Search */}

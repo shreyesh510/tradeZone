@@ -3,6 +3,7 @@ import React from 'react';
 interface RoundedButtonProps {
   onClick: () => void;
   variant?: 'primary' | 'secondary' | 'danger' | 'purple';
+  size?: 'sm' | 'md' | 'lg';
   children: React.ReactNode;
   className?: string;
   disabled?: boolean;
@@ -14,6 +15,7 @@ interface RoundedButtonProps {
 const RoundedButton: React.FC<RoundedButtonProps> = ({
   onClick,
   variant = 'primary',
+  size = 'md',
   children,
   className = '',
   disabled = false,
@@ -31,10 +33,12 @@ const RoundedButton: React.FC<RoundedButtonProps> = ({
         return 'bg-blue-600 text-white hover:bg-blue-700';
       case 'secondary':
         return isDarkMode 
-          ? 'bg-gray-700 hover:bg-gray-600 text-white' 
-          : 'bg-gray-200 hover:bg-gray-300 text-gray-700';
+          ? 'bg-gray-700/50 text-gray-300 hover:bg-gray-600/50' 
+          : 'bg-gray-200/50 text-gray-700 hover:bg-gray-300/50';
       case 'danger':
-        return 'bg-red-600 text-white hover:bg-red-700';
+        return isDarkMode 
+          ? 'bg-red-600/20 text-red-400 hover:bg-red-600/30' 
+          : 'bg-red-100 text-red-600 hover:bg-red-200';
       case 'purple':
         return 'bg-purple-600 hover:bg-purple-700 text-white';
       default:
@@ -42,11 +46,24 @@ const RoundedButton: React.FC<RoundedButtonProps> = ({
     }
   };
 
+  const getSizeClasses = () => {
+    switch (size) {
+      case 'sm':
+        return 'px-3 py-1 text-xs';
+      case 'md':
+        return 'px-4 py-2 text-sm';
+      case 'lg':
+        return 'px-6 py-3 text-base';
+      default:
+        return 'px-4 py-2 text-sm';
+    }
+  };
+
   return (
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`px-6 py-3 rounded-lg font-medium transition-colors ${getVariantClasses()} ${className} ${
+      className={`${getSizeClasses()} rounded-lg font-medium transition-colors ${getVariantClasses()} ${className} ${
         disabled ? 'opacity-50 cursor-not-allowed' : ''
       }`}
     >

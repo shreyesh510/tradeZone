@@ -160,28 +160,10 @@ class MessageStorage {
   }
 
   /**
-   * Add a single message and save to localStorage
-   */
-  addMessage(message: Message, existingMessages: Message[]): Message[] {
-    const updatedMessages = [...existingMessages, message];
-    this.saveMessages(updatedMessages);
-    return updatedMessages;
-  }
-
-  /**
    * Update existing messages and save to localStorage
    */
   updateMessages(messages: Message[]): void {
     this.saveMessages(messages);
-  }
-
-  /**
-   * Clear all messages from localStorage
-   */
-  clearMessages(): void {
-    localStorage.removeItem(MessageStorage.STORAGE_KEY);
-    localStorage.removeItem(MessageStorage.SESSION_KEY);
-    console.log('🗑️ Cleared all messages from localStorage');
   }
 
   /**
