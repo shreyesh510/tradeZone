@@ -11,11 +11,22 @@ import { WithdrawalsModule } from './withdrawals/withdrawals.module';
 import { DepositsModule } from './deposits/deposits.module';
 import { WalletsModule } from './wallets/wallets.module';
 import { TradePnLModule } from './trade-pnl/trade-pnl.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 import { FirebaseDatabaseService } from './database/firebase-database.service';
 
 @Module({
-  imports: [AuthModule, ChatModule, DatabaseModule, PositionsModule, WithdrawalsModule, DepositsModule, WalletsModule, TradePnLModule],
+  imports: [
+    AuthModule,
+    ChatModule,
+    DatabaseModule,
+    PositionsModule,
+    WithdrawalsModule,
+    DepositsModule,
+    WalletsModule,
+    TradePnLModule,
+    DashboardModule,
+  ],
   controllers: [AppController],
   providers: [
     AppService,
@@ -26,7 +37,9 @@ import { FirebaseDatabaseService } from './database/firebase-database.service';
   ],
 })
 export class AppModule implements OnModuleInit {
-  constructor(private readonly firebaseDatabaseService: FirebaseDatabaseService) {}
+  constructor(
+    private readonly firebaseDatabaseService: FirebaseDatabaseService,
+  ) {}
 
   async onModuleInit() {
     // Initialize sample data in Firebase

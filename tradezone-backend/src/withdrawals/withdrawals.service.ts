@@ -6,7 +6,12 @@ import type { Withdrawal } from './entities/withdrawal.entity';
 export class WithdrawalsService {
   constructor(private readonly db: FirebaseDatabaseService) {}
 
-  async create(userId: string, amount: number, method?: string, description?: string): Promise<Withdrawal> {
+  async create(
+    userId: string,
+    amount: number,
+    method?: string,
+    description?: string,
+  ): Promise<Withdrawal> {
     const base = {
       userId,
       amount,
@@ -22,7 +27,11 @@ export class WithdrawalsService {
     return await this.db.getWithdrawals(userId);
   }
 
-  async update(userId: string, id: string, data: Partial<Withdrawal>): Promise<boolean> {
+  async update(
+    userId: string,
+    id: string,
+    data: Partial<Withdrawal>,
+  ): Promise<boolean> {
     return await this.db.updateWithdrawal(userId, id, data);
   }
 

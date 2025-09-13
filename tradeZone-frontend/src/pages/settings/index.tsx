@@ -7,10 +7,10 @@ import {
   cryptoOptions, 
   timeframeOptions, 
   chartStyleOptions 
-} from '../../contexts/SettingsContext';
-import Header from '../../layouts/Header';
-import Sidebar from '../../components/Sidebar';
-import FloatingNav, { type MobileTab } from '../../layouts/FloatingNav';
+} from '../../contexts/settingsContext';
+import Header from '../../layouts/header';
+import Sidebar from '../../layouts/sidebar';
+import FloatingButton, { type MobileTab } from '../../components/button/floatingButton';
 
 interface OnlineUser {
   userId: string;
@@ -125,7 +125,7 @@ const Settings: React.FC = () => {
         </div>
 
         {/* Floating Navigation */}
-        <FloatingNav activeTab={activeTab} onTabChange={handleTabChange} />
+        <FloatingButton activeTab={activeTab} onTabChange={handleTabChange} />
       </div>
     );
   }

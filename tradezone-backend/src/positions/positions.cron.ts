@@ -46,9 +46,11 @@ export class PositionsCronService {
         updated += ids.length;
       }
 
-      this.logger.log(`Price refresh completed. Symbols: ${symbols.length}, Documents updated: ${updated}`);
+      this.logger.log(
+        `Price refresh completed. Symbols: ${symbols.length}, Documents updated: ${updated}`,
+      );
     } catch (err) {
-      this.logger.error('Error during price refresh cron', err as any);
+      this.logger.error('Error during price refresh cron', err);
     }
   }
 }

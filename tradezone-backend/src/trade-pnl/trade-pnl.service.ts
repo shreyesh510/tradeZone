@@ -41,22 +41,30 @@ export class TradePnLService {
 
   async findAll(userId: string, days?: number): Promise<TradePnL[]> {
     const items = await this.firebaseDatabaseService.getTradePnL(userId);
-    
+
     if (!days) {
       return items;
     }
-    
+
     // Filter items by date range - use date-only comparison
     const today = new Date();
-    const cutoffDate = new Date(today.getFullYear(), today.getMonth(), today.getDate() - days + 1);
+    const cutoffDate = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate() - days + 1,
+    );
     const cutoffDateString = cutoffDate.toISOString().split('T')[0]; // YYYY-MM-DD format
-    
-    console.log(`Filtering items from ${cutoffDateString} onwards (${days} days including today ${today.toISOString().split('T')[0]})`);
-    
+
+    console.log(
+      `Filtering items from ${cutoffDateString} onwards (${days} days including today ${today.toISOString().split('T')[0]})`,
+    );
+
     return items.filter((item) => {
       const itemDateString = item.date.split('T')[0]; // Handle both YYYY-MM-DD and full ISO strings
       const isIncluded = itemDateString >= cutoffDateString;
-      console.log(`Item ${itemDateString}: ${isIncluded ? 'INCLUDED' : 'EXCLUDED'} (cutoff: ${cutoffDateString})`);
+      console.log(
+        `Item ${itemDateString}: ${isIncluded ? 'INCLUDED' : 'EXCLUDED'} (cutoff: ${cutoffDateString})`,
+      );
       return isIncluded;
     });
   }
@@ -122,38 +130,44 @@ export class TradePnLService {
       errors: [],
     };
 
-    console.log(`Starting bulk import for ${items.length} items for user ${userId}`);
-    
+    console.log(
+      `Starting bulk import for ${items.length} items for user ${userId}`,
+    );
+
     // Process items in batches of 50 to avoid overwhelming the database
     const batchSize = 50;
     for (let i = 0; i < items.length; i += batchSize) {
       const batch = items.slice(i, i + batchSize);
-      console.log(`Processing batch ${Math.floor(i / batchSize) + 1} of ${Math.ceil(items.length / batchSize)} (${batch.length} items)`);
-      
-      // Process each item in the batch
-      const batchPromises: Promise<ImportItemResult>[] = batch.map(async (item): Promise<ImportItemResult> => {
-        try {
-          // Skip if netPnL is zero (no realized P&L)
-          if (item.netPnL === 0) {
-            return { type: 'skipped' };
-          }
+      console.log(
+        `Processing batch ${Math.floor(i / batchSize) + 1} of ${Math.ceil(items.length / batchSize)} (${batch.length} items)`,
+      );
 
-          // Create the item
-          await this.create(item, userId);
-          return { type: 'created' };
-        } catch (error) {
-          return {
-            type: 'error',
-            message: `Failed to create record for ${item.date}: ${error?.message || 'Unknown error'}`,
-          };
-        }
-      });
+      // Process each item in the batch
+      const batchPromises: Promise<ImportItemResult>[] = batch.map(
+        async (item): Promise<ImportItemResult> => {
+          try {
+            // Skip if netPnL is zero (no realized P&L)
+            if (item.netPnL === 0) {
+              return { type: 'skipped' };
+            }
+
+            // Create the item
+            await this.create(item, userId);
+            return { type: 'created' };
+          } catch (error) {
+            return {
+              type: 'error',
+              message: `Failed to create record for ${item.date}: ${error?.message || 'Unknown error'}`,
+            };
+          }
+        },
+      );
 
       // Wait for the batch to complete
       const batchResults: ImportItemResult[] = await Promise.all(batchPromises);
-      
+
       // Aggregate results
-      batchResults.forEach(batchResult => {
+      batchResults.forEach((batchResult) => {
         if (batchResult.type === 'created') {
           result.created++;
         } else if (batchResult.type === 'skipped') {
@@ -165,7 +179,9 @@ export class TradePnLService {
       });
     }
 
-    console.log(`Bulk import completed: Created ${result.created}, Skipped ${result.skipped}, Errors ${result.errors.length}`);
+    console.log(
+      `Bulk import completed: Created ${result.created}, Skipped ${result.skipped}, Errors ${result.errors.length}`,
+    );
     return result;
   }
 

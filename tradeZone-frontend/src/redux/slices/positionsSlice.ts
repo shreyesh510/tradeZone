@@ -7,20 +7,41 @@ import {
   deletePosition,
   fetchOpenPositions,
   fetchClosedPositions,
+  fetchDashboardPositions,
 } from '../thunks/positions/positionsThunks';
 import type { Position, PositionLike, PositionFilters } from '../../types/position';
+
+interface DashboardPositionsData {
+  summary: {
+    totalPositions: number;
+    totalInvested: number;
+    totalPnL: number;
+  };
+  chartData: {
+    daily: any[];
+    weekly: any[];
+    monthly: any[];
+    yearly: any[];
+  };
+  performance: {
+    dayChange: number;
+    percentChange: number;
+  };
+}
 
 interface PositionsState {
   positions: PositionLike[];
   openPositions: Position[];
   closedPositions: Position[];
   currentPosition: Position | null;
+  dashboardData: DashboardPositionsData | null;
   loading: boolean;
   openLoading: boolean;
   closedLoading: boolean;
   createLoading: boolean;
   updateLoading: boolean;
   deleteLoading: boolean;
+  dashboardLoading: boolean;
   error: string | null;
   filters: PositionFilters;
   lastUpdated: number | null;
@@ -31,12 +52,14 @@ const initialState: PositionsState = {
   openPositions: [],
   closedPositions: [],
   currentPosition: null,
+  dashboardData: null,
   loading: false,
   openLoading: false,
   closedLoading: false,
   createLoading: false,
   updateLoading: false,
   deleteLoading: false,
+  dashboardLoading: false,
   error: null,
   filters: { status: 'all' },
   lastUpdated: null,
@@ -260,6 +283,21 @@ const positionsSlice = createSlice({
       })
       .addCase(fetchClosedPositions.rejected, (state, action) => {
         state.closedLoading = false;
+        state.error = action.payload as string;
+      })
+      
+      // Fetch dashboard positions
+      .addCase(fetchDashboardPositions.pending, (state) => {
+        state.dashboardLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchDashboardPositions.fulfilled, (state, action: PayloadAction<DashboardPositionsData>) => {
+        state.dashboardLoading = false;
+        state.dashboardData = action.payload;
+        state.error = null;
+      })
+      .addCase(fetchDashboardPositions.rejected, (state, action) => {
+        state.dashboardLoading = false;
         state.error = action.payload as string;
       })
   // Bulk import removed

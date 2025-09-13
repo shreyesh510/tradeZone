@@ -1,12 +1,12 @@
 import { memo, useState, useEffect } from 'react';
-import LiveChart from '../../components/LiveChart';
-import Header from '../../layouts/Header';
-import Chat from '../dashboard/components/Chat';
-import Sidebar from '../../components/Sidebar';
-import FloatingNav, { type MobileTab } from '../../layouts/FloatingNav';
-import ResizablePane from '../../components/ResizablePane';
+import LiveChart from '../../components/chart/liveChart';
+import Header from '../../layouts/header';
+import Chat from '../dashboard/components/chat';
+import Sidebar from '../../layouts/sidebar';
+import FloatingButton, { type MobileTab } from '../../components/button/floatingButton';
+import ResizablePane from '../../layouts/resizablePane';
 import Settings from '../settings';
-import { useSettings } from '../../contexts/SettingsContext';
+import { useSettings } from '../../contexts/settingsContext';
 
 interface OnlineUser {
   userId: string;
@@ -70,7 +70,7 @@ const Zone = memo(function Zone() {
           </div>
 
           {/* Floating Navigation */}
-          <FloatingNav activeTab={activeTab} onTabChange={handleTabChange} />
+          <FloatingButton activeTab={activeTab} onTabChange={handleTabChange} />
         </div>
       );
     }

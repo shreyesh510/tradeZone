@@ -6,8 +6,18 @@ import type { Deposit } from './entities/deposit.entity';
 export class DepositsService {
   constructor(private readonly db: FirebaseDatabaseService) {}
 
-  async create(userId: string, amount: number, method?: string, description?: string): Promise<Deposit> {
-    const base: any = { userId, amount, status: 'pending', requestedAt: new Date() };
+  async create(
+    userId: string,
+    amount: number,
+    method?: string,
+    description?: string,
+  ): Promise<Deposit> {
+    const base: any = {
+      userId,
+      amount,
+      status: 'pending',
+      requestedAt: new Date(),
+    };
     if (method !== undefined) base.method = method;
     if (description !== undefined) base.description = description;
     return await this.db.createDeposit(base);
@@ -17,7 +27,11 @@ export class DepositsService {
     return await this.db.getDeposits(userId);
   }
 
-  async update(userId: string, id: string, data: Partial<Deposit>): Promise<boolean> {
+  async update(
+    userId: string,
+    id: string,
+    data: Partial<Deposit>,
+  ): Promise<boolean> {
     return await this.db.updateDeposit(userId, id, data);
   }
 

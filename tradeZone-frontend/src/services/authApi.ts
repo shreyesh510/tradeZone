@@ -1,4 +1,4 @@
-import api from './api';
+import getAxios from '../utils/interceptor/axiosInterceptor';
 import type { UserPermissions } from '../types/permissions';
 
 export interface LoginData {
@@ -27,12 +27,12 @@ export interface AuthResponse {
 
 export const authApi = {
   login: async (data: LoginData): Promise<AuthResponse> => {
-    const response = await api.post('/auth/login', data);
+    const response = await getAxios.post('/auth/login', data);
     return response.data;
   },
 
   register: async (data: RegisterData): Promise<AuthResponse> => {
-    const response = await api.post('/auth/register', data);
+    const response = await getAxios.post('/auth/register', data);
     return response.data;
   },
 

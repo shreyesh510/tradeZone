@@ -1,7 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { FirebaseConfig } from '../config/firebase.config';
 import * as admin from 'firebase-admin';
-import { Permission, UserPermissions, DEFAULT_USER_PERMISSIONS } from '../auth/entities/permission.entity';
+import {
+  Permission,
+  UserPermissions,
+  DEFAULT_USER_PERMISSIONS,
+} from '../auth/entities/permission.entity';
 import { Position } from '../positions/entities/position.entity';
 
 export interface User {
@@ -42,10 +46,12 @@ export class FirebaseDatabaseService {
   // User operations
   async getUsers(): Promise<User[]> {
     try {
-      const snapshot = await this.getFirestore().collection(this.usersCollection).get();
-      return snapshot.docs.map(doc => ({
+      const snapshot = await this.getFirestore()
+        .collection(this.usersCollection)
+        .get();
+      return snapshot.docs.map((doc) => ({
         id: doc.id,
-        ...doc.data()
+        ...doc.data(),
       })) as User[];
     } catch (error) {
       console.error('Error getting users:', error);
@@ -68,7 +74,7 @@ export class FirebaseDatabaseService {
       const doc = snapshot.docs[0];
       return {
         id: doc.id,
-        ...doc.data()
+        ...doc.data(),
       } as User;
     } catch (error) {
       console.error('Error finding user by email:', error);
@@ -78,17 +84,19 @@ export class FirebaseDatabaseService {
 
   async createUser(userData: Omit<User, 'id'>): Promise<User> {
     try {
-      const docRef = await this.getFirestore().collection(this.usersCollection).add({
-        ...userData,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      });
+      const docRef = await this.getFirestore()
+        .collection(this.usersCollection)
+        .add({
+          ...userData,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
 
       return {
         id: docRef.id,
         ...userData,
         createdAt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
       };
     } catch (error) {
       console.error('Error creating user:', error);
@@ -103,7 +111,7 @@ export class FirebaseDatabaseService {
         .doc(userId)
         .update({
           ...userData,
-          updatedAt: new Date()
+          updatedAt: new Date(),
         });
     } catch (error) {
       console.error('Error updating user:', error);
@@ -128,33 +136,35 @@ export class FirebaseDatabaseService {
   // Initialize with sample data
   async initializeSampleData(): Promise<void> {
     try {
-      const usersSnapshot = await this.getFirestore().collection(this.usersCollection).get();
-      
+      const usersSnapshot = await this.getFirestore()
+        .collection(this.usersCollection)
+        .get();
+
       if (usersSnapshot.empty) {
-  // Initializing sample users...
-        
+        // Initializing sample users...
+
         const sampleUsers = [
           {
             name: 'vivekkolhe',
             email: 'vivekkolhe@gmail.com',
             password: 'Vivek@123',
             createdAt: new Date(),
-            updatedAt: new Date()
+            updatedAt: new Date(),
           },
           {
             name: 'shreyashkolhe',
             email: 'shreyashkolhe@gmail.com',
             password: 'shreyash@123',
             createdAt: new Date(),
-            updatedAt: new Date()
-          }
+            updatedAt: new Date(),
+          },
         ];
 
         for (const user of sampleUsers) {
           await this.createUser(user);
         }
-        
-  // Sample users initialized successfully
+
+        // Sample users initialized successfully
       }
     } catch (error) {
       console.error('Error initializing sample data:', error);
@@ -162,21 +172,26 @@ export class FirebaseDatabaseService {
   }
 
   // Permission operations
-  async createUserPermissions(userId: string, permissions: UserPermissions = DEFAULT_USER_PERMISSIONS): Promise<Permission> {
+  async createUserPermissions(
+    userId: string,
+    permissions: UserPermissions = DEFAULT_USER_PERMISSIONS,
+  ): Promise<Permission> {
     try {
       const permissionData = {
         userId,
         permissions,
       };
 
-      const docRef = await this.getFirestore().collection(this.permissionsCollection).add(permissionData);
-      
+      const docRef = await this.getFirestore()
+        .collection(this.permissionsCollection)
+        .add(permissionData);
+
       const permission: Permission = {
         _id: docRef.id,
         ...permissionData,
       };
 
-  // Permissions created for user
+      // Permissions created for user
       return permission;
     } catch (error) {
       console.error('Error creating user permissions:', error);
@@ -193,14 +208,14 @@ export class FirebaseDatabaseService {
         .get();
 
       if (snapshot.empty) {
-  // No permissions found; creating default permissions
+        // No permissions found; creating default permissions
         return await this.createUserPermissions(userId);
       }
 
       const doc = snapshot.docs[0];
       return {
         _id: doc.id,
-        ...doc.data()
+        ...doc.data(),
       } as Permission;
     } catch (error) {
       console.error('Error getting user permissions:', error);
@@ -208,11 +223,14 @@ export class FirebaseDatabaseService {
     }
   }
 
-  async updateUserPermissions(userId: string, permissions: Partial<UserPermissions>): Promise<Permission> {
+  async updateUserPermissions(
+    userId: string,
+    permissions: Partial<UserPermissions>,
+  ): Promise<Permission> {
     try {
       // Get existing permissions
       const existingPermission = await this.getUserPermissions(userId);
-      
+
       if (!existingPermission) {
         throw new Error(`No permissions found for user ${userId}`);
       }
@@ -220,7 +238,7 @@ export class FirebaseDatabaseService {
       // Merge with existing permissions
       const updatedPermissions = {
         ...existingPermission.permissions,
-        ...permissions
+        ...permissions,
       };
 
       const updateData = {
@@ -236,8 +254,8 @@ export class FirebaseDatabaseService {
         .doc(existingPermission._id)
         .update(updateData);
 
-  // Updated permissions for user
-      
+      // Updated permissions for user
+
       return {
         ...existingPermission,
         ...updateData,
@@ -256,12 +274,12 @@ export class FirebaseDatabaseService {
         .get();
 
       const batch = this.getFirestore().batch();
-      snapshot.docs.forEach(doc => {
+      snapshot.docs.forEach((doc) => {
         batch.delete(doc.ref);
       });
 
       await batch.commit();
-  // Deleted permissions for user
+      // Deleted permissions for user
     } catch (error) {
       console.error('Error deleting user permissions:', error);
       throw error;
@@ -270,10 +288,12 @@ export class FirebaseDatabaseService {
 
   async getAllUserPermissions(): Promise<Permission[]> {
     try {
-      const snapshot = await this.getFirestore().collection(this.permissionsCollection).get();
-      return snapshot.docs.map(doc => ({
+      const snapshot = await this.getFirestore()
+        .collection(this.permissionsCollection)
+        .get();
+      return snapshot.docs.map((doc) => ({
         _id: doc.id,
-        ...doc.data()
+        ...doc.data(),
       })) as Permission[];
     } catch (error) {
       console.error('Error getting all permissions:', error);
@@ -284,34 +304,34 @@ export class FirebaseDatabaseService {
   // Position operations
   async getPositions(userId: string): Promise<Position[]> {
     try {
-  // Fetching positions for user
-      
+      // Fetching positions for user
+
       const snapshot = await this.getFirestore()
         .collection(this.positionsCollection)
         .where('userId', '==', userId)
         .get();
-      
-  // Firestore query returned documents
-      
-      const positions = snapshot.docs.map(doc => {
+
+      // Firestore query returned documents
+
+      const positions = snapshot.docs.map((doc) => {
         const data = doc.data();
-  // Mapping position document
+        // Mapping position document
         return {
           id: doc.id,
-          ...data
+          ...data,
         };
       }) as Position[];
-      
-  // Mapped positions
-      
+
+      // Mapped positions
+
       // Sort by createdAt in JavaScript instead of Firestore
       const sortedPositions = positions.sort((a, b) => {
         const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
         const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
         return dateB - dateA; // Descending order
       });
-      
-  // Returning sorted positions
+
+      // Returning sorted positions
       return sortedPositions;
     } catch (error) {
       console.error('❌ Error getting positions:', error);
@@ -319,7 +339,10 @@ export class FirebaseDatabaseService {
     }
   }
 
-  async getPositionsBySymbol(userId: string, symbol: string): Promise<Position[]> {
+  async getPositionsBySymbol(
+    userId: string,
+    symbol: string,
+  ): Promise<Position[]> {
     try {
       const sym = (symbol || '').toUpperCase();
       const snapshot = await this.getFirestore()
@@ -328,9 +351,9 @@ export class FirebaseDatabaseService {
         .where('symbol', '==', sym)
         .get();
 
-      const positions = snapshot.docs.map(doc => ({
+      const positions = snapshot.docs.map((doc) => ({
         id: doc.id,
-        ...doc.data()
+        ...doc.data(),
       })) as Position[];
 
       // Sort by createdAt desc (fallback to 0)
@@ -358,7 +381,7 @@ export class FirebaseDatabaseService {
 
       return {
         id: doc.id,
-        ...doc.data()
+        ...doc.data(),
       } as Position;
     } catch (error) {
       console.error('Error getting position by ID:', error);
@@ -370,17 +393,19 @@ export class FirebaseDatabaseService {
     try {
       // Use serverTimestamp() for Firestore timestamps
       const now = new Date();
-      const docRef = await this.getFirestore().collection(this.positionsCollection).add({
-        ...positionData,
-        createdAt: now,
-        updatedAt: now
-      });
+      const docRef = await this.getFirestore()
+        .collection(this.positionsCollection)
+        .add({
+          ...positionData,
+          createdAt: now,
+          updatedAt: now,
+        });
 
       return {
         id: docRef.id,
         ...positionData,
         createdAt: now,
-        updatedAt: now
+        updatedAt: now,
       };
     } catch (error) {
       console.error('Error creating position:', error);
@@ -388,14 +413,17 @@ export class FirebaseDatabaseService {
     }
   }
 
-  async updatePosition(positionId: string, positionData: Partial<Position>): Promise<void> {
+  async updatePosition(
+    positionId: string,
+    positionData: Partial<Position>,
+  ): Promise<void> {
     try {
       await this.getFirestore()
         .collection(this.positionsCollection)
         .doc(positionId)
         .update({
           ...positionData,
-          updatedAt: new Date()
+          updatedAt: new Date(),
         });
     } catch (error) {
       console.error('Error updating position:', error);
@@ -441,11 +469,16 @@ export class FirebaseDatabaseService {
         createdAt: now,
       } as Record<string, any>;
       // Strip undefined
-      const payload = Object.entries(raw).reduce((acc, [k, v]) => {
-        if (v !== undefined) (acc as any)[k] = v;
-        return acc;
-      }, {} as Record<string, any>);
-      const docRef = await db.collection(this.positionsHistoryCollection).add(payload);
+      const payload = Object.entries(raw).reduce(
+        (acc, [k, v]) => {
+          if (v !== undefined) (acc as any)[k] = v;
+          return acc;
+        },
+        {} as Record<string, any>,
+      );
+      const docRef = await db
+        .collection(this.positionsHistoryCollection)
+        .add(payload);
       return docRef.id;
     } catch (error) {
       console.error('Error adding position history entry:', error);
@@ -467,11 +500,13 @@ export class FirebaseDatabaseService {
         return { id: d.id, ...data, createdAt };
       });
       const sorted = items.sort((a, b) => {
-        const at = a.createdAt ? new Date(a.createdAt as any).getTime() : 0;
-        const bt = b.createdAt ? new Date(b.createdAt as any).getTime() : 0;
+        const at = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const bt = b.createdAt ? new Date(b.createdAt).getTime() : 0;
         return bt - at;
       });
-      return typeof limit === 'number' && limit > 0 ? sorted.slice(0, limit) : sorted;
+      return typeof limit === 'number' && limit > 0
+        ? sorted.slice(0, limit)
+        : sorted;
     } catch (error) {
       console.error('Error getting position history:', error);
       return [];
@@ -486,7 +521,10 @@ export class FirebaseDatabaseService {
         .where('status', '==', 'open')
         .get();
 
-      return snapshot.docs.map((doc) => ({ id: doc.id, ...(doc.data() as any) })) as Position[];
+      return snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...(doc.data() as any),
+      })) as Position[];
     } catch (error) {
       console.error('Error getting all open positions:', error);
       return [];
@@ -494,7 +532,10 @@ export class FirebaseDatabaseService {
   }
 
   // New: batch update currentPrice by symbol for open positions
-  async updatePositionsCurrentPriceBySymbol(symbol: string, price: number): Promise<number> {
+  async updatePositionsCurrentPriceBySymbol(
+    symbol: string,
+    price: number,
+  ): Promise<number> {
     const sym = (symbol || '').toUpperCase();
     if (!sym || !(price > 0)) return 0;
     try {
@@ -528,10 +569,10 @@ export class FirebaseDatabaseService {
         .where('status', '==', 'open')
         .orderBy('createdAt', 'desc')
         .get();
-      
-      return snapshot.docs.map(doc => ({
+
+      return snapshot.docs.map((doc) => ({
         id: doc.id,
-        ...doc.data()
+        ...doc.data(),
       })) as Position[];
     } catch (error) {
       console.error('Error getting open positions:', error);
@@ -547,10 +588,10 @@ export class FirebaseDatabaseService {
         .where('status', '==', 'closed')
         .orderBy('closedAt', 'desc')
         .get();
-      
-      return snapshot.docs.map(doc => ({
+
+      return snapshot.docs.map((doc) => ({
         id: doc.id,
-        ...doc.data()
+        ...doc.data(),
       })) as Position[];
     } catch (error) {
       console.error('Error getting closed positions:', error);
@@ -558,7 +599,9 @@ export class FirebaseDatabaseService {
     }
   }
 
-  async createPositionsBatch(positions: Array<Omit<Position, 'id'>>): Promise<Position[]> {
+  async createPositionsBatch(
+    positions: Array<Omit<Position, 'id'>>,
+  ): Promise<Position[]> {
     if (!positions || positions.length === 0) return [];
 
     const db = this.getFirestore();
@@ -574,7 +617,7 @@ export class FirebaseDatabaseService {
         updatedAt: p.updatedAt ?? now,
       } as any;
       batch.set(docRef, data);
-      created.push({ id: docRef.id, ...(data as any) } as Position);
+      created.push({ id: docRef.id, ...data } as Position);
     }
 
     await batch.commit();
@@ -582,29 +625,46 @@ export class FirebaseDatabaseService {
   }
 
   // Withdrawals operations
-  async createWithdrawal(data: Omit<import('../withdrawals/entities/withdrawal.entity').Withdrawal, 'id'>): Promise<import('../withdrawals/entities/withdrawal.entity').Withdrawal> {
+  async createWithdrawal(
+    data: Omit<
+      import('../withdrawals/entities/withdrawal.entity').Withdrawal,
+      'id'
+    >,
+  ): Promise<import('../withdrawals/entities/withdrawal.entity').Withdrawal> {
     try {
       const db = this.getFirestore();
       const now = data.requestedAt ?? new Date();
       // Remove undefined fields to satisfy Firestore validation
       const raw = { ...data, requestedAt: now } as Record<string, any>;
-      const payload = Object.entries(raw).reduce((acc, [k, v]) => {
-        if (v !== undefined) (acc as any)[k] = v;
-        return acc;
-      }, {} as Record<string, any>);
+      const payload = Object.entries(raw).reduce(
+        (acc, [k, v]) => {
+          if (v !== undefined) (acc as any)[k] = v;
+          return acc;
+        },
+        {} as Record<string, any>,
+      );
 
-      const docRef = await db.collection(this.withdrawalsCollection).add(payload);
+      const docRef = await db
+        .collection(this.withdrawalsCollection)
+        .add(payload);
       // Normalize dates to ISO for API consumers
       const requestedAt = this.serializeDate(payload.requestedAt);
       const completedAt = this.serializeDate(payload.completedAt);
-      return { id: docRef.id, ...(payload as any), requestedAt, completedAt } as any;
+      return {
+        id: docRef.id,
+        ...(payload as any),
+        requestedAt,
+        completedAt,
+      };
     } catch (error) {
       console.error('Error creating withdrawal:', error);
       throw error;
     }
   }
 
-  async getWithdrawals(userId: string): Promise<import('../withdrawals/entities/withdrawal.entity').Withdrawal[]> {
+  async getWithdrawals(
+    userId: string,
+  ): Promise<import('../withdrawals/entities/withdrawal.entity').Withdrawal[]> {
     try {
       // Fetch by userId then sort in memory to avoid requiring a Firestore composite index
       const snapshot = await this.getFirestore()
@@ -617,10 +677,10 @@ export class FirebaseDatabaseService {
         const requestedAt = this.serializeDate(data.requestedAt);
         const completedAt = this.serializeDate(data.completedAt);
         return { id: d.id, ...data, requestedAt, completedAt };
-      }) as any[];
+      });
       return items.sort((a, b) => {
-        const aTime = a.requestedAt ? new Date(a.requestedAt as any).getTime() : 0;
-        const bTime = b.requestedAt ? new Date(b.requestedAt as any).getTime() : 0;
+        const aTime = a.requestedAt ? new Date(a.requestedAt).getTime() : 0;
+        const bTime = b.requestedAt ? new Date(b.requestedAt).getTime() : 0;
         return bTime - aTime;
       }) as any;
     } catch (error) {
@@ -630,26 +690,38 @@ export class FirebaseDatabaseService {
   }
 
   // Deposits operations
-  async createDeposit(data: Omit<import('../deposits/entities/deposit.entity').Deposit, 'id'>): Promise<import('../deposits/entities/deposit.entity').Deposit> {
+  async createDeposit(
+    data: Omit<import('../deposits/entities/deposit.entity').Deposit, 'id'>,
+  ): Promise<import('../deposits/entities/deposit.entity').Deposit> {
     try {
       const db = this.getFirestore();
       const now = data.requestedAt ?? new Date();
       const raw = { ...data, requestedAt: now } as Record<string, any>;
-      const payload = Object.entries(raw).reduce((acc, [k, v]) => {
-        if (v !== undefined) (acc as any)[k] = v;
-        return acc;
-      }, {} as Record<string, any>);
+      const payload = Object.entries(raw).reduce(
+        (acc, [k, v]) => {
+          if (v !== undefined) (acc as any)[k] = v;
+          return acc;
+        },
+        {} as Record<string, any>,
+      );
       const docRef = await db.collection(this.depositsCollection).add(payload);
       const requestedAt = this.serializeDate(payload.requestedAt);
       const completedAt = this.serializeDate(payload.completedAt);
-      return { id: docRef.id, ...(payload as any), requestedAt, completedAt } as any;
+      return {
+        id: docRef.id,
+        ...(payload as any),
+        requestedAt,
+        completedAt,
+      };
     } catch (error) {
       console.error('Error creating deposit:', error);
       throw error;
     }
   }
 
-  async getDeposits(userId: string): Promise<import('../deposits/entities/deposit.entity').Deposit[]> {
+  async getDeposits(
+    userId: string,
+  ): Promise<import('../deposits/entities/deposit.entity').Deposit[]> {
     try {
       const snapshot = await this.getFirestore()
         .collection(this.depositsCollection)
@@ -660,10 +732,10 @@ export class FirebaseDatabaseService {
         const requestedAt = this.serializeDate(data.requestedAt);
         const completedAt = this.serializeDate(data.completedAt);
         return { id: d.id, ...data, requestedAt, completedAt };
-      }) as any[];
+      });
       return items.sort((a, b) => {
-        const aTime = a.requestedAt ? new Date(a.requestedAt as any).getTime() : 0;
-        const bTime = b.requestedAt ? new Date(b.requestedAt as any).getTime() : 0;
+        const aTime = a.requestedAt ? new Date(a.requestedAt).getTime() : 0;
+        const bTime = b.requestedAt ? new Date(b.requestedAt).getTime() : 0;
         return bTime - aTime;
       }) as any;
     } catch (error) {
@@ -672,7 +744,11 @@ export class FirebaseDatabaseService {
     }
   }
 
-  async updateDeposit(userId: string, id: string, data: Partial<import('../deposits/entities/deposit.entity').Deposit>): Promise<boolean> {
+  async updateDeposit(
+    userId: string,
+    id: string,
+    data: Partial<import('../deposits/entities/deposit.entity').Deposit>,
+  ): Promise<boolean> {
     try {
       const db = this.getFirestore();
       const ref = db.collection(this.depositsCollection).doc(id);
@@ -681,10 +757,13 @@ export class FirebaseDatabaseService {
       const existing = snap.data() as any;
       if (!existing || existing.userId !== userId) return false;
       const raw = { ...data, updatedAt: new Date() } as Record<string, any>;
-      const payload = Object.entries(raw).reduce((acc, [k, v]) => {
-        if (v !== undefined) (acc as any)[k] = v;
-        return acc;
-      }, {} as Record<string, any>);
+      const payload = Object.entries(raw).reduce(
+        (acc, [k, v]) => {
+          if (v !== undefined) (acc as any)[k] = v;
+          return acc;
+        },
+        {} as Record<string, any>,
+      );
       await ref.update(payload);
       return true;
     } catch (error) {
@@ -712,14 +791,17 @@ export class FirebaseDatabaseService {
   private serializeDate(value: any): string | undefined {
     if (!value) return undefined;
     // Firebase Admin Timestamp instance
-    const adminAny: any = value as any;
+    const adminAny: any = value;
     if (adminAny && typeof adminAny.toDate === 'function') {
       try {
         return adminAny.toDate().toISOString();
       } catch {}
     }
     // Shape from JSON ({ _seconds, _nanoseconds })
-    if (typeof adminAny === 'object' && ('_seconds' in adminAny || 'seconds' in adminAny)) {
+    if (
+      typeof adminAny === 'object' &&
+      ('_seconds' in adminAny || 'seconds' in adminAny)
+    ) {
       const seconds = adminAny._seconds ?? adminAny.seconds ?? 0;
       const nanos = adminAny._nanoseconds ?? adminAny.nanoseconds ?? 0;
       const ms = seconds * 1000 + Math.floor(nanos / 1e6);
@@ -734,7 +816,13 @@ export class FirebaseDatabaseService {
     return undefined;
   }
 
-  async updateWithdrawal(userId: string, id: string, data: Partial<import('../withdrawals/entities/withdrawal.entity').Withdrawal>): Promise<boolean> {
+  async updateWithdrawal(
+    userId: string,
+    id: string,
+    data: Partial<
+      import('../withdrawals/entities/withdrawal.entity').Withdrawal
+    >,
+  ): Promise<boolean> {
     try {
       const db = this.getFirestore();
       const ref = db.collection(this.withdrawalsCollection).doc(id);
@@ -744,10 +832,13 @@ export class FirebaseDatabaseService {
       if (!existing || existing.userId !== userId) return false; // ownership check
 
       const raw = { ...data, updatedAt: new Date() } as Record<string, any>;
-      const payload = Object.entries(raw).reduce((acc, [k, v]) => {
-        if (v !== undefined) (acc as any)[k] = v;
-        return acc;
-      }, {} as Record<string, any>);
+      const payload = Object.entries(raw).reduce(
+        (acc, [k, v]) => {
+          if (v !== undefined) (acc as any)[k] = v;
+          return acc;
+        },
+        {} as Record<string, any>,
+      );
       await ref.update(payload);
       return true;
     } catch (error) {
@@ -804,7 +895,12 @@ export class FirebaseDatabaseService {
           const data = d.data() as any;
           const createdAt = this.serializeDate(data.createdAt);
           const updatedAt = this.serializeDate(data.updatedAt);
-          return { id: d.id, ...data, ...(createdAt ? { createdAt } : {}), ...(updatedAt ? { updatedAt } : {}) };
+          return {
+            id: d.id,
+            ...data,
+            ...(createdAt ? { createdAt } : {}),
+            ...(updatedAt ? { updatedAt } : {}),
+          };
         });
 
         if (fromCollection.length > 0) {
@@ -833,7 +929,9 @@ export class FirebaseDatabaseService {
         ...deposits.map((d: any) => ({ type: 'deposit', ...d })),
         ...withdrawals.map((w: any) => ({ type: 'withdrawal', ...w })),
       ].sort((a, b) => normalizeTime(b) - normalizeTime(a));
-      return typeof limit === 'number' && limit > 0 ? items.slice(0, limit) : items;
+      return typeof limit === 'number' && limit > 0
+        ? items.slice(0, limit)
+        : items;
     } catch (error) {
       console.error('Error getting wallet history:', error);
       return [];
@@ -841,15 +939,23 @@ export class FirebaseDatabaseService {
   }
 
   // Wallets operations
-  async createWallet(data: Omit<import('../wallets/entities/wallet.entity').Wallet, 'id'>): Promise<import('../wallets/entities/wallet.entity').Wallet> {
+  async createWallet(
+    data: Omit<import('../wallets/entities/wallet.entity').Wallet, 'id'>,
+  ): Promise<import('../wallets/entities/wallet.entity').Wallet> {
     try {
       const db = this.getFirestore();
       const now = data.createdAt ?? new Date();
-      const raw = { ...data, createdAt: now, updatedAt: now } as Record<string, any>;
-      const payload = Object.entries(raw).reduce((acc, [k, v]) => {
-        if (v !== undefined) (acc as any)[k] = v;
-        return acc;
-      }, {} as Record<string, any>);
+      const raw = { ...data, createdAt: now, updatedAt: now } as Record<
+        string,
+        any
+      >;
+      const payload = Object.entries(raw).reduce(
+        (acc, [k, v]) => {
+          if (v !== undefined) (acc as any)[k] = v;
+          return acc;
+        },
+        {} as Record<string, any>,
+      );
       const docRef = await db.collection(this.walletsCollection).add(payload);
       const createdAt = this.serializeDate(payload.createdAt);
       const updatedAt = this.serializeDate(payload.updatedAt);
@@ -875,7 +981,12 @@ export class FirebaseDatabaseService {
       } catch (e) {
         console.warn('Failed to write wallet_history (create):', e);
       }
-      return { id: docRef.id, ...(payload as any), createdAt, updatedAt } as any;
+      return {
+        id: docRef.id,
+        ...(payload as any),
+        createdAt,
+        updatedAt,
+      };
     } catch (error) {
       console.error('Error creating wallet:', error);
       throw error;
@@ -885,7 +996,11 @@ export class FirebaseDatabaseService {
   // --- Positions bulk import helpers ---
   private base64Url(input: string): string {
     try {
-      return Buffer.from(input).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+      return Buffer.from(input)
+        .toString('base64')
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_')
+        .replace(/=+$/g, '');
     } catch {
       // Fallback simple hash
       let h = 0;
@@ -913,16 +1028,23 @@ export class FirebaseDatabaseService {
     if (!value) return new Date();
     const anyVal: any = value;
     if (anyVal && typeof anyVal.toDate === 'function') {
-      try { const d = anyVal.toDate(); if (d instanceof Date && !isNaN(d.getTime())) return d; } catch {}
+      try {
+        const d = anyVal.toDate();
+        if (d instanceof Date && !isNaN(d.getTime())) return d;
+      } catch {}
     }
-    if (typeof anyVal === 'object' && (('seconds' in anyVal) || ('_seconds' in anyVal))) {
+    if (
+      typeof anyVal === 'object' &&
+      ('seconds' in anyVal || '_seconds' in anyVal)
+    ) {
       const seconds = anyVal.seconds ?? anyVal._seconds ?? 0;
       const nanos = anyVal.nanoseconds ?? anyVal._nanoseconds ?? 0;
       const ms = seconds * 1000 + Math.floor(nanos / 1e6);
       const d = new Date(ms);
       if (!isNaN(d.getTime())) return d;
     }
-    if (anyVal instanceof Date) return !isNaN(anyVal.getTime()) ? anyVal : new Date();
+    if (anyVal instanceof Date)
+      return !isNaN(anyVal.getTime()) ? anyVal : new Date();
     const parsed = new Date(anyVal);
     return !isNaN(parsed.getTime()) ? parsed : new Date();
   }
@@ -931,8 +1053,12 @@ export class FirebaseDatabaseService {
    * Create a position with deterministic doc id for deduping imports.
    * If a doc with the same id exists, skip creation.
    */
-  async createPositionImported(userId: string, data: Partial<import('../positions/entities/position.entity').Position> & { importKey: string }): Promise<{ created: boolean; id: string; }>
-  {
+  async createPositionImported(
+    userId: string,
+    data: Partial<import('../positions/entities/position.entity').Position> & {
+      importKey: string;
+    },
+  ): Promise<{ created: boolean; id: string }> {
     const db = this.getFirestore();
     const id = this.makeImportDocId(userId, data.importKey);
     const ref = db.collection(this.positionsCollection).doc(id);
@@ -944,10 +1070,14 @@ export class FirebaseDatabaseService {
     const payload: Record<string, any> = {
       userId,
       symbol: (data.symbol || '').toString().toUpperCase(),
-      side: (data.side === 'sell' ? 'sell' : 'buy'),
+      side: data.side === 'sell' ? 'sell' : 'buy',
       entryPrice: Number(data.entryPrice) || 0,
       lots: Number(data.lots) || 0,
-      investedAmount: Number(data.investedAmount ?? (Number(data.entryPrice) || 0) * (Number(data.lots) || 0)) || 0,
+      investedAmount:
+        Number(
+          data.investedAmount ??
+            (Number(data.entryPrice) || 0) * (Number(data.lots) || 0),
+        ) || 0,
       platform: (data.platform as any) || 'Delta Exchange',
       leverage: data.leverage,
       account: (data.account as any) || 'main',
@@ -975,20 +1105,34 @@ export class FirebaseDatabaseService {
    * Bulk import positions with deduping. Dedupe key is built as
    * date|symbol|account|platform|entry|lots.
    */
-  async createPositionsBulk(userId: string, items: Array<Partial<import('../positions/entities/position.entity').Position> & { date?: any }>): Promise<{ created: number; skipped: number; ids: string[] }>
-  {
+  async createPositionsBulk(
+    userId: string,
+    items: Array<
+      Partial<import('../positions/entities/position.entity').Position> & {
+        date?: any;
+      }
+    >,
+  ): Promise<{ created: number; skipped: number; ids: string[] }> {
     let created = 0;
     let skipped = 0;
     const ids: string[] = [];
     for (const raw of items) {
       const symbol = (raw.symbol || '').toString().toUpperCase();
-      if (!symbol) { skipped++; continue; }
+      if (!symbol) {
+        skipped++;
+        continue;
+      }
       const lots = Number(raw.lots) || 0;
       const entry = Number(raw.entryPrice) || 0;
-      if (!lots || !entry) { skipped++; continue; }
+      if (!lots || !entry) {
+        skipped++;
+        continue;
+      }
       const account = (raw.account as any) || 'main';
       const platform = (raw.platform as any) || 'Delta Exchange';
-      const dateKey = this.normalizeDateKey(raw.date || raw.timestamp || new Date());
+      const dateKey = this.normalizeDateKey(
+        raw.date || raw.timestamp || new Date(),
+      );
       const key = `${dateKey}|${symbol}|${account}|${platform}|${entry}|${lots}`;
       const res = await this.createPositionImported(userId, {
         ...raw,
@@ -997,16 +1141,20 @@ export class FirebaseDatabaseService {
         entryPrice: entry,
         account,
         platform,
-        timestamp: raw.timestamp || new Date(dateKey + 'T00:00:00Z').toISOString(),
+        timestamp:
+          raw.timestamp || new Date(dateKey + 'T00:00:00Z').toISOString(),
         importKey: key,
       } as any);
       ids.push(res.id);
-      if (res.created) created++; else skipped++;
+      if (res.created) created++;
+      else skipped++;
     }
     return { created, skipped, ids };
   }
 
-  async getWallets(userId: string): Promise<import('../wallets/entities/wallet.entity').Wallet[]> {
+  async getWallets(
+    userId: string,
+  ): Promise<import('../wallets/entities/wallet.entity').Wallet[]> {
     try {
       const snapshot = await this.getFirestore()
         .collection(this.walletsCollection)
@@ -1017,10 +1165,10 @@ export class FirebaseDatabaseService {
         const createdAt = this.serializeDate(data.createdAt);
         const updatedAt = this.serializeDate(data.updatedAt);
         return { id: d.id, ...data, createdAt, updatedAt };
-      }) as any[];
+      });
       return items.sort((a, b) => {
-        const aTime = a.createdAt ? new Date(a.createdAt as any).getTime() : 0;
-        const bTime = b.createdAt ? new Date(b.createdAt as any).getTime() : 0;
+        const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
         return bTime - aTime;
       }) as any;
     } catch (error) {
@@ -1029,7 +1177,11 @@ export class FirebaseDatabaseService {
     }
   }
 
-  async updateWallet(userId: string, id: string, data: Partial<import('../wallets/entities/wallet.entity').Wallet>): Promise<boolean> {
+  async updateWallet(
+    userId: string,
+    id: string,
+    data: Partial<import('../wallets/entities/wallet.entity').Wallet>,
+  ): Promise<boolean> {
     try {
       const db = this.getFirestore();
       const ref = db.collection(this.walletsCollection).doc(id);
@@ -1038,23 +1190,45 @@ export class FirebaseDatabaseService {
       const existing = snap.data() as any;
       if (!existing || existing.userId !== userId) return false;
       const raw = { ...data, updatedAt: new Date() } as Record<string, any>;
-      const payload = Object.entries(raw).reduce((acc, [k, v]) => {
-        if (v !== undefined) (acc as any)[k] = v;
-        return acc;
-      }, {} as Record<string, any>);
+      const payload = Object.entries(raw).reduce(
+        (acc, [k, v]) => {
+          if (v !== undefined) (acc as any)[k] = v;
+          return acc;
+        },
+        {} as Record<string, any>,
+      );
       await ref.update(payload);
       // Record history entry
       try {
-        const fields = ['name', 'platform', 'balance', 'currency', 'address', 'notes'] as const;
-        const prev = fields.reduce((acc, k) => ({ ...acc, [k]: existing[k] }), {} as Record<string, any>);
-        const next = fields.reduce((acc, k) => ({ ...acc, [k]: (k in payload ? (payload as any)[k] : existing[k]) }), {} as Record<string, any>);
-        const changes = fields.reduce((acc, k) => {
-          const before = prev[k];
-          const after = next[k];
-          const changed = (before ?? null) !== (after ?? null);
-          if (changed) acc[k] = { from: before, to: after };
-          return acc;
-        }, {} as Record<string, { from: any; to: any }>);
+        const fields = [
+          'name',
+          'platform',
+          'balance',
+          'currency',
+          'address',
+          'notes',
+        ] as const;
+        const prev = fields.reduce(
+          (acc, k) => ({ ...acc, [k]: existing[k] }),
+          {} as Record<string, any>,
+        );
+        const next = fields.reduce(
+          (acc, k) => ({
+            ...acc,
+            [k]: k in payload ? (payload as any)[k] : existing[k],
+          }),
+          {} as Record<string, any>,
+        );
+        const changes = fields.reduce(
+          (acc, k) => {
+            const before = prev[k];
+            const after = next[k];
+            const changed = (before ?? null) !== (after ?? null);
+            if (changed) acc[k] = { from: before, to: after };
+            return acc;
+          },
+          {} as Record<string, { from: any; to: any }>,
+        );
 
         await db.collection(this.walletHistoryCollection).add({
           userId: existing.userId,
@@ -1138,7 +1312,9 @@ export class FirebaseDatabaseService {
         createdAt: now,
         closedAt: closedAt ?? now,
       } as any;
-      const docRef = await this.getFirestore().collection(this.exitPositionsCollection).add(payload);
+      const docRef = await this.getFirestore()
+        .collection(this.exitPositionsCollection)
+        .add(payload);
       return docRef.id;
     } catch (error) {
       console.error('Error creating single exit entry:', error);
@@ -1169,7 +1345,9 @@ export class FirebaseDatabaseService {
         createdAt: now,
         closedAt: closedAt ?? now,
       } as any;
-      const docRef = await this.getFirestore().collection(this.exitPositionsCollection).add(payload);
+      const docRef = await this.getFirestore()
+        .collection(this.exitPositionsCollection)
+        .add(payload);
       return docRef.id;
     } catch (error) {
       console.error('Error creating bulk exit entry:', error);
@@ -1197,7 +1375,11 @@ export class FirebaseDatabaseService {
         const chunk = snapshot.docs.slice(i, i + chunkSize);
         const batch = db.batch();
         chunk.forEach((doc) => {
-          batch.update(doc.ref, { status: 'closed', closedAt: now, updatedAt: now });
+          batch.update(doc.ref, {
+            status: 'closed',
+            closedAt: now,
+            updatedAt: now,
+          });
           count += 1;
         });
         await batch.commit();
@@ -1210,7 +1392,10 @@ export class FirebaseDatabaseService {
   }
 
   // Close all open positions for a specific user and symbol; returns number of updated docs
-  async closeOpenPositionsBySymbolForUser(userId: string, symbol: string): Promise<number> {
+  async closeOpenPositionsBySymbolForUser(
+    userId: string,
+    symbol: string,
+  ): Promise<number> {
     const sym = (symbol || '').toUpperCase();
     if (!userId || !sym) return 0;
     try {
@@ -1231,7 +1416,11 @@ export class FirebaseDatabaseService {
         const chunk = snapshot.docs.slice(i, i + chunkSize);
         const batch = db.batch();
         chunk.forEach((doc) => {
-          batch.update(doc.ref, { status: 'closed', closedAt: now, updatedAt: now });
+          batch.update(doc.ref, {
+            status: 'closed',
+            closedAt: now,
+            updatedAt: now,
+          });
           count += 1;
         });
         await batch.commit();
@@ -1244,26 +1433,41 @@ export class FirebaseDatabaseService {
   }
 
   // Trade P&L operations
-  async createTradePnL(data: Omit<import('../trade-pnl/trade-pnl.service').TradePnL, 'id'>): Promise<import('../trade-pnl/trade-pnl.service').TradePnL> {
+  async createTradePnL(
+    data: Omit<import('../trade-pnl/trade-pnl.service').TradePnL, 'id'>,
+  ): Promise<import('../trade-pnl/trade-pnl.service').TradePnL> {
     try {
       const db = this.getFirestore();
       const now = data.createdAt ?? new Date();
-      const raw = { ...data, createdAt: now, updatedAt: now } as Record<string, any>;
-      const payload = Object.entries(raw).reduce((acc, [k, v]) => {
-        if (v !== undefined) (acc as any)[k] = v;
-        return acc;
-      }, {} as Record<string, any>);
+      const raw = { ...data, createdAt: now, updatedAt: now } as Record<
+        string,
+        any
+      >;
+      const payload = Object.entries(raw).reduce(
+        (acc, [k, v]) => {
+          if (v !== undefined) (acc as any)[k] = v;
+          return acc;
+        },
+        {} as Record<string, any>,
+      );
       const docRef = await db.collection(this.tradePnLCollection).add(payload);
       const createdAt = this.serializeDate(payload.createdAt);
       const updatedAt = this.serializeDate(payload.updatedAt);
-      return { id: docRef.id, ...(payload as any), createdAt, updatedAt } as any;
+      return {
+        id: docRef.id,
+        ...(payload as any),
+        createdAt,
+        updatedAt,
+      };
     } catch (error) {
       console.error('Error creating trade P&L:', error);
       throw error;
     }
   }
 
-  async getTradePnL(userId: string): Promise<import('../trade-pnl/trade-pnl.service').TradePnL[]> {
+  async getTradePnL(
+    userId: string,
+  ): Promise<import('../trade-pnl/trade-pnl.service').TradePnL[]> {
     try {
       const snapshot = await this.getFirestore()
         .collection(this.tradePnLCollection)
@@ -1274,10 +1478,10 @@ export class FirebaseDatabaseService {
         const createdAt = this.serializeDate(data.createdAt);
         const updatedAt = this.serializeDate(data.updatedAt);
         return { id: d.id, ...data, createdAt, updatedAt };
-      }) as any[];
+      });
       return items.sort((a, b) => {
-        const aTime = a.date ? new Date(a.date as any).getTime() : 0;
-        const bTime = b.date ? new Date(b.date as any).getTime() : 0;
+        const aTime = a.date ? new Date(a.date).getTime() : 0;
+        const bTime = b.date ? new Date(b.date).getTime() : 0;
         return bTime - aTime;
       }) as any;
     } catch (error) {
@@ -1286,7 +1490,11 @@ export class FirebaseDatabaseService {
     }
   }
 
-  async updateTradePnL(userId: string, id: string, data: Partial<import('../trade-pnl/trade-pnl.service').TradePnL>): Promise<boolean> {
+  async updateTradePnL(
+    userId: string,
+    id: string,
+    data: Partial<import('../trade-pnl/trade-pnl.service').TradePnL>,
+  ): Promise<boolean> {
     try {
       const db = this.getFirestore();
       const ref = db.collection(this.tradePnLCollection).doc(id);
@@ -1295,10 +1503,13 @@ export class FirebaseDatabaseService {
       const existing = snap.data() as any;
       if (!existing || existing.userId !== userId) return false;
       const raw = { ...data, updatedAt: new Date() } as Record<string, any>;
-      const payload = Object.entries(raw).reduce((acc, [k, v]) => {
-        if (v !== undefined) (acc as any)[k] = v;
-        return acc;
-      }, {} as Record<string, any>);
+      const payload = Object.entries(raw).reduce(
+        (acc, [k, v]) => {
+          if (v !== undefined) (acc as any)[k] = v;
+          return acc;
+        },
+        {} as Record<string, any>,
+      );
       await ref.update(payload);
       return true;
     } catch (error) {
@@ -1323,7 +1534,10 @@ export class FirebaseDatabaseService {
     }
   }
 
-  async getTradePnLById(userId: string, id: string): Promise<import('../trade-pnl/trade-pnl.service').TradePnL | null> {
+  async getTradePnLById(
+    userId: string,
+    id: string,
+  ): Promise<import('../trade-pnl/trade-pnl.service').TradePnL | null> {
     try {
       const db = this.getFirestore();
       const ref = db.collection(this.tradePnLCollection).doc(id);
@@ -1333,7 +1547,7 @@ export class FirebaseDatabaseService {
       if (!data || data.userId !== userId) return null;
       const createdAt = this.serializeDate(data.createdAt);
       const updatedAt = this.serializeDate(data.updatedAt);
-      return { id: snap.id, ...data, createdAt, updatedAt } as any;
+      return { id: snap.id, ...data, createdAt, updatedAt };
     } catch (error) {
       console.error('Error getting trade P&L by id:', error);
       return null;

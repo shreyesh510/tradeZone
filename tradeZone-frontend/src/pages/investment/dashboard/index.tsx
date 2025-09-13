@@ -1,10 +1,18 @@
 import { memo, useState, useEffect } from 'react';
-import Header from '../../../layouts/Header';
-import Sidebar from '../../../components/Sidebar';
-import FloatingNav, { type MobileTab } from '../../../layouts/FloatingNav';
-import { useSettings } from '../../../contexts/SettingsContext';
+import { useDispatch, useSelector } from 'react-redux';
+import Header from '../../../layouts/header';
+import Sidebar from '../../../layouts/sidebar';
+import FloatingButton, { type MobileTab } from '../../../components/button/floatingButton';
+import RoundedButton from '../../../components/button/RoundedButton';
+import { useSettings } from '../../../contexts/settingsContext';
 import { usePermissions } from '../../../hooks/usePermissions';
 import { useNavigate } from 'react-router-dom';
+import type { RootState, AppDispatch } from '../../../redux/store';
+import { fetchDashboardSummary } from '../../../redux/thunks/dashboard/dashboardThunks';
+import { 
+  fetchAllDashboardData
+} from '../../../redux/thunks/dashboard/newDashboardThunks';
+import { setTimeframe } from '../../../redux/slices/newDashboardSlice';
 
 interface OnlineUser {
   userId: string;
@@ -12,65 +20,108 @@ interface OnlineUser {
   socketId: string;
 }
 
-interface PlatformData {
-  platform: 'Delta Exchange' | 'Groww';
-  totalInvestment: number;
-  currentValue: number;
-  returns: number;
-  returnsPercent: number;
-  color: string;
-}
+type TimeFilter = '1W' | '1M' | '1Y' | '5Y';
 
-interface PortfolioData {
-  totalInvestment: number;
-  currentValue: number;
-  totalReturns: number;
-  totalReturnsPercent: number;
-  dayChange: number;
-  dayChangePercent: number;
-  activePositions: number;
-  platforms: PlatformData[];
-}
+// ---- Chart Helper Types & Utilities ----
+interface TimeSeriesPoint { period: string; value: number }
+interface PositionedPoint extends TimeSeriesPoint { x: number; y: number; label: string }
+interface TradePnLPoint { period: string; netPnL: number }
+interface WithdrawalPoint { period: string; totalAmount: number; count: number; completedCount?: number; pendingCount?: number }
 
-interface AssetPosition {
-  symbol: string;
-  lots: number;
-  investedAmount: number;
-  currentValue: number;
-  returns: number;
-  returnsPercent: number;
-  platform: 'Delta Exchange' | 'Groww';
-  color: string;
-}
+const safeNumber = (v: unknown, fallback = 0): number => (typeof v === 'number' && isFinite(v) ? v : fallback);
 
-interface Transaction {
-  id: string;
-  symbol: string;
-  amount: number;
-  lots: number;
-  type: 'buy' | 'sell';
-  platform: 'Delta Exchange' | 'Groww';
-  timestamp: string;
-  price: number;
+function buildLinearPoints(
+  raw: TimeSeriesPoint[],
+  width: number,
+  height: number,
+  padding: number,
+  formatLabel: (p: TimeSeriesPoint) => string,
+): PositionedPoint[] {
+  if (!raw.length) return [];
+  const values = raw.map(p => safeNumber(p.value));
+  const max = Math.max(...values);
+  const min = Math.min(...values);
+  const denom = max - min === 0 ? 1 : max - min;
+  const base = (raw.length - 1) || 1;
+  return raw.map((p, idx) => {
+    const value = safeNumber(p.value, min);
+    const normalized = (value - min) / denom; // 0..1
+    const x = padding + (idx * (width - 2 * padding)) / base;
+    const y = height - padding - normalized * (height - 2 * padding);
+    return { ...p, x, y, label: formatLabel(p) };
+  });
 }
-
-interface ChartDataPoint {
-  date: string;
-  value: number;
-  returns: number;
-}
-
-type TimeFilter = '1M' | '1W' | '6M' | '1Y' | '5Y';
 
 const InvestmentDashboard = memo(function InvestmentDashboard() {
   const navigate = useNavigate();
+  const dispatch = useDispatch<AppDispatch>();
   const { settings } = useSettings();
   const { canAccessInvestment } = usePermissions();
+  
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
   const [isMobile, setIsMobile] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<MobileTab>('chart');
   const [selectedTimeFilter, setSelectedTimeFilter] = useState<TimeFilter>('1M');
+
+  // Redux state - using both old and new dashboard for transition
+  const { data: oldDashboardData, loading: oldLoading, error: oldError } = useSelector((state: RootState) => state.dashboard);
+  const newDashboard = useSelector((state: RootState) => state.newDashboard);
+  
+  // Use new dashboard data if available, fallback to old
+  const loading = newDashboard.loading.all || oldLoading;
+  const error = newDashboard.errors.all || oldError;
+
+  // Create unified data object for component consumption
+  const dashboardData = {
+    wallets: newDashboard.wallets ? {
+      dematWallet: newDashboard.wallets.summary.dematWallet,
+      bankWallet: newDashboard.wallets.summary.bankWallet,
+      recentActivity: newDashboard.wallets.recentActivity || []
+    } : oldDashboardData?.wallets || {
+      dematWallet: { balance: 0, currency: 'INR', count: 0 },
+      bankWallet: { balance: 0, currency: 'INR', count: 0 },
+      recentActivity: []
+    },
+    
+    positions: newDashboard.positions ? {
+      totalInvested: newDashboard.positions.summary.totalInvested,
+      totalPnL: newDashboard.positions.summary.totalPnL
+    } : oldDashboardData?.positions || {
+      totalInvested: 0,
+      totalPnL: 0
+    },
+    
+    tradePnL: newDashboard.tradePnL ? {
+      total: newDashboard.tradePnL.total || { netPnL: 0, profit: 0, loss: 0, trades: 0 },
+      statistics: newDashboard.tradePnL.statistics || {
+        netPnL: 0,
+        totalTrades: 0,
+        winRate: 0,
+        averageDailyPnL: 0
+      },
+      chartData: newDashboard.tradePnL.chartData
+    } : oldDashboardData?.tradePnL || {
+      total: { netPnL: 0, profit: 0, loss: 0, trades: 0 },
+      statistics: { netPnL: 0, totalTrades: 0, winRate: 0, averageDailyPnL: 0 },
+      chartData: { daily: [], weekly: [], monthly: [], yearly: [] }
+    },
+    
+    transactions: newDashboard.transactions ? {
+      deposits: {
+        total: newDashboard.transactions.deposits.total,
+        pending: newDashboard.transactions.deposits.pending,
+        completed: newDashboard.transactions.deposits.completed,
+        list: newDashboard.transactions.deposits.recentActivity || []
+      },
+      withdrawals: {
+        chartData: newDashboard.transactions.withdrawals.chartData
+      }
+    } : oldDashboardData?.transactions || {
+      deposits: { total: 0, pending: 0, completed: 0, list: [] },
+      withdrawals: { chartData: { daily: [], weekly: [], monthly: [], yearly: [] } }
+    }
+  };
 
   // Redirect if no permission
   useEffect(() => {
@@ -90,6 +141,19 @@ const InvestmentDashboard = memo(function InvestmentDashboard() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // Fetch dashboard data - using new 4-API approach
+  useEffect(() => {
+    // Update timeframe in Redux
+    dispatch(setTimeframe(selectedTimeFilter));
+    
+    // Fetch all dashboard data in parallel
+    dispatch(fetchAllDashboardData(selectedTimeFilter));
+    
+    // Fallback: also fetch old dashboard data for now
+    const days = selectedTimeFilter === '1W' ? 7 : selectedTimeFilter === '1M' ? 30 : selectedTimeFilter === '1Y' ? 365 : 1825;
+    dispatch(fetchDashboardSummary(days));
+  }, [dispatch, selectedTimeFilter]);
+
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
   };
@@ -100,261 +164,57 @@ const InvestmentDashboard = memo(function InvestmentDashboard() {
 
   const isDarkMode = settings.theme === 'dark';
 
-  // Mock Portfolio Data with Platform Breakdown
-  const portfolioData: PortfolioData = {
-    totalInvestment: 50000,
-    currentValue: 65430.75,
-    totalReturns: 15430.75,
-    totalReturnsPercent: 30.86,
-    dayChange: 1247.85,
-    dayChangePercent: 1.95,
-    activePositions: 8,
-    platforms: [
-      {
-        platform: 'Delta Exchange',
-        totalInvestment: 30000,
-        currentValue: 42150.50,
-        returns: 12150.50,
-        returnsPercent: 40.50,
-        color: '#22C55E'
-      },
-      {
-        platform: 'Groww',
-        totalInvestment: 20000,
-        currentValue: 23280.25,
-        returns: 3280.25,
-        returnsPercent: 16.40,
-        color: '#3B82F6'
-      }
-    ]
+  const formatCurrency = (value: number, currency: string = 'USD') => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: currency,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(value);
   };
 
-  // Mock Asset Positions (Lot-wise)
-  const assetPositions: AssetPosition[] = [
-    {
-      symbol: 'BTC',
-      lots: 2,
-      investedAmount: 15000,
-      currentValue: 21500,
-      returns: 6500,
-      returnsPercent: 43.33,
-      platform: 'Delta Exchange',
-      color: '#F7931A'
-    },
-    {
-      symbol: 'ETH',
-      lots: 10,
-      investedAmount: 12000,
-      currentValue: 18200,
-      returns: 6200,
-      returnsPercent: 51.67,
-      platform: 'Delta Exchange',
-      color: '#627EEA'
-    },
-    {
-      symbol: 'DOGE',
-      lots: 5,
-      investedAmount: 3000,
-      currentValue: 2450.50,
-      returns: -549.50,
-      returnsPercent: -18.32,
-      platform: 'Delta Exchange',
-      color: '#C2A633'
-    },
-    {
-      symbol: 'AAPL',
-      lots: 15,
-      investedAmount: 8000,
-      currentValue: 9850.75,
-      returns: 1850.75,
-      returnsPercent: 23.13,
-      platform: 'Groww',
-      color: '#000000'
-    },
-    {
-      symbol: 'TSLA',
-      lots: 8,
-      investedAmount: 7000,
-      currentValue: 8120.25,
-      returns: 1120.25,
-      returnsPercent: 16.00,
-      platform: 'Groww',
-      color: '#E31E24'
-    },
-    {
-      symbol: 'GOOGL',
-      lots: 12,
-      investedAmount: 5000,
-      currentValue: 5309.25,
-      returns: 309.25,
-      returnsPercent: 6.19,
-      platform: 'Groww',
-      color: '#4285F4'
-    }
-  ];
-
-  // Mock Recent Transactions
-  const recentTransactions: Transaction[] = [
-    {
-      id: '1',
-      symbol: 'BTC',
-      amount: 7500,
-      lots: 1,
-      type: 'buy',
-      platform: 'Delta Exchange',
-      timestamp: '2024-01-15 14:30',
-      price: 43500
-    },
-    {
-      id: '2',
-      symbol: 'ETH',
-      amount: 6000,
-      lots: 5,
-      type: 'buy',
-      platform: 'Delta Exchange',
-      timestamp: '2024-01-15 12:15',
-      price: 2450
-    },
-    {
-      id: '3',
-      symbol: 'AAPL',
-      amount: 4000,
-      lots: 8,
-      type: 'buy',
-      platform: 'Groww',
-      timestamp: '2024-01-15 10:45',
-      price: 185.50
-    },
-    {
-      id: '4',
-      symbol: 'TSLA',
-      amount: 3500,
-      lots: 4,
-      type: 'buy',
-      platform: 'Groww',
-      timestamp: '2024-01-14 16:20',
-      price: 240.75
-    }
-  ];
-
-  // Mock Chart Data based on selected time filter
-  const generateChartData = (timeFilter: TimeFilter): ChartDataPoint[] => {
-    const now = new Date();
-    const dataPoints: ChartDataPoint[] = [];
-    let days = 30; // Default 1M
-    
-    switch (timeFilter) {
-      case '1W': days = 7; break;
-      case '1M': days = 30; break;
-      case '6M': days = 180; break;
-      case '1Y': days = 365; break;
-      case '5Y': days = 1825; break;
-    }
-
-    for (let i = days; i >= 0; i--) {
-      const date = new Date(now);
-      date.setDate(date.getDate() - i);
-      
-      // Generate realistic portfolio growth with some volatility
-      const baseValue = 50000;
-      const trend = (days - i) / days * 15430.75; // Growth trend
-      const volatility = Math.sin(i * 0.1) * 1000 + Math.random() * 500 - 250; // Market volatility
-      const value = baseValue + trend + volatility;
-      const returns = value - baseValue;
-      
-      dataPoints.push({
-        date: date.toISOString().split('T')[0],
-        value: Math.max(value, baseValue * 0.8), // Prevent unrealistic drops
-        returns: returns
-      });
-    }
-    
-    return dataPoints;
-  };
-
-  const chartData = generateChartData(selectedTimeFilter);
-
-  // Simple Line Chart Component
-  const LineChart: React.FC<{ data: ChartDataPoint[]; height?: number }> = ({ data, height = 200 }) => {
-    if (data.length === 0) return null;
-
-    const maxValue = Math.max(...data.map(d => d.value));
-    const minValue = Math.min(...data.map(d => d.value));
-    const valueRange = maxValue - minValue;
-    const width = 100; // SVG width percentage
-
-    const pathData = data.map((point, index) => {
-      const x = (index / (data.length - 1)) * width;
-      const y = height - ((point.value - minValue) / valueRange) * height;
-      return `${index === 0 ? 'M' : 'L'} ${x} ${y}`;
-    }).join(' ');
-
-    const isPositive = data[data.length - 1].value > data[0].value;
-
+  // Loading state
+  if (loading) {
     return (
-      <div className="relative" style={{ height }}>
-        <svg
-          width="100%"
-          height="100%"
-          viewBox={`0 0 ${width} ${height}`}
-          className="absolute inset-0"
-        >
-          {/* Grid lines */}
-          {[0, 25, 50, 75, 100].map(y => (
-            <line
-              key={y}
-              x1="0"
-              y1={y * height / 100}
-              x2={width}
-              y2={y * height / 100}
-              stroke={isDarkMode ? '#374151' : '#E5E7EB'}
-              strokeWidth="0.5"
-            />
-          ))}
-          
-          {/* Area under curve */}
-          <defs>
-            <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={isPositive ? '#22C55E' : '#EF4444'} stopOpacity="0.3" />
-              <stop offset="100%" stopColor={isPositive ? '#22C55E' : '#EF4444'} stopOpacity="0.05" />
-            </linearGradient>
-          </defs>
-          
-          <path
-            d={`${pathData} L ${width} ${height} L 0 ${height} Z`}
-            fill="url(#areaGradient)"
-          />
-          
-          {/* Main line */}
-          <path
-            d={pathData}
-            fill="none"
-            stroke={isPositive ? '#22C55E' : '#EF4444'}
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          
-          {/* Data points */}
-          {data.map((point, index) => {
-            const x = (index / (data.length - 1)) * width;
-            const y = height - ((point.value - minValue) / valueRange) * height;
-            
-            return (
-              <circle
-                key={index}
-                cx={x}
-                cy={y}
-                r="2"
-                fill={isPositive ? '#22C55E' : '#EF4444'}
-                className="opacity-60 hover:opacity-100"
-              />
-            );
-          })}
-        </svg>
+      <div className={`h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-100'} flex items-center justify-center`}>
+        <div className="flex flex-col items-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <p className={isDarkMode ? 'text-white' : 'text-gray-900'}>Loading dashboard...</p>
+        </div>
       </div>
     );
-  };
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className={`h-screen ${isDarkMode ? 'bg-gray-900' : 'bg-gray-100'} flex items-center justify-center`}>
+        <div className="text-center">
+          <div className="text-red-500 mb-4">
+            <svg className="h-16 w-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <h2 className={`text-xl font-bold mb-2 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+            Error Loading Dashboard
+          </h2>
+          <p className={`mb-4 ${isDarkMode ? 'text-gray-300' : 'text-gray-600'}`}>
+            {error}
+          </p>
+          <button
+            onClick={() => dispatch(fetchDashboardSummary())}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!dashboardData) {
+    return null;
+  }
 
   const content = (
     <div className={`flex-1 p-6 overflow-y-auto ${
@@ -362,322 +222,940 @@ const InvestmentDashboard = memo(function InvestmentDashboard() {
     }`}>
       {/* Header */}
       <div className="mb-6">
-        <h1 className={`text-xl font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'} mb-2`}>
-          Investment Dashboard
+        <h1 className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'} mb-2`}>
+          Portfolio Overview
         </h1>
+        <p className={`${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+          Real-time portfolio insights and performance analytics
+        </p>
       </div>
 
-      {/* Time Filter Buttons */}
+      {/* Time Filter Buttons & Refresh */}
       <div className="mb-6">
-        <div className="flex flex-wrap gap-2">
-          {(['1W', '1M', '6M', '1Y', '5Y'] as TimeFilter[]).map(filter => (
-            <button
-              key={filter}
-              onClick={() => setSelectedTimeFilter(filter)}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                selectedTimeFilter === filter
-                  ? 'bg-blue-600 text-white'
-                  : isDarkMode
-                  ? 'bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-700'
-                  : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
-              }`}
-            >
-              {filter}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex flex-wrap gap-2">
+            {(['1W', '1M', '1Y', '5Y'] as TimeFilter[]).map(filter => (
+              <button
+                key={filter}
+                onClick={() => setSelectedTimeFilter(filter)}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  selectedTimeFilter === filter
+                    ? 'bg-blue-600 text-white shadow-lg'
+                    : isDarkMode
+                    ? 'bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-700'
+                    : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200 shadow-sm'
+                }`}
+              >
+                {filter}
+              </button>
+            ))}
+          </div>
+          
+          {/* Refresh Button */}
+          <RoundedButton
+            onClick={() => {
+              dispatch(fetchAllDashboardData(selectedTimeFilter));
+              // Fallback for old API during transition
+              const days = selectedTimeFilter === '1W' ? 7 : selectedTimeFilter === '1M' ? 30 : selectedTimeFilter === '1Y' ? 365 : 1825;
+              dispatch(fetchDashboardSummary(days));
+            }}
+            variant="purple"
+            size="md"
+            isDarkMode={isDarkMode}
+            icon={
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            }
+          >
+            Refresh
+          </RoundedButton>
         </div>
       </div>
 
-      {/* Portfolio Overview Cards */}
+      {/* Portfolio Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {/* Total Investment */}
+        {/* Portfolio Value */}
         <div className={`p-6 rounded-2xl backdrop-blur-lg border ${
           isDarkMode 
-            ? 'bg-gray-800/30 border-gray-700/50 shadow-xl shadow-gray-900/20' 
-            : 'bg-white/60 border-white/20 shadow-xl shadow-gray-900/10'
+            ? 'bg-gray-800/50 border-gray-700/50 shadow-xl' 
+            : 'bg-white/80 border-white/50 shadow-xl'
         } hover:scale-105 transition-all duration-300`}>
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-4">
             <h3 className={`text-sm font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-              Total Investment
+              Demat Account
             </h3>
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
-              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-              </svg>
-            </div>
-          </div>
-          <p className={`text-lg font-semibold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
-            ${portfolioData.totalInvestment.toLocaleString()}
-          </p>
-        </div>
-
-        {/* Current Value */}
-        <div className={`p-6 rounded-2xl backdrop-blur-lg border ${
-          isDarkMode 
-            ? 'bg-gray-800/30 border-gray-700/50 shadow-xl shadow-gray-900/20' 
-            : 'bg-white/60 border-white/20 shadow-xl shadow-gray-900/10'
-        } hover:scale-105 transition-all duration-300`}>
-          <div className="flex items-center justify-between mb-3">
-            <h3 className={`text-sm font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-              Current Value
-            </h3>
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center">
-              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
               </svg>
             </div>
           </div>
           <p className="text-3xl font-bold text-transparent bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text">
-            ${portfolioData.currentValue.toLocaleString()}
+            {formatCurrency(dashboardData.wallets.dematWallet.balance, dashboardData.wallets.dematWallet.currency)}
+          </p>
+          <p className={`text-sm mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+            Available balance
+          </p>
+        </div>
+
+        {/* Total Invested */}
+        <div className={`p-6 rounded-2xl backdrop-blur-lg border ${
+          isDarkMode 
+            ? 'bg-gray-800/50 border-gray-700/50 shadow-xl' 
+            : 'bg-white/80 border-white/50 shadow-xl'
+        } hover:scale-105 transition-all duration-300`}>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className={`text-sm font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+              Total Invested
+            </h3>
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+              </svg>
+            </div>
+          </div>
+          <p className="text-3xl font-bold text-transparent bg-gradient-to-r from-blue-400 to-cyan-400 bg-clip-text">
+            {formatCurrency(dashboardData.positions.totalInvested)}
           </p>
         </div>
 
         {/* Total Returns */}
         <div className={`p-6 rounded-2xl backdrop-blur-lg border ${
           isDarkMode 
-            ? 'bg-gray-800/30 border-gray-700/50 shadow-xl shadow-gray-900/20' 
-            : 'bg-white/60 border-white/20 shadow-xl shadow-gray-900/10'
+            ? 'bg-gray-800/50 border-gray-700/50 shadow-xl' 
+            : 'bg-white/80 border-white/50 shadow-xl'
         } hover:scale-105 transition-all duration-300`}>
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-4">
             <h3 className={`text-sm font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
               Total Returns
             </h3>
-            <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${
-              portfolioData.totalReturns >= 0 ? 'from-green-500 to-emerald-500' : 'from-red-500 to-pink-500'
+            <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${
+              dashboardData.positions.totalPnL >= 0 ? 'from-green-500 to-emerald-500' : 'from-red-500 to-pink-500'
             } flex items-center justify-center`}>
-              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                      d={portfolioData.totalReturns >= 0 ? "M7 11l5-5m0 0l5 5m-5-5v12" : "M17 13l-5 5m0 0l-5-5m5 5V6"} />
+                      d={dashboardData.positions.totalPnL >= 0 ? "M7 11l5-5m0 0l5 5m-5-5v12" : "M17 13l-5 5m0 0l-5-5m5 5V6"} />
               </svg>
             </div>
           </div>
           <p className={`text-3xl font-bold ${
-            portfolioData.totalReturns >= 0 ? 'text-green-400' : 'text-red-400'
+            dashboardData.positions.totalPnL >= 0 ? 'text-green-400' : 'text-red-400'
           }`}>
-            ${portfolioData.totalReturns.toLocaleString()} ({portfolioData.totalReturnsPercent.toFixed(2)}%)
+            {formatCurrency(dashboardData.positions.totalPnL)}
+          </p>
+          <p className={`text-sm mt-1 ${
+            dashboardData.positions.totalPnL >= 0 ? 'text-green-400' : 'text-red-400'
+          }`}>
+            Positions P&L
           </p>
         </div>
 
-        {/* Active Positions */}
+        {/* Total Performance */}
         <div className={`p-6 rounded-2xl backdrop-blur-lg border ${
           isDarkMode 
-            ? 'bg-gray-800/30 border-gray-700/50 shadow-xl shadow-gray-900/20' 
-            : 'bg-white/60 border-white/20 shadow-xl shadow-gray-900/10'
+            ? 'bg-gray-800/50 border-gray-700/50 shadow-xl' 
+            : 'bg-white/80 border-white/50 shadow-xl'
         } hover:scale-105 transition-all duration-300`}>
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-4">
             <h3 className={`text-sm font-medium ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-              Active Positions
+              Total P&L
             </h3>
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
-              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${
+              dashboardData.tradePnL.total.netPnL >= 0 ? 'from-green-500 to-emerald-500' : 'from-red-500 to-pink-500'
+            } flex items-center justify-center`}>
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
               </svg>
             </div>
           </div>
-          <p className="text-3xl font-bold text-transparent bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text">
-            {portfolioData.activePositions}
+          <p className={`text-3xl font-bold ${
+            dashboardData.tradePnL.total.netPnL >= 0 ? 'text-green-400' : 'text-red-400'
+          }`}>
+            {formatCurrency(dashboardData.tradePnL.total.netPnL)}
+          </p>
+          <p className={`text-sm mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+            {dashboardData.tradePnL.total.trades} total trades
           </p>
         </div>
       </div>
 
-      {/* Portfolio Performance Chart */}
-      <div className={`p-8 rounded-2xl backdrop-blur-lg border mb-8 ${
-        isDarkMode 
-          ? 'bg-gray-800/30 border-gray-700/50 shadow-xl shadow-gray-900/20' 
-          : 'bg-white/60 border-white/20 shadow-xl shadow-gray-900/10'
-      }`}>
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-semibold">Portfolio Performance</h2>
-          <div className="flex items-center space-x-4">
-            <div className={`px-3 py-1 rounded-lg ${
-              isDarkMode ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-700'
-            }`}>
+
+      {/* Wallet Summary */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8 items-start">
+        {/* Left Half - Current Wallets */}
+        <div className={`p-6 rounded-2xl backdrop-blur-lg border h-full ${
+          isDarkMode 
+            ? 'bg-gray-800/50 border-gray-700/50 shadow-xl' 
+            : 'bg-white/80 border-white/50 shadow-xl'
+        }`}>
+          <h2 className="text-lg font-semibold mb-4">Current Wallets</h2>
+          
+          {/* Wallet Totals - Top Half */}
+          <div className="mb-6">
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div className={`p-3 rounded-lg ${isDarkMode ? 'bg-gray-700/50' : 'bg-gray-50/80'}`}>
+                <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Demat Balance</p>
+                <p className="text-lg font-bold text-blue-400">
+                  {formatCurrency(dashboardData.wallets.dematWallet.balance, dashboardData.wallets.dematWallet.currency)}
+                </p>
+              </div>
+              <div className={`p-3 rounded-lg ${isDarkMode ? 'bg-gray-700/50' : 'bg-gray-50/80'}`}>
+                <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Bank Balance</p>
+                <p className="text-lg font-bold text-green-400">
+                  {formatCurrency(dashboardData.wallets.bankWallet.balance, dashboardData.wallets.bankWallet.currency)}
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <span className={`text-xs px-2 py-1 rounded-full ${
+                  isDarkMode ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-600'
+                }`}>
+                  {dashboardData.wallets.dematWallet.count} Demat Accounts
+                </span>
+                <span className={`text-xs px-2 py-1 rounded-full ${
+                  isDarkMode ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-600'
+                }`}>
+                  {dashboardData.wallets.bankWallet.count} Bank Accounts
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Wallet Recent Activity - Bottom Half */}
+          <div>
+            <h3 className="text-sm font-medium mb-3">Recent Wallet Activity</h3>
+            <div className="space-y-3 max-h-40 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-transparent">
+              {dashboardData.wallets.recentActivity.slice(0, 4).map((activity) => (
+                <div key={activity.id} className={`p-3 rounded-lg border transition-all duration-200 hover:scale-102 ${
+                  isDarkMode 
+                    ? 'bg-gradient-to-r from-gray-800/60 to-gray-700/60 border-gray-600/50 hover:border-gray-500/70' 
+                    : 'bg-gradient-to-r from-white/80 to-gray-50/80 border-gray-200/60 hover:border-gray-300/80'
+                }`}>
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start space-x-2 flex-1">
+                      {/* Action Icon */}
+                      <div className={`w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 ${
+                        activity.action === 'create' ? 'bg-green-500/20 text-green-400' :
+                        activity.action === 'deposit' ? 'bg-blue-500/20 text-blue-400' :
+                        activity.action === 'withdrawal' ? 'bg-red-500/20 text-red-400' :
+                        activity.action === 'trade' ? 'bg-purple-500/20 text-purple-400' :
+                        'bg-yellow-500/20 text-yellow-400'
+                      }`}>
+                        {activity.action === 'create' && (
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                          </svg>
+                        )}
+                        {activity.action === 'deposit' && (
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" />
+                          </svg>
+                        )}
+                        {activity.action === 'withdrawal' && (
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 13l-5 5m0 0l-5-5m5 5V6" />
+                          </svg>
+                        )}
+                        {activity.action === 'trade' && (
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                          </svg>
+                        )}
+                        {activity.action === 'update' && (
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                          </svg>
+                        )}
+                      </div>
+                      
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-xs mb-1 truncate">
+                          {activity.data?.name || 'Wallet Activity'}
+                        </p>
+                        <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                          {activity.action} • {new Date(activity.createdAt).toLocaleDateString('en-US', { 
+                            month: 'short', 
+                            day: 'numeric'
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-col items-end space-y-1">
+                      <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full ${
+                        activity.action === 'create' ? 'bg-green-500/20 text-green-400' :
+                        activity.action === 'deposit' ? 'bg-blue-500/20 text-blue-400' :
+                        activity.action === 'withdrawal' ? 'bg-red-500/20 text-red-400' :
+                        activity.action === 'trade' ? 'bg-purple-500/20 text-purple-400' :
+                        'bg-yellow-500/20 text-yellow-400'
+                      }`}>
+                        {activity.action.toUpperCase()}
+                      </span>
+                      
+                      {/* Show amount based on action type */}
+                      {(activity.action === 'deposit' || activity.action === 'withdrawal') && activity.data?.changes?.balance ? (
+                        <span className={`text-xs font-bold ${
+                          activity.action === 'deposit' ? 'text-green-400' : 'text-red-400'
+                        }`}>
+                          {activity.action === 'deposit' ? '+' : '-'}
+                          {formatCurrency(Math.abs(activity.data.changes.balance), activity.data?.next?.currency || activity.data?.prev?.currency || 'USD')}
+                        </span>
+                      ) : activity.data?.changes?.balance ? (
+                        <span className={`text-xs font-bold ${
+                          activity.data.changes.balance > 0 ? 'text-green-400' : 'text-red-400'
+                        }`}>
+                          {activity.data.changes.balance > 0 ? '+' : ''}
+                          {formatCurrency(activity.data.changes.balance, activity.data?.next?.currency || 'USD')}
+                        </span>
+                      ) : activity.data?.next?.balance && activity.action === 'create' ? (
+                        <span className="text-xs font-bold text-blue-400">
+                          {formatCurrency(activity.data.next.balance, activity.data.next.currency || 'USD')}
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Right Half - Deposits Section */}
+        <div className={`p-6 rounded-2xl backdrop-blur-lg border h-full ${
+          isDarkMode 
+            ? 'bg-gray-800/50 border-gray-700/50 shadow-xl' 
+            : 'bg-white/80 border-white/50 shadow-xl'
+        }`}>
+          <h2 className="text-lg font-semibold mb-4">Deposits</h2>
+          
+          {/* Deposits Data - Top Half */}
+          <div className="mb-6">
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div className={`p-3 rounded-lg ${isDarkMode ? 'bg-gray-700/50' : 'bg-gray-50/80'}`}>
+                <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Total Amount</p>
+                <p className="text-lg font-bold text-blue-400">
+                  {formatCurrency(dashboardData.transactions.deposits.total, 'INR')}
+                </p>
+              </div>
+              <div className={`p-3 rounded-lg ${isDarkMode ? 'bg-gray-700/50' : 'bg-gray-50/80'}`}>
+                <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Total Count</p>
+                <p className="text-lg font-bold text-gray-300">
+                  {dashboardData.transactions.deposits.pending + dashboardData.transactions.deposits.completed}
+                </p>
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <span className={`text-xs px-2 py-1 rounded-full ${
+                  isDarkMode ? 'bg-green-500/20 text-green-400' : 'bg-green-100 text-green-600'
+                }`}>
+                  {dashboardData.transactions.deposits.completed} Completed
+                </span>
+                <span className={`text-xs px-2 py-1 rounded-full ${
+                  isDarkMode ? 'bg-yellow-500/20 text-yellow-400' : 'bg-yellow-100 text-yellow-600'
+                }`}>
+                  {dashboardData.transactions.deposits.pending} Pending
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Deposits Recent Activity - Bottom Half */}
+          <div>
+            <h3 className="text-sm font-medium mb-3">Recent Deposit Activity</h3>
+            <div className="space-y-3 max-h-40 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-transparent">
+              {dashboardData.transactions.deposits.list.slice(0, 5).map((deposit) => (
+                <div key={deposit.id} className={`p-3 rounded-lg border transition-all duration-200 hover:scale-102 ${
+                  isDarkMode 
+                    ? 'bg-gradient-to-r from-gray-800/60 to-gray-700/60 border-gray-600/50 hover:border-gray-500/70' 
+                    : 'bg-gradient-to-r from-white/80 to-gray-50/80 border-gray-200/60 hover:border-gray-300/80'
+                }`}>
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start space-x-2 flex-1">
+                      {/* Deposit Icon */}
+                      <div className="w-6 h-6 rounded-md bg-blue-500/20 text-blue-400 flex items-center justify-center flex-shrink-0">
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11l5-5m0 0l5 5m-5-5v12" />
+                        </svg>
+                      </div>
+                      
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-xs mb-1 truncate">
+                          {deposit.method || 'Bank Transfer'}
+                        </p>
+                        <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                          {deposit.description}
+                        </p>
+                        <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>
+                          {new Date(deposit.requestedAt).toLocaleDateString('en-US', { 
+                            month: 'short', 
+                            day: 'numeric'
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-col items-end space-y-1">
+                      <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full ${
+                        deposit.status === 'completed' ? 'bg-green-500/20 text-green-400' :
+                        'bg-yellow-500/20 text-yellow-400'
+                      }`}>
+                        {deposit.status === 'completed' ? 'DONE' : 'PENDING'}
+                      </span>
+                      <span className="text-xs font-bold text-blue-400">
+                        +{formatCurrency(deposit.amount, 'INR')}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Performance & Actions */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Trade P&L Analytics */}
+        <div className={`p-6 rounded-2xl backdrop-blur-lg border ${
+          isDarkMode 
+            ? 'bg-gray-800/50 border-gray-700/50 shadow-xl' 
+            : 'bg-white/80 border-white/50 shadow-xl'
+        }`}>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-lg font-semibold">Trade P&L Analytics</h2>
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+              </svg>
+            </div>
+          </div>
+
+          {/* P&L Summary */}
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className={`p-3 rounded-lg ${isDarkMode ? 'bg-gray-700/50' : 'bg-gray-50/80'}`}>
+              <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Net P&L</p>
+              <p className={`text-lg font-bold ${
+                dashboardData.tradePnL.statistics.netPnL >= 0 ? 'text-green-400' : 'text-red-400'
+              }`}>
+                {formatCurrency(dashboardData.tradePnL.statistics.netPnL)}
+              </p>
+            </div>
+            <div className={`p-3 rounded-lg ${isDarkMode ? 'bg-gray-700/50' : 'bg-gray-50/80'}`}>
+              <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Total Trades</p>
+              <p className="text-lg font-bold text-gray-300">
+                {dashboardData.tradePnL.statistics.totalTrades}
+              </p>
+            </div>
+          </div>
+
+          {/* Line Chart */}
+          <div className="relative h-48 mb-4">
+            <div className={`absolute inset-0 rounded-lg ${isDarkMode ? 'bg-gray-900/50' : 'bg-gray-50'}`}>
+              <svg className="w-full h-full p-4" viewBox="0 0 400 160">
+                {/* Grid Lines */}
+                <defs>
+                  <pattern id="tradegrid" width="40" height="32" patternUnits="userSpaceOnUse">
+                    <path d="M 40 0 L 0 0 0 32" fill="none" stroke={isDarkMode ? '#374151' : '#e5e7eb'} strokeWidth="1" opacity="0.5"/>
+                  </pattern>
+                </defs>
+                <rect width="100%" height="100%" fill="url(#tradegrid)" />
+                
+                {/* Generate line chart points from trade P&L data */}
+                {(() => {
+                  // Get appropriate data based on timeframe
+                  const getDataForTimeframe = () => {
+                    const chartData = dashboardData.tradePnL?.chartData;
+                    if (!chartData) return [];
+                    
+                    switch (selectedTimeFilter) {
+                      case '1W': return (chartData as any).daily || [];
+                      case '1M': return chartData.weekly || [];
+                      case '1Y': return chartData.monthly || [];
+                      case '5Y': return chartData.yearly || [];
+                      default: return chartData.weekly || [];
+                    }
+                  };
+
+                  const data = getDataForTimeframe();
+                  if (!data || data.length === 0) {
+                    return <div className="flex items-center justify-center h-32 text-gray-500">No data available</div>;
+                  }
+                  const rawValues: number[] = data
+                    .map((d: { netPnL: number }) => safeNumber(d.netPnL))
+                    .filter((v: number) => isFinite(v));
+                  if (rawValues.length === 0) {
+                    return <div className="flex items-center justify-center h-32 text-gray-500">No data available</div>;
+                  }
+                  const maxPnL = Math.max(...rawValues);
+                  const minPnL = Math.min(...rawValues);
+                  const width = 360;
+                  const height = 120;
+                  const padding = 20;
+                  const centerY = height / 2;
+                  
+                  const denom = (maxPnL - minPnL) === 0 ? 1 : (maxPnL - minPnL);
+                  const points = data.map((item: TradePnLPoint, index: number) => {
+                    const safeValue = typeof item.netPnL === 'number' && isFinite(item.netPnL) ? item.netPnL : minPnL;
+                    const base = (data.length - 1) || 1;
+                    const x = padding + (index * (width - 2 * padding)) / base;
+                    const normalizedValue = (safeValue - minPnL) / denom; // 0..1
+                    const y = height - padding - (normalizedValue * (height - 2 * padding));
+                    
+                    // Format date based on timeframe
+                    let dateStr = '';
+                    if (selectedTimeFilter === '1W') {
+                      // Daily data: 2025-09-09
+                      dateStr = new Date(item.period).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    } else if (selectedTimeFilter === '1M') {
+                      // Weekly data: 2025-W32
+                      const weekNumStr = item.period.split('-W')[1];
+                      const yearStr = item.period.split('-W')[0];
+                      const weekNum = parseInt(weekNumStr, 10);
+                      const year = parseInt(yearStr, 10);
+                      const date = new Date(year, 0, 1 + (weekNum - 1) * 7);
+                      dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    } else if (selectedTimeFilter === '1Y') {
+                      // Monthly data: 2025-09
+                      const [year, month] = item.period.split('-');
+                      dateStr = new Date(parseInt(year), parseInt(month) - 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+                    } else if (selectedTimeFilter === '5Y') {
+                      // Yearly data: 2025
+                      dateStr = item.period;
+                    }
+                    
+                    return { x, y, netPnL: item.netPnL, period: item.period, dateStr };
+                  });
+                  
+                  const pathData = points
+                    .map((point: { x: number; y: number }, index: number) => {
+                      const px = isFinite(point.x) ? point.x : padding;
+                      const py = isFinite(point.y) ? point.y : (height / 2);
+                      return `${index === 0 ? 'M' : 'L'} ${px} ${py}`;
+                    })
+                    .join(' ');
+                  
+                  return (
+                    <g>
+                      {/* Zero line */}
+                      <line
+                        x1={padding}
+                        y1={centerY}
+                        x2={width - padding}
+                        y2={centerY}
+                        stroke={isDarkMode ? '#4B5563' : '#D1D5DB'}
+                        strokeWidth="1"
+                        strokeDasharray="5,5"
+                      />
+                      
+                      {/* Area under the line */}
+                      <path
+                        d={`${pathData} L ${points[points.length - 1].x} ${height - padding} L ${points[0].x} ${height - padding} Z`}
+                        fill="url(#greenGradient)"
+                        opacity="0.2"
+                      />
+                      
+                      {/* Line */}
+                      <path
+                        d={pathData}
+                        fill="none"
+                        stroke="#10b981"
+                        strokeWidth="3"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      
+                      {/* Data points */}
+                      {points.map((point: any, index: number) => {
+                        const px = isFinite(point.x) ? point.x : padding;
+                        const py = isFinite(point.y) ? point.y : (height / 2);
+                        return (
+                          <g key={index}>
+                            <circle
+                              cx={px}
+                              cy={py}
+                              r="4"
+                              fill="#10b981"
+                              stroke={isDarkMode ? '#1f2937' : '#ffffff'}
+                              strokeWidth="2"
+                            />
+                            <circle
+                              cx={px}
+                              cy={py}
+                              r="8"
+                              fill="transparent"
+                              className="hover:fill-green-400/20 cursor-pointer"
+                            >
+                              <title>{`${point.dateStr}: ${formatCurrency(point.netPnL)}`}</title>
+                            </circle>
+                          </g>
+                        );
+                      })}
+                      
+                      {/* Gradient definition */}
+                      <defs>
+                        <linearGradient id="greenGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                          <stop offset="0%" stopColor="#10b981" stopOpacity="0.4"/>
+                          <stop offset="100%" stopColor="#10b981" stopOpacity="0.1"/>
+                        </linearGradient>
+                      </defs>
+                    </g>
+                  );
+                })()}
+              </svg>
+            </div>
+          </div>
+
+          {/* Chart Legend */}
+          <div className="flex items-center justify-between text-xs mb-4">
+            {(() => {
+              // Get appropriate data based on timeframe
+              const getDataForTimeframe = () => {
+                const chartData = dashboardData.tradePnL?.chartData;
+                if (!chartData) return [];
+                
+                switch (selectedTimeFilter) {
+                  case '1W': return (chartData as any).daily || [];
+                  case '1M': return chartData.weekly || [];
+                  case '1Y': return chartData.monthly || [];
+                  case '5Y': return chartData.yearly || [];
+                  default: return chartData.weekly || [];
+                }
+              };
+              
+              const data = getDataForTimeframe();
+              const firstPeriod = data[0]?.period;
+              const lastPeriod = data[data.length - 1]?.period;
+              
+              let startLabel = '', endLabel = '';
+              
+              if (firstPeriod && lastPeriod) {
+                if (selectedTimeFilter === '1W') {
+                  startLabel = new Date(firstPeriod).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                  endLabel = new Date(lastPeriod).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                } else if (selectedTimeFilter === '1M') {
+                  const startWeek = firstPeriod.split('-W')[1];
+                  const endWeek = lastPeriod.split('-W')[1];
+                  startLabel = `Week ${startWeek}`;
+                  endLabel = `Week ${endWeek}`;
+                } else if (selectedTimeFilter === '1Y') {
+                  const [startYear, startMonth] = firstPeriod.split('-');
+                const [endYear, endMonth] = lastPeriod.split('-');
+                startLabel = new Date(parseInt(startYear), parseInt(startMonth) - 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+                endLabel = new Date(parseInt(endYear), parseInt(endMonth) - 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+              } else if (selectedTimeFilter === '5Y') {
+                startLabel = firstPeriod;
+                endLabel = lastPeriod;
+              }
+              }
+              
+              return (
+                <>
+                  <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>
+                    {startLabel}
+                  </span>
+                  <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>
+                    {endLabel}
+                  </span>
+                </>
+              );
+            })()}
+          </div>
+
+          {/* Status Summary */}
+          <div className="mt-4">
+            <div className="text-center">
               <span className="text-sm font-medium">
-                +{((chartData[chartData.length - 1]?.value / chartData[0]?.value - 1) * 100).toFixed(2)}%
+                Win Rate: {dashboardData.tradePnL.statistics.winRate}, Avg Daily: {formatCurrency(Number(dashboardData.tradePnL.statistics.averageDailyPnL))}
               </span>
             </div>
           </div>
         </div>
-        <div className="h-80">
-          <LineChart data={chartData} height={320} />
-        </div>
-      </div>
 
-      {/* Platform Breakdown */}
-      <div className={`p-8 rounded-2xl backdrop-blur-lg border mb-8 ${
-        isDarkMode 
-          ? 'bg-gray-800/30 border-gray-700/50 shadow-xl shadow-gray-900/20' 
-          : 'bg-white/60 border-white/20 shadow-xl shadow-gray-900/10'
-      }`}>
-        <h2 className="text-lg font-semibold mb-4">Platform Breakdown</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {portfolioData.platforms.map((platform) => (
-            <div key={platform.platform} className={`p-6 rounded-xl border ${
-              isDarkMode 
-                ? 'bg-gray-700/30 border-gray-600/50' 
-                : 'bg-white/70 border-gray-200/50'
-            }`}>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">{platform.platform}</h3>
-                <div 
-                  className="w-4 h-4 rounded-full"
-                  style={{ backgroundColor: platform.color }}
-                ></div>
-              </div>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Investment:</span>
-                  <span className="font-medium">${platform.totalInvestment.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Current Value:</span>
-                  <span className="font-medium">${platform.currentValue.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Returns:</span>
-                  <span className={`font-medium ${platform.returns >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                    ${platform.returns.toLocaleString()} ({platform.returnsPercent.toFixed(2)}%)
-                  </span>
-                </div>
-              </div>
+        {/* Withdrawal Analytics */}
+        <div className={`p-6 rounded-2xl backdrop-blur-lg border ${
+          isDarkMode 
+            ? 'bg-gray-800/50 border-gray-700/50 shadow-xl' 
+            : 'bg-white/80 border-white/50 shadow-xl'
+        }`}>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-lg font-semibold">Withdrawal Analytics</h2>
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-pink-500 flex items-center justify-center">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 13l-5 5m0 0l-5-5m5 5V6" />
+              </svg>
             </div>
-          ))}
-        </div>
-      </div>
+          </div>
 
-      {/* Asset Positions (Lot-wise) */}
-      <div className={`p-8 rounded-2xl backdrop-blur-lg border mb-8 ${
-        isDarkMode 
-          ? 'bg-gray-800/30 border-gray-700/50 shadow-xl shadow-gray-900/20' 
-          : 'bg-white/60 border-white/20 shadow-xl shadow-gray-900/10'
-      }`}>
-        <h2 className="text-2xl font-bold mb-6">Active Positions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {assetPositions.map((position) => (
-            <div key={`${position.symbol}-${position.platform}`} className={`p-6 rounded-xl border ${
-              isDarkMode 
-                ? 'bg-gray-700/30 border-gray-600/50 hover:bg-gray-700/50' 
-                : 'bg-white/70 border-gray-200/50 hover:bg-white/90'
-            } transition-all duration-300 hover:scale-105`}>
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-3">
-                  <div 
-                    className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold"
-                    style={{ backgroundColor: position.color }}
-                  >
-                    {position.symbol.substring(0, 2)}
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-lg">{position.symbol}</h3>
-                    <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                      {position.platform}
+          {/* Withdrawal Summary */}
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            {(() => {
+              // Get appropriate withdrawal data based on timeframe
+              const getWithdrawalDataForTimeframe = () => {
+                const chartData = dashboardData.transactions?.withdrawals?.chartData;
+                if (!chartData) return [];
+                
+                switch (selectedTimeFilter) {
+                  case '1W': return (chartData as any).daily || [];
+                  case '1M': return chartData.weekly || [];
+                  case '1Y': return chartData.monthly || [];
+                  case '5Y': return chartData.yearly || [];
+                  default: return chartData.weekly || [];
+                }
+              };
+              
+              const data = getWithdrawalDataForTimeframe();
+              const totalAmount = data.reduce((sum: number, item: WithdrawalPoint) => sum + (item.totalAmount || 0), 0);
+              const totalCount = data.reduce((sum: number, item: WithdrawalPoint) => sum + (item.count || 0), 0);
+              
+              return (
+                <>
+                  <div className={`p-3 rounded-lg ${isDarkMode ? 'bg-gray-700/50' : 'bg-gray-50/80'}`}>
+                    <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Total Amount</p>
+                    <p className="text-lg font-bold text-red-400">
+                      {formatCurrency(totalAmount, 'INR')}
                     </p>
                   </div>
-                </div>
-                <div className={`px-3 py-1 rounded-lg text-sm font-medium ${
-                  isDarkMode ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-700'
-                }`}>
-                  {position.lots} Lots
-                </div>
-              </div>
-              
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Invested:</span>
-                  <span className="font-medium">${position.investedAmount.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Current:</span>
-                  <span className="font-medium">${position.currentValue.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Returns:</span>
-                  <span className={`font-bold ${position.returns >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                    ${position.returns.toLocaleString()} ({position.returnsPercent.toFixed(2)}%)
-                  </span>
-                </div>
-              </div>
-              
-              {/* Mini progress bar for returns */}
-              <div className="mt-4">
-                <div className={`w-full h-2 rounded-full ${isDarkMode ? 'bg-gray-600' : 'bg-gray-200'}`}>
-                  <div 
-                    className={`h-2 rounded-full transition-all duration-500 ${
-                      position.returns >= 0 ? 'bg-gradient-to-r from-green-400 to-emerald-500' : 'bg-gradient-to-r from-red-400 to-pink-500'
-                    }`}
-                    style={{ 
-                      width: `${Math.min(Math.abs(position.returnsPercent), 100)}%` 
-                    }}
-                  ></div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Recent Transactions */}
-      <div className={`p-8 rounded-2xl backdrop-blur-lg border ${
-        isDarkMode 
-          ? 'bg-gray-800/30 border-gray-700/50 shadow-xl shadow-gray-900/20' 
-          : 'bg-white/60 border-white/20 shadow-xl shadow-gray-900/10'
-      }`}>
-        <h2 className="text-2xl font-bold mb-6">Recent Transactions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {recentTransactions.map((transaction) => (
-            <div key={transaction.id} className={`p-6 rounded-xl border ${
-              isDarkMode 
-                ? 'bg-gray-700/30 border-gray-600/50 hover:bg-gray-700/50' 
-                : 'bg-white/70 border-gray-200/50 hover:bg-white/90'
-            } transition-all duration-300`}>
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-3">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                    transaction.type === 'buy' 
-                      ? 'bg-green-500/20 text-green-400' 
-                      : 'bg-red-500/20 text-red-400'
-                  }`}>
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                            d={transaction.type === 'buy' ? "M7 11l5-5m0 0l5 5m-5-5v12" : "M17 13l-5 5m0 0l-5-5m5 5V6"} />
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="font-bold">{transaction.symbol}</h3>
-                    <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                      {transaction.platform}
+                  <div className={`p-3 rounded-lg ${isDarkMode ? 'bg-gray-700/50' : 'bg-gray-50/80'}`}>
+                    <p className={`text-xs ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Total Count</p>
+                    <p className="text-lg font-bold text-gray-300">
+                      {totalCount}
                     </p>
                   </div>
-                </div>
-                <div className={`px-3 py-1 rounded-lg text-sm font-medium ${
-                  transaction.type === 'buy'
-                    ? 'bg-green-500/20 text-green-400'
-                    : 'bg-red-500/20 text-red-400'
-                }`}>
-                  {transaction.type.toUpperCase()}
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Amount:</span>
-                  <span className="font-medium">${transaction.amount.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Lots:</span>
-                  <span className="font-medium">{transaction.lots}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Price:</span>
-                  <span className="font-medium">${transaction.price.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>Date:</span>
-                  <span className="font-medium text-sm">{transaction.timestamp}</span>
-                </div>
-              </div>
+                </>
+              );
+            })()}
+          </div>
+
+          {/* Line Chart */}
+          <div className="relative h-48 mb-4">
+            <div className={`absolute inset-0 rounded-lg ${isDarkMode ? 'bg-gray-900/50' : 'bg-gray-50'}`}>
+              <svg className="w-full h-full p-4" viewBox="0 0 400 160">
+                {/* Grid Lines */}
+                <defs>
+                  <pattern id="grid" width="40" height="32" patternUnits="userSpaceOnUse">
+                    <path d="M 40 0 L 0 0 0 32" fill="none" stroke={isDarkMode ? '#374151' : '#e5e7eb'} strokeWidth="1" opacity="0.5"/>
+                  </pattern>
+                </defs>
+                <rect width="100%" height="100%" fill="url(#grid)" />
+                
+                {/* Generate line chart points from withdrawal data */}
+                {(() => {
+                  // Get appropriate withdrawal data based on timeframe
+                  const getWithdrawalDataForTimeframe = () => {
+                    const chartData = dashboardData.transactions?.withdrawals?.chartData;
+                    if (!chartData) return [];
+                    
+                    switch (selectedTimeFilter) {
+                      case '1W': return (chartData as any).daily || [];
+                      case '1M': return chartData.weekly || [];
+                      case '1Y': return chartData.monthly || [];
+                      case '5Y': return chartData.yearly || [];
+                      default: return chartData.weekly || [];
+                    }
+                  };
+
+                  const data = getWithdrawalDataForTimeframe();
+                  if (!data || data.length === 0) {
+                    return <div className="flex items-center justify-center h-32 text-gray-500">No withdrawal data available</div>;
+                  }
+                  const rawAmounts: number[] = data
+                    .map((d: { totalAmount: number }) => safeNumber(d.totalAmount))
+                    .filter((v: number) => isFinite(v));
+                  if (rawAmounts.length === 0) {
+                    return <div className="flex items-center justify-center h-32 text-gray-500">No withdrawal data available</div>;
+                  }
+                  const maxAmount = Math.max(...rawAmounts);
+                  const width = 360;
+                  const height = 120;
+                  const padding = 20;
+                  
+                  const points = data.map((item: WithdrawalPoint, index: number) => {
+                    const base = (data.length - 1) || 1;
+                    const x = padding + (index * (width - 2 * padding)) / base;
+                    const safeAmount = typeof item.totalAmount === 'number' && isFinite(item.totalAmount) ? item.totalAmount : 0;
+                    const ratio = maxAmount === 0 ? 0 : safeAmount / maxAmount;
+                    const y = height - padding - (ratio * (height - 2 * padding));
+                    
+                    // Format date based on timeframe for tooltip
+                    let dateStr = '';
+                    if (selectedTimeFilter === '1W') {
+                      dateStr = new Date(item.period).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    } else if (selectedTimeFilter === '1M') {
+                      const weekNumStr = item.period.split('-W')[1];
+                      const yearStr = item.period.split('-W')[0];
+                      const weekNum = parseInt(weekNumStr, 10);
+                      const year = parseInt(yearStr, 10);
+                      const date = new Date(year, 0, 1 + (weekNum - 1) * 7);
+                      dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    } else if (selectedTimeFilter === '1Y') {
+                      const [year, month] = item.period.split('-');
+                      dateStr = new Date(parseInt(year), parseInt(month) - 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+                    } else if (selectedTimeFilter === '5Y') {
+                      dateStr = item.period;
+                    }
+                    
+                    return { x, y, amount: item.totalAmount, date: item.period, dateStr };
+                  });
+                  
+                  const pathData = points
+                    .map((point: { x: number; y: number }, index: number) => {
+                      const px = isFinite(point.x) ? point.x : padding;
+                      const py = isFinite(point.y) ? point.y : (height / 2);
+                      return `${index === 0 ? 'M' : 'L'} ${px} ${py}`;
+                    })
+                    .join(' ');
+                  
+                  return (
+                    <g>
+                      {/* Area under the line */}
+                      <path
+                        d={`${pathData} L ${points[points.length - 1].x} ${height - padding} L ${points[0].x} ${height - padding} Z`}
+                        fill="url(#redGradient)"
+                        opacity="0.2"
+                      />
+                      
+                      {/* Line */}
+                      <path
+                        d={pathData}
+                        fill="none"
+                        stroke="#f87171"
+                        strokeWidth="3"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      
+                      {/* Data points */}
+                      {points.map((point: any, index: number) => {
+                        const px = isFinite(point.x) ? point.x : padding;
+                        const py = isFinite(point.y) ? point.y : (height / 2);
+                        return (
+                          <g key={index}>
+                            <circle
+                              cx={px}
+                              cy={py}
+                              r="4"
+                              fill="#f87171"
+                              stroke={isDarkMode ? '#1f2937' : '#ffffff'}
+                              strokeWidth="2"
+                            />
+                            <circle
+                              cx={px}
+                              cy={py}
+                              r="8"
+                              fill="transparent"
+                              className="hover:fill-red-400/20 cursor-pointer"
+                            >
+                              <title>{`${point.dateStr}: ${formatCurrency(point.amount, 'INR')}`}</title>
+                            </circle>
+                          </g>
+                        );
+                      })}
+                      
+                      {/* Gradient definition */}
+                      <defs>
+                        <linearGradient id="redGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                          <stop offset="0%" stopColor="#f87171" stopOpacity="0.4"/>
+                          <stop offset="100%" stopColor="#f87171" stopOpacity="0.1"/>
+                        </linearGradient>
+                      </defs>
+                    </g>
+                  );
+                })()}
+              </svg>
             </div>
-          ))}
+          </div>
+
+          {/* Chart Legend */}
+          <div className="flex items-center justify-between text-xs">
+            {(() => {
+              // Get appropriate withdrawal data based on timeframe
+              const getWithdrawalDataForTimeframe = () => {
+                const chartData = dashboardData.transactions?.withdrawals?.chartData;
+                if (!chartData) return [];
+                
+                switch (selectedTimeFilter) {
+                  case '1W': return (chartData as any).daily || [];
+                  case '1M': return chartData.weekly || [];
+                  case '1Y': return chartData.monthly || [];
+                  case '5Y': return chartData.yearly || [];
+                  default: return chartData.weekly || [];
+                }
+              };
+              
+              const data = getWithdrawalDataForTimeframe();
+              const firstPeriod = data[0]?.period;
+              const lastPeriod = data[data.length - 1]?.period;
+              
+              let startLabel = '', endLabel = '';
+              
+              if (firstPeriod && lastPeriod) {
+                if (selectedTimeFilter === '1W') {
+                  startLabel = new Date(firstPeriod).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                  endLabel = new Date(lastPeriod).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                } else if (selectedTimeFilter === '1M') {
+                  const startWeek = firstPeriod.split('-W')[1];
+                  const endWeek = lastPeriod.split('-W')[1];
+                  startLabel = `Week ${startWeek}`;
+                  endLabel = `Week ${endWeek}`;
+                } else if (selectedTimeFilter === '1Y') {
+                  const [startYear, startMonth] = firstPeriod.split('-');
+                  const [endYear, endMonth] = lastPeriod.split('-');
+                  startLabel = new Date(parseInt(startYear), parseInt(startMonth) - 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+                  endLabel = new Date(parseInt(endYear), parseInt(endMonth) - 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+                } else if (selectedTimeFilter === '5Y') {
+                  startLabel = firstPeriod;
+                  endLabel = lastPeriod;
+                }
+              }
+              
+              return (
+                <>
+                  <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>
+                    {startLabel}
+                  </span>
+                  <span className={isDarkMode ? 'text-gray-400' : 'text-gray-600'}>
+                    {endLabel}
+                  </span>
+                </>
+              );
+            })()}
+          </div>
+
+          {/* Status Summary */}
+          <div className="mt-4">
+            <div className="text-center">
+              {(() => {
+                // Get appropriate withdrawal data based on timeframe
+                const getWithdrawalDataForTimeframe = () => {
+                  const chartData = dashboardData.transactions?.withdrawals?.chartData;
+                  if (!chartData) return [];
+                  
+                  switch (selectedTimeFilter) {
+                    case '1W': return (chartData as any).daily || [];
+                    case '1M': return chartData.weekly || [];
+                    case '1Y': return chartData.monthly || [];
+                    case '5Y': return chartData.yearly || [];
+                    default: return chartData.weekly || [];
+                  }
+                };
+                
+                const data = getWithdrawalDataForTimeframe();
+                const completedCount = data.reduce((sum: number, item: WithdrawalPoint) => sum + (item.completedCount || 0), 0);
+                const pendingCount = data.reduce((sum: number, item: WithdrawalPoint) => sum + (item.pendingCount || 0), 0);
+                
+                return (
+                  <span className="text-sm font-medium">
+                    {completedCount} Completed, {pendingCount} Pending
+                  </span>
+                );
+              })()}
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -704,7 +1182,7 @@ const InvestmentDashboard = memo(function InvestmentDashboard() {
         <div className="flex-1 overflow-hidden" style={{ height: '100vh' }}>
           {content}
         </div>
-        <FloatingNav activeTab={activeTab} onTabChange={handleTabChange} />
+        <FloatingButton activeTab={activeTab} onTabChange={handleTabChange} />
       </div>
     );
   }

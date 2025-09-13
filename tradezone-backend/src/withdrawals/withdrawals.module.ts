@@ -7,5 +7,6 @@ import { DatabaseModule } from '../database/database.module';
   imports: [DatabaseModule],
   providers: [WithdrawalsService],
   controllers: [WithdrawalsController],
+  exports: [WithdrawalsService],
 })
 export class WithdrawalsModule {}

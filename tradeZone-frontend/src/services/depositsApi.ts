@@ -1,4 +1,4 @@
-import api from './api';
+import getAxios from '../utils/interceptor/axiosInterceptor';
 
 export interface DepositDto {
   id: string;
@@ -12,19 +12,19 @@ export interface DepositDto {
 
 export const depositsApi = {
   list: async (): Promise<DepositDto[]> => {
-    const res = await api.get('/deposits');
+    const res = await getAxios.get('/deposits');
     return res.data;
   },
   create: async (data: { amount: number; method?: string; description?: string }): Promise<DepositDto> => {
-    const res = await api.post('/deposits', data);
+    const res = await getAxios.post('/deposits', data);
     return res.data;
   },
   async update(id: string, payload: Partial<{ amount: number; description?: string; method?: string }>) {
-    const res = await api.patch<{ success: boolean }>(`/deposits/${id}`, payload);
+    const res = await getAxios.patch<{ success: boolean }>(`/deposits/${id}`, payload);
     return res.data;
   },
   async remove(id: string) {
-    const res = await api.delete<{ success: boolean }>(`/deposits/${id}`);
+    const res = await getAxios.delete<{ success: boolean }>(`/deposits/${id}`);
     return res.data;
   }
 };

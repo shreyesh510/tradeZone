@@ -23,16 +23,20 @@ export class PositionsService {
     console.log('🔍 Creating position with data:', createPositionDto);
     console.log('🔍 For user ID:', userId);
 
-    const { entryPrice: _entryPriceIgnored, leverage: _levIgnored, ...rest } = createPositionDto as any;
+    const {
+      entryPrice: _entryPriceIgnored,
+      leverage: _levIgnored,
+      ...rest
+    } = createPositionDto as any;
     const positionData = {
       ...rest,
       account: (createPositionDto as any).account,
-  status: (createPositionDto as any).status || 'open',
+      status: (createPositionDto as any).status || 'open',
       userId: userId,
       createdAt: new Date(),
       updatedAt: new Date(),
       timestamp: createPositionDto.timestamp || new Date().toISOString(),
-    } as any;
+    };
 
     const position =
       await this.firebaseDatabaseService.createPosition(positionData);
@@ -43,7 +47,7 @@ export class PositionsService {
         action: 'create',
         positionId: position.id,
         symbol: position.symbol,
-  details: { ...positionData },
+        details: { ...positionData },
       });
     } catch {}
     console.log('✅ Position created successfully:', position.id);
@@ -131,8 +135,8 @@ export class PositionsService {
     updatePositionDto: UpdatePositionDto,
     userId: string,
   ): Promise<Position> {
-  // First check if position exists and belongs to user
-  const existing = await this.findOne(id, userId);
+    // First check if position exists and belongs to user
+    const existing = await this.findOne(id, userId);
 
     const updateData = {
       ...updatePositionDto,
@@ -162,7 +166,7 @@ export class PositionsService {
     // If we transitioned to closed, create an exit entry
     if (existing.status !== 'closed' && updateData.status === 'closed') {
       const pnlNumber = Number((updatePositionDto as any).pnl) || 0;
-  await this.firebaseDatabaseService.createExitEntrySingle({
+      await this.firebaseDatabaseService.createExitEntrySingle({
         userId,
         position: updated,
         pnl: pnlNumber,
@@ -170,7 +174,10 @@ export class PositionsService {
       });
       // Optionally, close any other open legs for the same symbol for this user to keep state consistent
       try {
-        await this.firebaseDatabaseService.closeOpenPositionsBySymbolForUser(userId, updated.symbol);
+        await this.firebaseDatabaseService.closeOpenPositionsBySymbolForUser(
+          userId,
+          updated.symbol,
+        );
       } catch (e) {
         // non-fatal
       }
@@ -217,25 +224,40 @@ export class PositionsService {
   }
 
   // Bulk import positions with deduping using deterministic keys
-  async bulkImport(userId: string, items: Array<any>, defaultAccount?: 'main' | 'longterm') {
-    const normalized = Array.isArray(items) ? items.map((x) => {
-      const obj = { ...(x || {}) } as any;
-      if (!obj.account && defaultAccount) obj.account = defaultAccount;
-      // Normalize field names from typical Excel headers
-      if (obj.Symbol && !obj.symbol) obj.symbol = String(obj.Symbol);
-      if (obj.Lots && !obj.lots) obj.lots = Number(obj.Lots);
-      if ((obj.Entry || obj['Entry Price']) && !obj.entryPrice) obj.entryPrice = Number(obj.Entry ?? obj['Entry Price']);
-      if ((obj.Amount || obj.Invested || obj.Margin) && obj.investedAmount === undefined) {
-        const n = Number(obj.Amount ?? obj.Invested ?? obj.Margin);
-        if (Number.isFinite(n)) obj.investedAmount = n;
-      }
-      if (obj.Side && !obj.side) obj.side = String(obj.Side).toLowerCase() === 'sell' ? 'sell' : 'buy';
-      if (obj.Platform && !obj.platform) obj.platform = obj.Platform;
-      if (obj.Date && !obj.date) obj.date = obj.Date;
-      if (obj.Timestamp && !obj.timestamp) obj.timestamp = obj.Timestamp;
-      return obj;
-    }) : [];
-    return await this.firebaseDatabaseService.createPositionsBulk(userId, normalized);
+  async bulkImport(
+    userId: string,
+    items: Array<any>,
+    defaultAccount?: 'main' | 'longterm',
+  ) {
+    const normalized = Array.isArray(items)
+      ? items.map((x) => {
+          const obj = { ...(x || {}) };
+          if (!obj.account && defaultAccount) obj.account = defaultAccount;
+          // Normalize field names from typical Excel headers
+          if (obj.Symbol && !obj.symbol) obj.symbol = String(obj.Symbol);
+          if (obj.Lots && !obj.lots) obj.lots = Number(obj.Lots);
+          if ((obj.Entry || obj['Entry Price']) && !obj.entryPrice)
+            obj.entryPrice = Number(obj.Entry ?? obj['Entry Price']);
+          if (
+            (obj.Amount || obj.Invested || obj.Margin) &&
+            obj.investedAmount === undefined
+          ) {
+            const n = Number(obj.Amount ?? obj.Invested ?? obj.Margin);
+            if (Number.isFinite(n)) obj.investedAmount = n;
+          }
+          if (obj.Side && !obj.side)
+            obj.side =
+              String(obj.Side).toLowerCase() === 'sell' ? 'sell' : 'buy';
+          if (obj.Platform && !obj.platform) obj.platform = obj.Platform;
+          if (obj.Date && !obj.date) obj.date = obj.Date;
+          if (obj.Timestamp && !obj.timestamp) obj.timestamp = obj.Timestamp;
+          return obj;
+        })
+      : [];
+    return await this.firebaseDatabaseService.createPositionsBulk(
+      userId,
+      normalized,
+    );
   }
 
   // Helper: same calendar day check
@@ -269,9 +291,18 @@ export class PositionsService {
   // Removed bulk default leverage helper
 
   // Helper: compute cutoff date for timeframe as last N days (24h per day)
-  private getTimeframeCutoff(timeframe?: '1D' | '7D' | '30D' | '90D' | 'all'): Date | null {
+  private getTimeframeCutoff(
+    timeframe?: '1D' | '7D' | '30D' | '90D' | 'all',
+  ): Date | null {
     if (!timeframe || timeframe === 'all') return null;
-    const days = timeframe === '1D' ? 1 : timeframe === '7D' ? 7 : timeframe === '30D' ? 30 : 90;
+    const days =
+      timeframe === '1D'
+        ? 1
+        : timeframe === '7D'
+          ? 7
+          : timeframe === '30D'
+            ? 30
+            : 90;
     const ms = days * 24 * 60 * 60 * 1000;
     return new Date(Date.now() - ms);
   }
@@ -285,9 +316,12 @@ export class PositionsService {
         const d = value.toDate();
         return d instanceof Date && !isNaN(d.getTime()) ? d : null;
       }
-      if (typeof value === 'object' && (('seconds' in value) || ('_seconds' in value))) {
-        const seconds = (value as any).seconds ?? (value as any)._seconds ?? 0;
-        const nanos = (value as any).nanoseconds ?? (value as any)._nanoseconds ?? 0;
+      if (
+        typeof value === 'object' &&
+        ('seconds' in value || '_seconds' in value)
+      ) {
+        const seconds = value.seconds ?? value._seconds ?? 0;
+        const nanos = value.nanoseconds ?? value._nanoseconds ?? 0;
         const ms = seconds * 1000 + Math.floor(nanos / 1e6);
         const d = new Date(ms);
         return !isNaN(d.getTime()) ? d : null;
@@ -313,7 +347,8 @@ export class PositionsService {
     if (!entry || entry <= 0 || !lots) {
       return { pnl: 0, pnlPercent: 0 };
     }
-    const priceDiff = position.side === 'buy' ? current - entry : entry - current;
+    const priceDiff =
+      position.side === 'buy' ? current - entry : entry - current;
     const pnl = priceDiff * lots;
     const pnlPercent = invested > 0 ? (pnl / invested) * 100 : 0;
     return { pnl, pnlPercent };
@@ -329,8 +364,7 @@ export class PositionsService {
       return { pnl: 0, pnlPercent: 0 };
     }
     const live = typeof current === 'number' && current > 0 ? current : entry;
-    const priceDiff =
-      position.side === 'buy' ? live - entry : entry - live;
+    const priceDiff = position.side === 'buy' ? live - entry : entry - live;
 
     const lotSize = this.marketData.getLotSize(position.symbol);
     let qty = 0;
@@ -426,7 +460,7 @@ export class PositionsService {
       const sorted = [...arr].sort((a, b) => toEpoch(a) - toEpoch(b));
       const rep =
         representative === 'earliest' ? sorted[0] : sorted[sorted.length - 1];
-      const side = (rep?.side ?? 'buy') as 'buy' | 'sell';
+      const side = rep?.side ?? 'buy';
 
       const live = priceMap[sym];
       // P&L: sum per-leg; prefer qty from invested & leverage when available
@@ -434,9 +468,10 @@ export class PositionsService {
       if (typeof live === 'number' && live > 0) {
         for (const p of arr) {
           if (!p.entryPrice || p.entryPrice <= 0) continue;
-          const lev = (p as any).leverage && (p as any).leverage > 0
-            ? Number((p as any).leverage)
-            : 1;
+          const lev =
+            (p as any).leverage && (p as any).leverage > 0
+              ? Number((p as any).leverage)
+              : 1;
           let qty = 0;
           const lotSize = this.marketData.getLotSize(p.symbol) || 0;
           if (lotSize > 0) {
@@ -463,7 +498,7 @@ export class PositionsService {
         lots: totalLots,
         investedAmount: round(totalInvested, 2),
         platform: (rep as any)?.platform,
-  account: (rep as any)?.account,
+        account: (rep as any)?.account,
         leverage: (rep as any)?.leverage,
         status: (rep as any)?.status,
         timestamp: (rep as any)?.timestamp,
@@ -487,11 +522,11 @@ export class PositionsService {
       aggregated?: string;
       representative?: 'latest' | 'earliest';
       compact?: string;
-  side?: 'buy' | 'sell';
-  platform?: 'Delta Exchange' | 'Groww';
-  account?: 'main' | 'longterm';
-  timeframe?: '1D' | '7D' | '30D' | '90D' | 'all';
-  symbol?: string;
+      side?: 'buy' | 'sell';
+      platform?: 'Delta Exchange' | 'Groww';
+      account?: 'main' | 'longterm';
+      timeframe?: '1D' | '7D' | '30D' | '90D' | 'all';
+      symbol?: string;
     },
   ): Promise<any> {
     const wantUnique = String(query.unique).toLowerCase() === 'true';
@@ -504,14 +539,25 @@ export class PositionsService {
         const data = await this.getOpenPositionsAggregated(userId, rep);
         // Apply optional filters for aggregated response
         let filtered = data;
-        if (query.side) filtered = filtered.filter((p) => p.side === query.side);
-        if (query.platform) filtered = filtered.filter((p: any) => (p.platform || '') === query.platform);
-        if (query.account) filtered = filtered.filter((p: any) => (p.account || '') === query.account);
-  if (query.symbol) filtered = filtered.filter((p: any) => (p.symbol || '').toUpperCase() === query.symbol!.toUpperCase());
-  const cutoff = this.getTimeframeCutoff(query.timeframe);
-  if (cutoff) {
+        if (query.side)
+          filtered = filtered.filter((p) => p.side === query.side);
+        if (query.platform)
+          filtered = filtered.filter(
+            (p: any) => (p.platform || '') === query.platform,
+          );
+        if (query.account)
+          filtered = filtered.filter(
+            (p: any) => (p.account || '') === query.account,
+          );
+        if (query.symbol)
+          filtered = filtered.filter(
+            (p: any) =>
+              (p.symbol || '').toUpperCase() === query.symbol!.toUpperCase(),
+          );
+        const cutoff = this.getTimeframeCutoff(query.timeframe);
+        if (cutoff) {
           filtered = filtered.filter((p: any) => {
-            const t = (p as any).timestamp ?? (p as any).createdAt ?? (p as any).updatedAt;
+            const t = p.timestamp ?? p.createdAt ?? p.updatedAt;
             const d = this.toDate(t);
             return !!(d && d >= cutoff);
           });
@@ -523,34 +569,46 @@ export class PositionsService {
       }
       let list = await this.getOpenPositions(userId);
       if (query.side) list = list.filter((p) => p.side === query.side);
-      if (query.platform) list = list.filter((p: any) => (p.platform || '') === query.platform);
-      if (query.account) list = list.filter((p: any) => (p.account || '') === query.account);
-  if (query.symbol) list = list.filter((p: any) => (p.symbol || '').toUpperCase() === query.symbol!.toUpperCase());
+      if (query.platform)
+        list = list.filter((p: any) => (p.platform || '') === query.platform);
+      if (query.account)
+        list = list.filter((p: any) => (p.account || '') === query.account);
+      if (query.symbol)
+        list = list.filter(
+          (p: any) =>
+            (p.symbol || '').toUpperCase() === query.symbol!.toUpperCase(),
+        );
       {
         const cutoff = this.getTimeframeCutoff(query.timeframe);
         if (cutoff) {
-        list = list.filter((p: any) => {
-          const t = (p as any).timestamp ?? (p as any).createdAt ?? (p as any).updatedAt;
-          const d = this.toDate(t);
-          return !!(d && d >= cutoff);
-        });
+          list = list.filter((p: any) => {
+            const t = p.timestamp ?? p.createdAt ?? p.updatedAt;
+            const d = this.toDate(t);
+            return !!(d && d >= cutoff);
+          });
         }
       }
       return wantUnique ? this.uniqueBySymbol(list) : list;
     } else if (query.status === 'closed') {
       let list = await this.getClosedPositions(userId);
       if (query.side) list = list.filter((p) => p.side === query.side);
-      if (query.platform) list = list.filter((p: any) => (p.platform || '') === query.platform);
-      if (query.account) list = list.filter((p: any) => (p.account || '') === query.account);
-  if (query.symbol) list = list.filter((p: any) => (p.symbol || '').toUpperCase() === query.symbol!.toUpperCase());
+      if (query.platform)
+        list = list.filter((p: any) => (p.platform || '') === query.platform);
+      if (query.account)
+        list = list.filter((p: any) => (p.account || '') === query.account);
+      if (query.symbol)
+        list = list.filter(
+          (p: any) =>
+            (p.symbol || '').toUpperCase() === query.symbol!.toUpperCase(),
+        );
       {
         const cutoff = this.getTimeframeCutoff(query.timeframe);
         if (cutoff) {
-        list = list.filter((p: any) => {
-          const t = (p as any).timestamp ?? (p as any).createdAt ?? (p as any).updatedAt;
-          const d = this.toDate(t);
-          return !!(d && d >= cutoff);
-        });
+          list = list.filter((p: any) => {
+            const t = p.timestamp ?? p.createdAt ?? p.updatedAt;
+            const d = this.toDate(t);
+            return !!(d && d >= cutoff);
+          });
         }
       }
       return wantUnique ? this.uniqueBySymbol(list) : list;
@@ -560,18 +618,29 @@ export class PositionsService {
       ? await this.findAllUnique(userId)
       : await this.findAll(userId);
     // Apply optional filters for generic case
-    if (query.side) positions = positions.filter((p: any) => p.side === query.side);
-    if (query.platform) positions = positions.filter((p: any) => (p.platform || '') === query.platform);
-    if (query.account) positions = positions.filter((p: any) => (p.account || '') === query.account);
-  if (query.symbol) positions = positions.filter((p: any) => (p.symbol || '').toUpperCase() === query.symbol!.toUpperCase());
+    if (query.side)
+      positions = positions.filter((p: any) => p.side === query.side);
+    if (query.platform)
+      positions = positions.filter(
+        (p: any) => (p.platform || '') === query.platform,
+      );
+    if (query.account)
+      positions = positions.filter(
+        (p: any) => (p.account || '') === query.account,
+      );
+    if (query.symbol)
+      positions = positions.filter(
+        (p: any) =>
+          (p.symbol || '').toUpperCase() === query.symbol!.toUpperCase(),
+      );
     {
       const cutoff = this.getTimeframeCutoff(query.timeframe);
       if (cutoff) {
-      positions = positions.filter((p: any) => {
-        const t = (p as any).timestamp ?? (p as any).createdAt ?? (p as any).updatedAt;
-        const d = this.toDate(t);
-        return !!(d && d >= cutoff);
-      });
+        positions = positions.filter((p: any) => {
+          const t = p.timestamp ?? p.createdAt ?? p.updatedAt;
+          const d = this.toDate(t);
+          return !!(d && d >= cutoff);
+        });
       }
     }
     return positions;

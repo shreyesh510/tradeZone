@@ -1,11 +1,11 @@
 import React, { memo, useState, useEffect, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { toast } from 'react-toastify';
-import { useSettings } from '../../../contexts/SettingsContext';
+import { useSettings } from '../../../contexts/settingsContext';
 import { useNavigate } from 'react-router-dom';
-import Header from '../../../layouts/Header';
-import Sidebar from '../../../components/Sidebar';
-import FloatingNav, { type MobileTab } from '../../../layouts/FloatingNav';
+import Header from '../../../layouts/header';
+import Sidebar from '../../../layouts/sidebar';
+import FloatingButton, { type MobileTab } from '../../../components/button/floatingButton';
 import { usePermissions } from '../../../hooks/usePermissions';
 import type { RootState, AppDispatch } from '../../../redux/store';
 import { fetchPositions, createPosition, updatePosition } from '../../../redux/thunks/positions/positionsThunks';
@@ -14,16 +14,10 @@ import type { Position, PositionLike, AggregatedPosition, CreatePositionData } f
 import Input from '../../../components/input';
 import Select from '../../../components/select';
 import Radio from '../../../components/radio';
+import RoundedButton from '../../../components/button/RoundedButton';
 // Removed ProgressBar in favor of a dropdown for leverage selection
-import { 
-  PositionCard, 
-  AddPositionForm, 
-  PositionsSummary, 
-  PositionsGrid,
-  ModifyPositionModal,
-  ClosePositionModal
-} from './components';
-import ImportPositionsModal from './components/ImportPositionsModal';
+import { ModifyPositionModal, ClosePositionModal } from './components';
+import { ImportPositionsModal } from './components/modal';
 import { positionsApi } from '../../../services/positionsApi';
 
 interface OnlineUser {
@@ -54,7 +48,6 @@ const Positions = memo(function Positions() {
   const [showImport, setShowImport] = useState<boolean>(false);
   // Close modal state
   const [showCloseModal, setShowCloseModal] = useState<boolean>(false);
-  const [closePnL, setClosePnL] = useState<string>('');
   const [closingOne, setClosingOne] = useState<boolean>(false);
   const [selectedForClose, setSelectedForClose] = useState<Position | null>(null);
 
@@ -66,7 +59,7 @@ const Positions = memo(function Positions() {
 
   // Filter state
   const [filters, setFilters] = useState({
-    timeframe: '1D',
+    timeframe: 'all',
     side: 'all' as 'all' | 'buy' | 'sell',
     account: 'longterm' as 'all' | 'main' | 'longterm',
     platform: 'Delta Exchange' as 'all' | 'Delta Exchange' | 'Groww',
@@ -224,22 +217,18 @@ const Positions = memo(function Positions() {
     }
   };
 
-  const submitCloseOne = async () => {
-    if (!selectedForClose?.id) return;
+  const handleClosePosition = async (id: string, pnl?: number) => {
     try {
       setClosingOne(true);
-      const pnlValue = Number(closePnL);
       await dispatch(
         updatePosition({
-          id: selectedForClose.id,
-          data: { status: 'closed', pnl: Number.isFinite(pnlValue) ? pnlValue : 0, closedAt: new Date() as any },
+          id,
+          data: { status: 'closed', pnl: Number.isFinite(pnl) ? pnl : 0, closedAt: new Date() as any },
         })
       ).unwrap();
       toast.success('Position closed');
       setShowCloseModal(false);
       setSelectedForClose(null);
-      setClosePnL('');
-      await dispatch(fetchPositions(undefined));
     } catch (err) {
       toast.error('Failed to close position');
     } finally {
@@ -258,7 +247,7 @@ const Positions = memo(function Positions() {
       toast.success('Position updated successfully');
       setShowModifyModal(false);
       setSelectedForModify(null);
-      await dispatch(fetchPositions(undefined));
+      // Removed fetchPositions call - Redux state is already updated by updatePosition.fulfilled
     } catch (error) {
       console.error('Error updating position:', error);
       toast.error('Failed to update position');
@@ -298,26 +287,27 @@ const Positions = memo(function Positions() {
           <h1 className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Positions</h1>
           <div className="flex space-x-3">
             {/* Import File Button */}
-            <button
+            <RoundedButton
               onClick={() => setShowImport(true)}
-              className={`px-6 py-3 rounded-lg font-medium transition-colors ${isDarkMode ? 'bg-purple-600 hover:bg-purple-700 text-white' : 'bg-purple-600 hover:bg-purple-700 text-white'}`}
+              variant="purple"
+              isDarkMode={isDarkMode}
             >
               Import File
-            </button>
+            </RoundedButton>
             {/* Add Position Button */}
-            <button
+            <RoundedButton
               onClick={() => setShowAddForm(!showAddForm)}
-              className={`px-6 py-3 rounded-lg font-medium transition-colors ${
-                showAddForm ? (isDarkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700') : 'bg-blue-600 text-white hover:bg-blue-700'
-              }`}
-            >
-              <div className="flex items-center space-x-2">
+              variant="primary"
+              isDarkMode={isDarkMode}
+              isActive={showAddForm}
+              icon={
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
-                <span>{showAddForm ? 'Cancel' : 'Add Position'}</span>
-              </div>
-            </button>
+              }
+            >
+              {showAddForm ? 'Cancel' : 'Add Position'}
+            </RoundedButton>
           </div>
         </div>
       </div>
@@ -431,7 +421,7 @@ const Positions = memo(function Positions() {
 
           {/* Clear Filters Button */}
           <button
-            onClick={() => { setFilters({ timeframe: '1D', side: 'all', account: 'longterm', platform: 'Delta Exchange' }); setSearch(''); }}
+            onClick={() => { setFilters({ timeframe: 'all', side: 'all', account: 'longterm', platform: 'Delta Exchange' }); setSearch(''); }}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               isDarkMode 
                 ? 'bg-gray-700/50 text-gray-300 hover:bg-gray-600/50' 
@@ -454,6 +444,9 @@ const Positions = memo(function Positions() {
           isDarkMode ? 'bg-gray-800/30 border-gray-700/50 shadow-xl shadow-gray-900/20' : 'bg-white/60 border-white/20 shadow-xl shadow-gray-900/10'
         }`}
       >
+        <h3 className={`text-lg font-semibold mb-6 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+          Statistics Overview
+        </h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Total Symbols */}
           <div className="flex items-center space-x-4">
@@ -860,7 +853,7 @@ const Positions = memo(function Positions() {
         <div className="flex-1 overflow-hidden" style={{ height: '100vh' }}>
           {content}
         </div>
-        <FloatingNav activeTab={activeTab} onTabChange={handleTabChange} />
+        <FloatingButton activeTab={activeTab} onTabChange={handleTabChange} />
       </div>
     );
   }
@@ -888,38 +881,17 @@ const Positions = memo(function Positions() {
         />
       )}
 
-      {/* Close Modal */}
-      {showCloseModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className={`${isDarkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900'} w-full max-w-md rounded-2xl shadow-xl overflow-hidden`}>
-            <div className={`px-6 py-4 border-b ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
-              <h3 className="text-lg font-semibold">Close Position{selectedForClose ? '' : 's'}</h3>
-              <p className={`text-sm mt-1 ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Enter realized PnL for record keeping. You can close the selected position or close all.</p>
-            </div>
-            <div className="px-6 py-5 space-y-4">
-              <div>
-                <label className={`block text-sm mb-1 ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>PnL (USD)</label>
-                <input
-                  type="number"
-                  value={closePnL}
-                  onChange={(e) => setClosePnL(e.target.value)}
-                  placeholder="e.g. 125.50 or -42.10"
-                  className={`w-full px-3 py-2 rounded-lg border outline-none ${isDarkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300 text-gray-900'}`}
-                />
-              </div>
-              {selectedForClose && (
-                <button onClick={submitCloseOne} disabled={closingOne} className={`w-full py-2.5 rounded-lg font-medium ${closingOne ? 'opacity-60' : ''} ${isDarkMode ? 'bg-red-600 hover:bg-red-700' : 'bg-red-600 hover:bg-red-700'} text-white`}>
-                  {closingOne ? 'Closing…' : `Close ${selectedForClose.symbol}`}
-                </button>
-              )}
-              {/* Removed Close All action */}
-              <button onClick={() => { setShowCloseModal(false); setSelectedForClose(null); setClosePnL(''); }} className={`w-full py-2.5 rounded-lg font-medium ${isDarkMode ? 'bg-gray-700 hover:bg-gray-600 text-gray-200' : 'bg-gray-200 hover:bg-gray-300 text-gray-800'}`}>
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Close Position Modal */}
+      <ClosePositionModal
+        position={selectedForClose}
+        isOpen={showCloseModal}
+        onClose={() => {
+          setShowCloseModal(false);
+          setSelectedForClose(null);
+        }}
+        onConfirm={handleClosePosition}
+        isDarkMode={isDarkMode}
+      />
 
       {/* Modify Modal */}
       <ModifyPositionModal
