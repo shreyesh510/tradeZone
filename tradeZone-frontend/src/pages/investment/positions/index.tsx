@@ -59,7 +59,7 @@ const Positions = memo(function Positions() {
 
   // Filter state
   const [filters, setFilters] = useState({
-    timeframe: '1D',
+    timeframe: 'all',
     side: 'all' as 'all' | 'buy' | 'sell',
     account: 'longterm' as 'all' | 'main' | 'longterm',
     platform: 'Delta Exchange' as 'all' | 'Delta Exchange' | 'Groww',
@@ -421,7 +421,7 @@ const Positions = memo(function Positions() {
 
           {/* Clear Filters Button */}
           <button
-            onClick={() => { setFilters({ timeframe: '1D', side: 'all', account: 'longterm', platform: 'Delta Exchange' }); setSearch(''); }}
+            onClick={() => { setFilters({ timeframe: 'all', side: 'all', account: 'longterm', platform: 'Delta Exchange' }); setSearch(''); }}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               isDarkMode 
                 ? 'bg-gray-700/50 text-gray-300 hover:bg-gray-600/50' 
@@ -444,6 +444,9 @@ const Positions = memo(function Positions() {
           isDarkMode ? 'bg-gray-800/30 border-gray-700/50 shadow-xl shadow-gray-900/20' : 'bg-white/60 border-white/20 shadow-xl shadow-gray-900/10'
         }`}
       >
+        <h3 className={`text-lg font-semibold mb-6 ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>
+          Statistics Overview
+        </h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Total Symbols */}
           <div className="flex items-center space-x-4">

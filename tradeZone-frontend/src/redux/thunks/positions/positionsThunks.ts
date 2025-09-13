@@ -95,4 +95,29 @@ export const fetchClosedPositions = createAsyncThunk(
   }
 );
 
+// Fetch dashboard positions data
+export const fetchDashboardPositions = createAsyncThunk(
+  'positions/fetchDashboardPositions',
+  async (timeframe: string = '1M', { rejectWithValue }) => {
+    try {
+      const response = await fetch(`/api/dashboard/positions?timeframe=${timeframe}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch dashboard positions');
+      }
+
+      const data = await response.json();
+      return data;
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to fetch dashboard positions');
+    }
+  }
+);
+
 // Removed legacy close-all thunk

@@ -25,7 +25,11 @@ export class WalletsService {
     return await this.db.getWallets(userId);
   }
 
-  async update(userId: string, id: string, data: Partial<Wallet>): Promise<boolean> {
+  async update(
+    userId: string,
+    id: string,
+    data: Partial<Wallet>,
+  ): Promise<boolean> {
     return await this.db.updateWallet(userId, id, data);
   }
 

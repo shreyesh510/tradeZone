@@ -1,4 +1,10 @@
-import { IsNumber, IsString, IsDateString, IsOptional, IsNotEmpty } from 'class-validator';
+import {
+  IsNumber,
+  IsString,
+  IsDateString,
+  IsOptional,
+  IsNotEmpty,
+} from 'class-validator';
 
 export class CreateTradePnLDto {
   @IsDateString()

@@ -7,5 +7,6 @@ import { FirebaseConfig } from '../config/firebase.config';
 @Module({
   controllers: [WalletsController],
   providers: [WalletsService, FirebaseDatabaseService, FirebaseConfig],
+  exports: [WalletsService],
 })
 export class WalletsModule {}

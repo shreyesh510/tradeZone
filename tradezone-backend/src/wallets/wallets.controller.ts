@@ -1,4 +1,15 @@
-import { Controller, Get, Post, Body, UseGuards, Request, Patch, Param, Delete, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  UseGuards,
+  Request,
+  Patch,
+  Param,
+  Delete,
+  Query,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { WalletsService } from './wallets.service';
 import { CreateWalletDto } from './dto/create-wallet.dto';
@@ -22,7 +33,11 @@ export class WalletsController {
   }
 
   @Patch(':id')
-  async update(@Param('id') id: string, @Body() dto: UpdateWalletDto, @Request() req) {
+  async update(
+    @Param('id') id: string,
+    @Body() dto: UpdateWalletDto,
+    @Request() req,
+  ) {
     const userId = req.user.userId;
     const ok = await this.walletsService.update(userId, id, dto as any);
     return { success: ok };

@@ -1,4 +1,12 @@
-import { IsString, IsNumber, IsEnum, IsOptional, Min, IsPositive, IsIn } from 'class-validator';
+import {
+  IsString,
+  IsNumber,
+  IsEnum,
+  IsOptional,
+  Min,
+  IsPositive,
+  IsIn,
+} from 'class-validator';
 
 export class CreatePositionDto {
   @IsString()

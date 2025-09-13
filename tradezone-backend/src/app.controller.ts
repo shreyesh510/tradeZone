@@ -18,7 +18,7 @@ export class AppController {
       timestamp: new Date().toISOString(),
       message: 'Backend is running successfully!',
       version: '1.0.0',
-      cors: 'enabled'
+      cors: 'enabled',
     };
     console.log('✅ Health check response:', response);
     return response;

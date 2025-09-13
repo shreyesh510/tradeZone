@@ -27,7 +27,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
 
-  private connectedUsers = new Map<string, { userId: string; socketId: string; userName: string }>();
+  private connectedUsers = new Map<
+    string,
+    { userId: string; socketId: string; userName: string }
+  >();
   private memoryMessages: any[] = []; // In-memory message storage
   private readonly MAX_MESSAGES = 100; // Keep only last 100 messages
 
@@ -38,7 +41,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   async handleConnection(client: Socket) {
     console.log(`🔌 Client connected: ${client.id}`);
     console.log('🔍 Handshake auth:', client.handshake.auth);
-    
+
     // Extract user info from handshake auth
     const user = client.handshake.auth.user;
     if (user) {
@@ -49,12 +52,14 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         userName: user.userName,
       });
       console.log(`👤 User connected: ${user.userName} (${user.userId})`);
-      
+
       // Join user to their personal room
       await client.join(`user_${user.userId}`);
-      
+
       // Send in-memory messages to the newly connected client
-      console.log(`📚 Sending ${this.memoryMessages.length} in-memory messages to client ${client.id}`);
+      console.log(
+        `📚 Sending ${this.memoryMessages.length} in-memory messages to client ${client.id}`,
+      );
       client.emit('previousMessages', this.memoryMessages);
 
       // Broadcast user online status
@@ -70,12 +75,14 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   handleDisconnect(client: Socket) {
     console.log(`🔌 Client disconnected: ${client.id}`);
-    
+
     const userInfo = this.connectedUsers.get(client.id);
     if (userInfo) {
       this.connectedUsers.delete(client.id);
-      console.log(`👤 User disconnected: ${userInfo.userName} (${userInfo.userId})`);
-      
+      console.log(
+        `👤 User disconnected: ${userInfo.userName} (${userInfo.userId})`,
+      );
+
       // Broadcast user offline status
       this.server.emit('userOffline', {
         userId: userInfo.userId,
@@ -89,8 +96,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() client: Socket,
     @MessageBody() createMessageDto: CreateMessageDto,
   ) {
-    console.log('📨 Received message from client:', client.id, createMessageDto);
-    
+    console.log(
+      '📨 Received message from client:',
+      client.id,
+      createMessageDto,
+    );
+
     const userInfo = this.connectedUsers.get(client.id);
     if (!userInfo) {
       console.log('❌ User not authenticated for client:', client.id);
@@ -112,15 +123,15 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         updatedAt: new Date(),
         messageType: createMessageDto.messageType || 'text',
       };
-      
+
       // Add to memory storage
       this.memoryMessages.push(message);
-      
+
       // Keep only last MAX_MESSAGES
       if (this.memoryMessages.length > this.MAX_MESSAGES) {
         this.memoryMessages = this.memoryMessages.slice(-this.MAX_MESSAGES);
       }
-      
+
       console.log('✅ Message created in memory:', message);
 
       // Emit message to sender
@@ -129,8 +140,13 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // Emit message to receiver or room
       if (createMessageDto.receiverId) {
         // Direct message
-        console.log('📤 Sending direct message to:', createMessageDto.receiverId);
-        this.server.to(`user_${createMessageDto.receiverId}`).emit('newMessage', message);
+        console.log(
+          '📤 Sending direct message to:',
+          createMessageDto.receiverId,
+        );
+        this.server
+          .to(`user_${createMessageDto.receiverId}`)
+          .emit('newMessage', message);
       } else if (createMessageDto.roomId) {
         // Room message
         console.log('📤 Sending room message to:', createMessageDto.roomId);
@@ -156,7 +172,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   ) {
     await client.join(data.roomId);
     console.log(`👥 User joined room: ${data.roomId}`);
-    
+
     // Notify room members
     this.server.to(data.roomId).emit('userJoinedRoom', {
       roomId: data.roomId,
@@ -171,7 +187,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   ) {
     await client.leave(data.roomId);
     console.log(`👥 User left room: ${data.roomId}`);
-    
+
     // Notify room members
     this.server.to(data.roomId).emit('userLeftRoom', {
       roomId: data.roomId,
@@ -197,7 +213,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     try {
       // In-memory chat doesn't need persistent read status
-      
+
       // Notify the sender that their messages have been read
       this.server.to(`user_${data.senderId}`).emit('messagesRead', {
         readerId: userInfo.userId,
@@ -227,14 +243,16 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         timestamp?: string;
         isOnline?: boolean;
       }
-      
+
       const chatSummary: ChatSummary[] = [];
-      
+
       // Update online status for users in the summary
-      const onlineUserIds = Array.from(this.connectedUsers.values()).map(u => u.userId);
-      const updatedSummary = chatSummary.map(summary => ({
+      const onlineUserIds = Array.from(this.connectedUsers.values()).map(
+        (u) => u.userId,
+      );
+      const updatedSummary = chatSummary.map((summary) => ({
         ...summary,
-        isOnline: onlineUserIds.includes(summary.userId)
+        isOnline: onlineUserIds.includes(summary.userId),
       }));
 
       client.emit('userChatSummary', updatedSummary);
@@ -248,7 +266,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @SubscribeMessage('typing')
   handleTyping(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { receiverId?: string; roomId?: string; isTyping: boolean },
+    @MessageBody()
+    data: { receiverId?: string; roomId?: string; isTyping: boolean },
   ) {
     const userInfo = this.connectedUsers.get(client.id);
     if (!userInfo) {
@@ -266,7 +285,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.server.to(`user_${data.receiverId}`).emit('userTyping', typingData);
     } else if (data.roomId) {
       // Room typing indicator
-      this.server.to(data.roomId).emit('userTyping', { ...typingData, roomId: data.roomId });
+      this.server
+        .to(data.roomId)
+        .emit('userTyping', { ...typingData, roomId: data.roomId });
     }
   }
 
@@ -284,10 +305,14 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const startTime = new Date(data.startTime);
       const endTime = new Date(data.endTime);
       // In-memory chat: filter messages by time range
-      const messages = this.memoryMessages.filter(msg => {
+      const messages = this.memoryMessages.filter((msg) => {
         const msgTime = new Date(msg.createdAt);
-        return msgTime >= startTime && msgTime <= endTime &&
-               (msg.senderId === userInfo.userId || msg.receiverId === userInfo.userId);
+        return (
+          msgTime >= startTime &&
+          msgTime <= endTime &&
+          (msg.senderId === userInfo.userId ||
+            msg.receiverId === userInfo.userId)
+        );
       });
 
       client.emit('messagesWithTimeRange', messages);
@@ -303,7 +328,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.server.emit('systemMessage', {
       content: message,
       timestamp: new Date(),
-      type: 'system'
+      type: 'system',
     });
   }
 
@@ -314,7 +339,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   // Check if user is online
   isUserOnline(userId: string): boolean {
-    return Array.from(this.connectedUsers.values()).some(user => user.userId === userId);
+    return Array.from(this.connectedUsers.values()).some(
+      (user) => user.userId === userId,
+    );
   }
 
   @SubscribeMessage('getMessages')

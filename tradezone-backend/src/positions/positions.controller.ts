@@ -1,15 +1,15 @@
-import { 
-  Controller, 
-  Get, 
-  Post, 
-  Body, 
-  Patch, 
-  Param, 
-  Delete, 
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
   UseGuards,
   Request,
   Query,
-  Header
+  Header,
 } from '@nestjs/common';
 import { PositionsService } from './positions.service';
 import { CreatePositionDto } from './dto/create-position.dto';
@@ -39,18 +39,18 @@ export class PositionsController {
     @Request() req,
     @Query('status') status?: string,
     @Query('unique') unique?: string,
-  @Query('aggregated') aggregated?: string,
-  @Query('representative') representative?: 'latest' | 'earliest',
-  @Query('compact') compact?: string,
-  @Query('side') side?: 'buy' | 'sell',
-  @Query('platform') platform?: 'Delta Exchange' | 'Groww',
-  @Query('account') account?: 'main' | 'longterm',
-  @Query('timeframe') timeframe?: '1D' | '7D' | '30D' | '90D' | 'all',
-  @Query('symbol') symbol?: string,
+    @Query('aggregated') aggregated?: string,
+    @Query('representative') representative?: 'latest' | 'earliest',
+    @Query('compact') compact?: string,
+    @Query('side') side?: 'buy' | 'sell',
+    @Query('platform') platform?: 'Delta Exchange' | 'Groww',
+    @Query('account') account?: 'main' | 'longterm',
+    @Query('timeframe') timeframe?: '1D' | '7D' | '30D' | '90D' | 'all',
+    @Query('symbol') symbol?: string,
   ) {
     console.log('🔍 Getting positions for user:', req.user.userId);
     const userId = req.user.userId;
-    
+
     if (!userId) {
       throw new Error('User ID not found in JWT token');
     }
@@ -61,11 +61,11 @@ export class PositionsController {
       aggregated,
       representative,
       compact,
-  side,
-  platform,
-  account,
-  timeframe,
-  symbol,
+      side,
+      platform,
+      account,
+      timeframe,
+      symbol,
     });
     if (Array.isArray(result)) {
       console.log(`🔍 Found ${result.length} positions for user ${userId}`);
@@ -111,7 +111,11 @@ export class PositionsController {
       return { created: 0, skipped: 0, ids: [], error: 'items array required' };
     }
     // Forward to service
-    return await this.positionsService.bulkImport(userId, body.items, body.account);
+    return await this.positionsService.bulkImport(
+      userId,
+      body.items,
+      body.account,
+    );
   }
 
   // Removed close-all endpoint
@@ -125,9 +129,9 @@ export class PositionsController {
 
   @Patch(':id')
   async update(
-    @Param('id') id: string, 
+    @Param('id') id: string,
     @Body() updatePositionDto: UpdatePositionDto,
-    @Request() req
+    @Request() req,
   ) {
     const userId = req.user.userId;
     return await this.positionsService.update(id, updatePositionDto, userId);
