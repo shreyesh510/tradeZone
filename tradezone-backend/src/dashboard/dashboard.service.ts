@@ -69,6 +69,53 @@ export interface DashboardSummary {
 
 @Injectable()
 export class DashboardService {
+  private getDateRangeFromTimeframe(timeframe: string): { startDate: Date; endDate: Date } {
+    const endDate = new Date();
+    let startDate = new Date();
+
+    switch (timeframe) {
+      case '1D':
+        startDate.setDate(endDate.getDate() - 1);
+        break;
+      case '1W':
+        startDate.setDate(endDate.getDate() - 7);
+        break;
+      case '1M':
+        startDate.setMonth(endDate.getMonth() - 1);
+        break;
+      case '3M':
+        startDate.setMonth(endDate.getMonth() - 3);
+        break;
+      case '6M':
+        startDate.setMonth(endDate.getMonth() - 6);
+        break;
+      case '1Y':
+        startDate.setFullYear(endDate.getFullYear() - 1);
+        break;
+      case 'ALL':
+        startDate = new Date(2020, 0, 1); // Set to a very early date
+        break;
+      default:
+        startDate.setMonth(endDate.getMonth() - 1); // Default to 1 month
+    }
+
+    return { startDate, endDate };
+  }
+
+  private filterByDateRange<T extends { createdAt?: any; requestedAt?: any; date?: any; timestamp?: any }>(
+    data: T[],
+    startDate: Date,
+    endDate: Date,
+  ): T[] {
+    return data.filter((item) => {
+      // Try different date fields
+      const dateValue = item.createdAt || item.requestedAt || item.date || item.timestamp;
+      if (!dateValue) return false;
+
+      const itemDate = new Date(dateValue);
+      return itemDate >= startDate && itemDate <= endDate;
+    });
+  }
   constructor(
     private readonly positionsService: PositionsService,
     private readonly walletsService: WalletsService,
@@ -257,7 +304,7 @@ export class DashboardService {
           },
         },
         tradePnL: {
-          total: totalData,
+          today: totalData,
           recent: safeRecentTradePnL,
           statistics: safeTradePnLStats,
           chartData,
@@ -304,7 +351,7 @@ export class DashboardService {
           },
         },
         tradePnL: {
-          total: {
+          today: {
             profit: 0,
             loss: 0,
             netPnL: 0,
@@ -328,6 +375,65 @@ export class DashboardService {
     const yearly = this.aggregateByYear(allTradePnL);
 
     return { weekly, monthly, yearly };
+  }
+
+  private processChartDataWithDaily(allTradePnL: any[], timeframe: string): {
+    daily?: any[];
+    weekly: any[];
+    monthly: any[];
+    yearly: any[];
+  } {
+    const result: any = {
+      weekly: this.aggregateByWeek(allTradePnL),
+      monthly: this.aggregateByMonth(allTradePnL),
+      yearly: this.aggregateByYear(allTradePnL),
+    };
+
+    // Add daily aggregation for shorter timeframes
+    if (timeframe === '1D' || timeframe === '1W' || timeframe === '1M') {
+      result.daily = this.aggregateByDay(allTradePnL);
+    }
+
+    return result;
+  }
+
+  private aggregateByDay(data: any[]): any[] {
+    const dayMap = new Map<string, any>();
+
+    data.forEach((item) => {
+      if (!item.date) return;
+      try {
+        const date = new Date(item.date);
+        if (isNaN(date.getTime())) return;
+        const day = date.toISOString().split('T')[0]; // YYYY-MM-DD format
+
+        if (!dayMap.has(day)) {
+          dayMap.set(day, {
+            period: day,
+            profit: 0,
+            loss: 0,
+            netPnL: 0,
+            totalTrades: 0,
+            winningTrades: 0,
+            losingTrades: 0,
+          });
+        }
+
+        const dayData = dayMap.get(day)!;
+        dayData.profit += item.profit || 0;
+        dayData.loss += item.loss || 0;
+        dayData.netPnL += item.netPnL || 0;
+        dayData.totalTrades += item.totalTrades || 0;
+        dayData.winningTrades += item.winningTrades || 0;
+        dayData.losingTrades += item.losingTrades || 0;
+      } catch (e) {
+        return;
+      }
+    });
+
+    return Array.from(dayMap.values()).sort((a, b) =>
+      a.period.localeCompare(b.period),
+    );
   }
 
   private aggregateByWeek(data: any[]): any[] {
@@ -453,15 +559,54 @@ export class DashboardService {
   }
 
   private processWithdrawalChartData(withdrawals: any[]): {
+    daily?: any[];
     weekly: any[];
     monthly: any[];
     yearly: any[];
   } {
+    const daily = this.aggregateWithdrawalsByDay(withdrawals);
     const weekly = this.aggregateWithdrawalsByWeek(withdrawals);
     const monthly = this.aggregateWithdrawalsByMonth(withdrawals);
     const yearly = this.aggregateWithdrawalsByYear(withdrawals);
 
-    return { weekly, monthly, yearly };
+    return { daily, weekly, monthly, yearly };
+  }
+
+  private aggregateWithdrawalsByDay(data: any[]): any[] {
+    const dayMap = new Map<string, any>();
+
+    data.forEach((item) => {
+      const date = new Date(item.requestedAt || item.completedAt);
+      const day = date.toISOString().split('T')[0]; // YYYY-MM-DD format
+
+      if (!dayMap.has(day)) {
+        dayMap.set(day, {
+          period: day,
+          totalAmount: 0,
+          count: 0,
+          pendingAmount: 0,
+          completedAmount: 0,
+          pendingCount: 0,
+          completedCount: 0,
+        });
+      }
+
+      const dayData = dayMap.get(day)!;
+      dayData.totalAmount += item.amount || 0;
+      dayData.count += 1;
+
+      if (item.status === 'pending') {
+        dayData.pendingAmount += item.amount || 0;
+        dayData.pendingCount += 1;
+      } else if (item.status === 'completed') {
+        dayData.completedAmount += item.amount || 0;
+        dayData.completedCount += 1;
+      }
+    });
+
+    return Array.from(dayMap.values()).sort((a, b) =>
+      a.period.localeCompare(b.period),
+    );
   }
 
   private aggregateWithdrawalsByWeek(data: any[]): any[] {
@@ -576,15 +721,54 @@ export class DashboardService {
   }
 
   private processDepositChartData(deposits: any[]): {
+    daily?: any[];
     weekly: any[];
     monthly: any[];
     yearly: any[];
   } {
+    const daily = this.aggregateDepositsByDay(deposits);
     const weekly = this.aggregateDepositsByWeek(deposits);
     const monthly = this.aggregateDepositsByMonth(deposits);
     const yearly = this.aggregateDepositsByYear(deposits);
 
-    return { weekly, monthly, yearly };
+    return { daily, weekly, monthly, yearly };
+  }
+
+  private aggregateDepositsByDay(data: any[]): any[] {
+    const dayMap = new Map<string, any>();
+
+    data.forEach((item) => {
+      const date = new Date(item.requestedAt || item.completedAt);
+      const day = date.toISOString().split('T')[0]; // YYYY-MM-DD format
+
+      if (!dayMap.has(day)) {
+        dayMap.set(day, {
+          period: day,
+          totalAmount: 0,
+          count: 0,
+          pendingAmount: 0,
+          completedAmount: 0,
+          pendingCount: 0,
+          completedCount: 0,
+        });
+      }
+
+      const dayData = dayMap.get(day)!;
+      dayData.totalAmount += item.amount || 0;
+      dayData.count += 1;
+
+      if (item.status === 'pending') {
+        dayData.pendingAmount += item.amount || 0;
+        dayData.pendingCount += 1;
+      } else if (item.status === 'completed') {
+        dayData.completedAmount += item.amount || 0;
+        dayData.completedCount += 1;
+      }
+    });
+
+    return Array.from(dayMap.values()).sort((a, b) =>
+      a.period.localeCompare(b.period),
+    );
   }
 
   private aggregateDepositsByWeek(data: any[]): any[] {
@@ -698,8 +882,8 @@ export class DashboardService {
     );
   }
 
-  // New separate API methods
-  async getPositionsData(userId: string, timeframe: string) {
+  // New separate API methods - optimized to return all timeframe data
+  async getPositionsData(userId: string, timeframe: string = 'ALL') {
     try {
       const [openPositions, allPositions] = await Promise.allSettled([
         this.positionsService.getOpenPositionsAggregated(userId),
@@ -711,7 +895,7 @@ export class DashboardService {
       const safeAllPositions =
         allPositions.status === 'fulfilled' ? allPositions.value : [];
 
-      // Calculate summary data
+      // Calculate summary data from ALL open positions (current totals)
       const totalPnL = safeOpenPositions.reduce(
         (sum, pos) => sum + (pos.pnl || 0),
         0,
@@ -721,24 +905,22 @@ export class DashboardService {
         0,
       );
 
-      // Generate chart data based on positions (mock for now)
-      const chartData = this.generatePositionsChartData(
-        safeAllPositions,
-        timeframe,
-      );
+      // Generate chart data for ALL timeframes at once
+      const chartData = this.generatePositionsChartDataAllTimeframes(safeAllPositions);
 
       return {
         summary: {
-          totalPositions: safeAllPositions.length,
+          totalPositions: safeOpenPositions.length,
           totalInvested,
           totalPnL,
         },
-        chartData,
+        chartData, // Contains all timeframe data
         performance: {
           dayChange: totalPnL * 0.1, // Mock calculation
           percentChange:
             totalInvested > 0 ? (totalPnL / totalInvested) * 100 : 0,
         },
+        allTimeframeData: true, // Indicates this contains all timeframe data
       };
     } catch (error) {
       console.error('Error in getPositionsData:', error);
@@ -746,15 +928,16 @@ export class DashboardService {
         summary: { totalPositions: 0, totalInvested: 0, totalPnL: 0 },
         chartData: { daily: [], weekly: [], monthly: [], yearly: [] },
         performance: { dayChange: 0, percentChange: 0 },
+        allTimeframeData: true,
       };
     }
   }
 
-  async getWalletsData(userId: string, timeframe: string) {
+  async getWalletsData(userId: string, timeframe: string = 'ALL') {
     try {
       const [wallets, walletHistory] = await Promise.allSettled([
         this.walletsService.list(userId),
-        this.walletsService.history(userId, this.getHistoryLimit(timeframe)),
+        this.walletsService.history(userId, 500), // Get more history for all timeframes
       ]);
 
       const safeWallets = wallets.status === 'fulfilled' ? wallets.value : [];
@@ -773,7 +956,7 @@ export class DashboardService {
           w.platform === 'Unknown',
       );
 
-      // Calculate balances
+      // Calculate current balances
       const dematBalanceUSD = dematWallets.reduce((sum, wallet) => {
         const balance = wallet.balance || 0;
         return wallet.currency === 'INR' ? sum + balance / 83 : sum + balance;
@@ -784,11 +967,8 @@ export class DashboardService {
         0,
       );
 
-      // Generate chart data from wallet history
-      const chartData = this.generateWalletChartData(
-        safeWalletHistory,
-        timeframe,
-      );
+      // Generate chart data for all timeframes
+      const chartData = this.generateWalletChartData(safeWalletHistory, 'ALL');
 
       return {
         summary: {
@@ -803,8 +983,9 @@ export class DashboardService {
             count: bankWallets.length,
           },
         },
-        chartData,
+        chartData, // Contains all timeframe data
         recentActivity: safeWalletHistory.slice(0, 10),
+        allTimeframeData: true,
       };
     } catch (error) {
       console.error('Error in getWalletsData:', error);
@@ -815,61 +996,49 @@ export class DashboardService {
         },
         chartData: { daily: [], weekly: [], monthly: [], yearly: [] },
         recentActivity: [],
+        allTimeframeData: true,
       };
     }
   }
 
-  async getTradePnLData(userId: string, timeframe: string) {
+  async getTradePnLData(userId: string, timeframe: string = 'ALL') {
     try {
-      const [recentTradePnL, tradePnLStats, allTradePnL] =
-        await Promise.allSettled([
-          this.tradePnLService.findAll(
-            userId,
-            this.getTimeframeDays(timeframe),
-          ),
-          this.tradePnLService.getStatistics(
-            userId,
-            this.getTimeframeDays(timeframe),
-          ),
-          this.tradePnLService.findAll(userId),
-        ]);
+      const [allTradePnL, tradePnLStats] = await Promise.allSettled([
+        this.tradePnLService.findAll(userId), // Get ALL data at once
+        this.tradePnLService.getStatistics(userId, 365), // Get stats for full year
+      ]);
 
-      const safeRecentTradePnL =
-        recentTradePnL.status === 'fulfilled' ? recentTradePnL.value : [];
-      const safeTradePnLStats =
-        tradePnLStats.status === 'fulfilled' ? tradePnLStats.value : null;
       const safeAllTradePnL =
         allTradePnL.status === 'fulfilled' ? allTradePnL.value : [];
+      const safeTradePnLStats =
+        tradePnLStats.status === 'fulfilled' ? tradePnLStats.value : null;
 
-      // Process total trade PnL from statistics
-      const totalData = {
-        profit: safeTradePnLStats?.totalProfit || 0,
-        loss: safeTradePnLStats?.totalLoss || 0,
-        netPnL: safeTradePnLStats?.netPnL || 0,
-        trades: safeTradePnLStats?.totalTrades || 0,
-      };
+      // Calculate totals for all timeframes
+      const allTimeframeTotals = this.calculateTradePnLByTimeframes(safeAllTradePnL);
 
-      // Process chart data
-      const chartData = this.processChartData(safeAllTradePnL);
+      // Process chart data with all timeframes included
+      const chartData = this.processChartDataWithDaily(safeAllTradePnL, 'ALL');
 
       return {
-        total: totalData,
+        allTimeframeTotals, // Contains totals for each timeframe
         statistics: safeTradePnLStats,
-        chartData,
-        recent: safeRecentTradePnL.slice(0, 10),
+        chartData, // Contains daily, weekly, monthly, yearly data
+        recent: safeAllTradePnL.slice(0, 10),
+        allTimeframeData: true,
       };
     } catch (error) {
       console.error('Error in getTradePnLData:', error);
       return {
-        total: { profit: 0, loss: 0, netPnL: 0, trades: 0 },
+        allTimeframeTotals: {},
         statistics: null,
         chartData: { daily: [], weekly: [], monthly: [], yearly: [] },
         recent: [],
+        allTimeframeData: true,
       };
     }
   }
 
-  async getTransactionsData(userId: string, timeframe: string) {
+  async getTransactionsData(userId: string, timeframe: string = 'ALL') {
     try {
       const [deposits, withdrawals] = await Promise.allSettled([
         this.depositsService.list(userId),
@@ -881,33 +1050,12 @@ export class DashboardService {
       const safeWithdrawals =
         withdrawals.status === 'fulfilled' ? withdrawals.value : [];
 
-      // Process deposits data
-      const depositTotal = safeDeposits.reduce(
-        (sum, deposit) => sum + (deposit.amount || 0),
-        0,
-      );
-      const pendingDeposits = safeDeposits.filter(
-        (d) => d.status === 'pending',
-      ).length;
-      const completedDeposits = safeDeposits.filter(
-        (d) => d.status === 'completed',
-      ).length;
+      // Calculate totals for all timeframes
+      const depositsByTimeframe = this.calculateTransactionsByTimeframes(safeDeposits);
+      const withdrawalsByTimeframe = this.calculateTransactionsByTimeframes(safeWithdrawals);
 
-      // Process withdrawals data
-      const withdrawalTotal = safeWithdrawals.reduce(
-        (sum, withdrawal) => sum + (withdrawal.amount || 0),
-        0,
-      );
-      const pendingWithdrawals = safeWithdrawals.filter(
-        (w) => w.status === 'pending',
-      ).length;
-      const completedWithdrawals = safeWithdrawals.filter(
-        (w) => w.status === 'completed',
-      ).length;
-
-      // Process chart data
-      const withdrawalChartData =
-        this.processWithdrawalChartData(safeWithdrawals);
+      // Process chart data for all timeframes
+      const withdrawalChartData = this.processWithdrawalChartData(safeWithdrawals);
       const depositChartData = this.processDepositChartData(safeDeposits);
 
       // Get recent activities
@@ -928,38 +1076,32 @@ export class DashboardService {
         .slice(0, 10);
 
       return {
+        depositsByTimeframe, // Contains totals for each timeframe
+        withdrawalsByTimeframe, // Contains totals for each timeframe
         deposits: {
-          total: depositTotal,
-          pending: pendingDeposits,
-          completed: completedDeposits,
           chartData: depositChartData,
           recentActivity: recentDeposits,
         },
         withdrawals: {
-          total: withdrawalTotal,
-          pending: pendingWithdrawals,
-          completed: completedWithdrawals,
           chartData: withdrawalChartData,
           recentActivity: recentWithdrawals,
         },
+        allTimeframeData: true,
       };
     } catch (error) {
       console.error('Error in getTransactionsData:', error);
       return {
+        depositsByTimeframe: {},
+        withdrawalsByTimeframe: {},
         deposits: {
-          total: 0,
-          pending: 0,
-          completed: 0,
           chartData: { daily: [], weekly: [], monthly: [], yearly: [] },
           recentActivity: [],
         },
         withdrawals: {
-          total: 0,
-          pending: 0,
-          completed: 0,
           chartData: { daily: [], weekly: [], monthly: [], yearly: [] },
           recentActivity: [],
         },
+        allTimeframeData: true,
       };
     }
   }
@@ -967,14 +1109,20 @@ export class DashboardService {
   // Helper methods
   private getTimeframeDays(timeframe: string): number {
     switch (timeframe) {
+      case '1D':
+        return 1;
       case '1W':
         return 7;
       case '1M':
         return 30;
+      case '3M':
+        return 90;
+      case '6M':
+        return 180;
       case '1Y':
         return 365;
-      case '5Y':
-        return 1825;
+      case 'ALL':
+        return 3650;
       default:
         return 30;
     }
@@ -1061,5 +1209,168 @@ export class DashboardService {
     };
 
     return mockData;
+  }
+
+  private generatePositionsChartDataAllTimeframes(positions: any[]) {
+    return {
+      daily: this.aggregatePositionsByDay(positions),
+      weekly: this.aggregatePositionsByWeek(positions),
+      monthly: this.aggregatePositionsByMonth(positions),
+      yearly: this.aggregatePositionsByYear(positions),
+    };
+  }
+
+  private aggregatePositionsByDay(positions: any[]): any[] {
+    const dayMap = new Map<string, any>();
+
+    positions.forEach((position) => {
+      if (!position.createdAt && !position.timestamp) return;
+
+      const date = new Date(position.createdAt || position.timestamp);
+      if (isNaN(date.getTime())) return;
+
+      const day = date.toISOString().split('T')[0];
+
+      if (!dayMap.has(day)) {
+        dayMap.set(day, {
+          period: day,
+          totalValue: 0,
+          pnl: 0,
+          count: 0,
+        });
+      }
+
+      const dayData = dayMap.get(day)!;
+      dayData.totalValue += position.investedAmount || 0;
+      dayData.pnl += position.pnl || 0;
+      dayData.count += 1;
+    });
+
+    return Array.from(dayMap.values()).sort((a, b) => a.period.localeCompare(b.period));
+  }
+
+  private aggregatePositionsByWeek(positions: any[]): any[] {
+    const weekMap = new Map<string, any>();
+
+    positions.forEach((position) => {
+      if (!position.createdAt && !position.timestamp) return;
+
+      const date = new Date(position.createdAt || position.timestamp);
+      if (isNaN(date.getTime())) return;
+
+      const week = this.getWeekKey(date);
+
+      if (!weekMap.has(week)) {
+        weekMap.set(week, {
+          period: week,
+          totalValue: 0,
+          pnl: 0,
+          count: 0,
+        });
+      }
+
+      const weekData = weekMap.get(week)!;
+      weekData.totalValue += position.investedAmount || 0;
+      weekData.pnl += position.pnl || 0;
+      weekData.count += 1;
+    });
+
+    return Array.from(weekMap.values()).sort((a, b) => a.period.localeCompare(b.period));
+  }
+
+  private aggregatePositionsByMonth(positions: any[]): any[] {
+    const monthMap = new Map<string, any>();
+
+    positions.forEach((position) => {
+      if (!position.createdAt && !position.timestamp) return;
+
+      const date = new Date(position.createdAt || position.timestamp);
+      if (isNaN(date.getTime())) return;
+
+      const month = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+      if (!monthMap.has(month)) {
+        monthMap.set(month, {
+          period: month,
+          totalValue: 0,
+          pnl: 0,
+          count: 0,
+        });
+      }
+
+      const monthData = monthMap.get(month)!;
+      monthData.totalValue += position.investedAmount || 0;
+      monthData.pnl += position.pnl || 0;
+      monthData.count += 1;
+    });
+
+    return Array.from(monthMap.values()).sort((a, b) => a.period.localeCompare(b.period));
+  }
+
+  private aggregatePositionsByYear(positions: any[]): any[] {
+    const yearMap = new Map<string, any>();
+
+    positions.forEach((position) => {
+      if (!position.createdAt && !position.timestamp) return;
+
+      const date = new Date(position.createdAt || position.timestamp);
+      if (isNaN(date.getTime())) return;
+
+      const year = String(date.getFullYear());
+
+      if (!yearMap.has(year)) {
+        yearMap.set(year, {
+          period: year,
+          totalValue: 0,
+          pnl: 0,
+          count: 0,
+        });
+      }
+
+      const yearData = yearMap.get(year)!;
+      yearData.totalValue += position.investedAmount || 0;
+      yearData.pnl += position.pnl || 0;
+      yearData.count += 1;
+    });
+
+    return Array.from(yearMap.values()).sort((a, b) => a.period.localeCompare(b.period));
+  }
+
+  private calculateTradePnLByTimeframes(tradePnL: any[]) {
+    const timeframes = ['1D', '1W', '1M', '3M', '6M', '1Y', 'ALL'];
+    const result: any = {};
+
+    timeframes.forEach(timeframe => {
+      const { startDate, endDate } = this.getDateRangeFromTimeframe(timeframe);
+      const filtered = this.filterByDateRange(tradePnL, startDate, endDate);
+
+      result[timeframe] = {
+        profit: filtered.reduce((sum, item) => sum + (item.profit || 0), 0),
+        loss: filtered.reduce((sum, item) => sum + (item.loss || 0), 0),
+        netPnL: filtered.reduce((sum, item) => sum + (item.netPnL || 0), 0),
+        trades: filtered.length,
+      };
+    });
+
+    return result;
+  }
+
+  private calculateTransactionsByTimeframes(transactions: any[]) {
+    const timeframes = ['1D', '1W', '1M', '3M', '6M', '1Y', 'ALL'];
+    const result: any = {};
+
+    timeframes.forEach(timeframe => {
+      const { startDate, endDate } = this.getDateRangeFromTimeframe(timeframe);
+      const filtered = this.filterByDateRange(transactions, startDate, endDate);
+
+      result[timeframe] = {
+        total: filtered.reduce((sum, item) => sum + (item.amount || 0), 0),
+        pending: filtered.filter(item => item.status === 'pending').length,
+        completed: filtered.filter(item => item.status === 'completed').length,
+        count: filtered.length,
+      };
+    });
+
+    return result;
   }
 }
