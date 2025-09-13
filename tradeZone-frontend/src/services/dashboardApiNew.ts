@@ -17,6 +17,11 @@ export interface DashboardPositionsResponse {
     dayChange: number;
     percentChange: number;
   };
+  timeframe?: string;
+  dateRange?: {
+    startDate: string;
+    endDate: string;
+  };
 }
 
 export interface DashboardWalletsResponse {
@@ -39,6 +44,11 @@ export interface DashboardWalletsResponse {
     yearly: any[];
   };
   recentActivity: any[];
+  timeframe?: string;
+  dateRange?: {
+    startDate: string;
+    endDate: string;
+  };
 }
 
 export interface DashboardTradePnLResponse {
@@ -56,6 +66,11 @@ export interface DashboardTradePnLResponse {
     yearly: any[];
   };
   recent: any[];
+  timeframe?: string;
+  dateRange?: {
+    startDate: string;
+    endDate: string;
+  };
 }
 
 export interface DashboardTransactionsResponse {
@@ -82,6 +97,11 @@ export interface DashboardTransactionsResponse {
       yearly: any[];
     };
     recentActivity: any[];
+  };
+  timeframe?: string;
+  dateRange?: {
+    startDate: string;
+    endDate: string;
   };
 }
 
