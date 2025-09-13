@@ -1,16 +1,16 @@
 import { memo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useSettings } from '../contexts/SettingsContext';
-import { usePermissions } from '../hooks/usePermissions';
+import { useSettings } from '../../contexts/settingsContext';
+import { usePermissions } from '../../hooks/usePermissions';
 
 export type MobileTab = 'chart' | 'chat' | 'settings' | 'iDashboard' | 'iPositions' | 'iWithdraw' | 'iDeposit';
 
-interface FloatingNavProps {
+interface FloatingButtonProps {
   activeTab: MobileTab;
   onTabChange: (tab: MobileTab) => void;
 }
 
-const FloatingNav = memo(function FloatingNav({ activeTab, onTabChange }: FloatingNavProps) {
+const FloatingButton = memo(function FloatingButton({ activeTab, onTabChange }: FloatingButtonProps) {
   const { settings } = useSettings();
   const { canAccessInvestment } = usePermissions();
   const navigate = useNavigate();
@@ -200,4 +200,4 @@ const FloatingNav = memo(function FloatingNav({ activeTab, onTabChange }: Floati
   );
 });
 
-export default FloatingNav;
+export default FloatingButton;

@@ -1,5 +1,4 @@
 import { memo } from 'react';
-import { getLotSize } from '../../../../utils/lotSize';
 
 interface Position {
   id: string;
@@ -22,40 +21,6 @@ interface PositionCardProps {
 }
 
 const PositionCard = memo<PositionCardProps>(({ position, isDarkMode }) => {
-
-  // Format date for display
-  const formatDate = (dateStr: string | Date | undefined) => {
-    if (!dateStr) return 'N/A';
-    
-    try {
-      // Handle Firebase timestamp objects that might be serialized as objects with seconds and nanoseconds
-      if (typeof dateStr === 'object' && dateStr !== null && 'seconds' in dateStr) {
-        // @ts-ignore - Firebase Timestamp format
-        return new Date(dateStr.seconds * 1000).toLocaleString();
-      }
-      
-      // Handle standard date strings or Date objects
-      const date = typeof dateStr === 'string' ? new Date(dateStr) : dateStr;
-      if (isNaN(date.getTime())) {
-        // If not a valid date object, use the string as is
-        return typeof dateStr === 'string' ? dateStr : 'Invalid Date';
-      }
-      
-      // Format the date as a nice readable string
-      return date.toLocaleString(undefined, {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    } catch (e) {
-      console.error('Error formatting date:', e);
-      return typeof dateStr === 'string' ? dateStr : 'Error';
-    }
-  };
-
-
   return (
     <div 
       className={`p-6 rounded-2xl backdrop-blur-lg border transition-all duration-300 hover:scale-105 ${

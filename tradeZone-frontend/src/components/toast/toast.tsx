@@ -1,5 +1,5 @@
 import { memo, useEffect, useState } from 'react';
-import { useSettings } from '../contexts/SettingsContext';
+import { useSettings } from '../../contexts/settingsContext';
 
 interface ToastProps {
   id: string;

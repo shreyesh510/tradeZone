@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import PositionCard from './PositionCard';
+import PositionCard from './positionCard';
 
 interface Position {
   id: string;

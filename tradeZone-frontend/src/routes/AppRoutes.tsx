@@ -1,98 +1,107 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
-import { useAppSelector } from '../redux/hooks';
-import { Login, Dashboard } from '../pages';
-import ProtectedRoute from './ProtectedRoute';
+import React from 'react';
+import { Navigate } from 'react-router-dom';
+import Login from '../pages/login';
+import Zone from '../pages/zone';
+import Settings from '../pages/settings';
+import LiveChart from '../components/chart/liveChart';
+import Positions from '../pages/investment/positions';
 import InvestmentDashboard from '../pages/investment/dashboard';
-import InvestmentPositions from '../pages/investment/positions';
-import InvestmentWithdraw from '../pages/investment/withdraw';
-import InvestmentDeposit from '../pages/investment/deposit';
-import WalletsPage from '../pages/wallets';
+import Withdraw from '../pages/investment/withdraw';
+import Deposit from '../pages/investment/deposit';
+import WalletsPage from '../pages/investment/wallets';
+import TradePnL from '../pages/investment/tradePnl';
+import ProtectedRoute from './ProtectedRoute';
 
-export default function AppRoutes() {
-  const isAuthenticated = useAppSelector((state: any) => state.auth.isAuthenticated);
-
-  // Check localStorage for auth info
-  const checkLocalStorageAuth = () => {
-    if (typeof window !== 'undefined') {
-      const savedAuth = localStorage.getItem('tradezone_auth');
-      if (savedAuth) {
-        try {
-          const authData = JSON.parse(savedAuth);
-          return authData.isAuthenticated && authData.user && authData.token;
-        } catch (error) {
-          console.error('Error parsing auth data from localStorage:', error);
-          return false;
-        }
-      }
-    }
-    return false;
-  };
-
-  // Check if user is authenticated (either in Redux state or localStorage)
-  const isUserAuthenticated = isAuthenticated || checkLocalStorageAuth();
-
-  return (
-    <Routes>
-      <Route 
-        path="/" 
-        element={isUserAuthenticated ? <Navigate to="/dashboard" replace /> : <Login />} 
-      />
-      <Route 
-        path="/dashboard" 
-        element={
-          <ProtectedRoute>
-            <Dashboard />
-          </ProtectedRoute>
-        } 
-      />
-      
-      {/* Investment Routes */}
-      <Route 
-        path="/investment/dashboard" 
-        element={
-          <ProtectedRoute>
-            <InvestmentDashboard />
-          </ProtectedRoute>
-        } 
-      />
-      <Route 
-        path="/investment/positions" 
-        element={
-          <ProtectedRoute>
-            <InvestmentPositions />
-          </ProtectedRoute>
-        } 
-      />
-      <Route 
-        path="/investment/withdraw" 
-        element={
-          <ProtectedRoute>
-            <InvestmentWithdraw />
-          </ProtectedRoute>
-        } 
-      />
-      <Route 
-        path="/investment/deposit" 
-        element={
-          <ProtectedRoute>
-            <InvestmentDeposit />
-          </ProtectedRoute>
-        } 
-      />
-      <Route 
-        path="/wallets" 
-        element={
-          <ProtectedRoute>
-            <WalletsPage />
-          </ProtectedRoute>
-        } 
-      />
-      
-      {/* Catch-all route */}
-      <Route 
-        path="*" 
-        element={<Navigate to="/" replace />} 
-      />
-    </Routes>
-  );
+interface AppRoutesConfig {
+  isAuthenticated: boolean;
 }
+
+export const createAppRoutes = ({ isAuthenticated }: AppRoutesConfig) => [
+  {
+    path: '/login',
+    element: isAuthenticated ? <Navigate to="/zone" replace /> : <Login />
+  },
+  {
+    path: '/zone',
+    element: (
+      <ProtectedRoute>
+        <Zone />
+      </ProtectedRoute>
+    )
+  },
+  {
+    path: '/settings',
+    element: (
+      <ProtectedRoute>
+        <Settings />
+      </ProtectedRoute>
+    )
+  },
+  {
+    path: '/chart',
+    element: (
+      <ProtectedRoute>
+        <LiveChart />
+      </ProtectedRoute>
+    )
+  },
+  // Investment Routes
+  {
+    path: '/investment/positions',
+    element: (
+      <ProtectedRoute>
+        <Positions />
+      </ProtectedRoute>
+    )
+  },
+  {
+    path: '/investment/dashboard',
+    element: (
+      <ProtectedRoute>
+        <InvestmentDashboard />
+      </ProtectedRoute>
+    )
+  },
+  {
+    path: '/investment/withdraw',
+    element: (
+      <ProtectedRoute>
+        <Withdraw />
+      </ProtectedRoute>
+    )
+  },
+  {
+    path: '/investment/deposit',
+    element: (
+      <ProtectedRoute>
+        <Deposit />
+      </ProtectedRoute>
+    )
+  },
+  {
+    path: '/investment/wallets',
+    element: (
+      <ProtectedRoute>
+        <WalletsPage />
+      </ProtectedRoute>
+    )
+  },
+  {
+    path: '/investment/tradePnl',
+    element: (
+      <ProtectedRoute>
+        <TradePnL />
+      </ProtectedRoute>
+    )
+  },
+  // Root redirect
+  {
+    path: '/',
+    element: isAuthenticated ? <Navigate to="/zone" replace /> : <Navigate to="/login" replace />
+  },
+  // Fallback for unknown routes
+  {
+    path: '*',
+    element: isAuthenticated ? <Navigate to="/zone" replace /> : <Navigate to="/login" replace />
+  }
+];

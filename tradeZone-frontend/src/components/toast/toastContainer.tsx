@@ -1,6 +1,6 @@
 import { memo } from 'react';
-import Toast from './Toast';
-import { useToast } from '../contexts/ToastContext';
+import Toast from './toast';
+import { useToast } from '../../contexts/toastContext';
 
 const ToastContainer = memo(function ToastContainer() {
   const { toasts, removeToast } = useToast();

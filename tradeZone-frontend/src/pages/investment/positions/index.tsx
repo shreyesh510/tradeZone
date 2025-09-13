@@ -1,11 +1,11 @@
 import React, { memo, useState, useEffect, useMemo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { toast } from 'react-toastify';
-import { useSettings } from '../../../contexts/SettingsContext';
+import { useSettings } from '../../../contexts/settingsContext';
 import { useNavigate } from 'react-router-dom';
-import Header from '../../../layouts/Header';
-import Sidebar from '../../../components/Sidebar';
-import FloatingNav, { type MobileTab } from '../../../layouts/FloatingNav';
+import Header from '../../../layouts/header';
+import Sidebar from '../../../layouts/sidebar';
+import FloatingButton, { type MobileTab } from '../../../components/button/floatingButton';
 import { usePermissions } from '../../../hooks/usePermissions';
 import type { RootState, AppDispatch } from '../../../redux/store';
 import { fetchPositions, createPosition, updatePosition } from '../../../redux/thunks/positions/positionsThunks';
@@ -14,6 +14,7 @@ import type { Position, PositionLike, AggregatedPosition, CreatePositionData } f
 import Input from '../../../components/input';
 import Select from '../../../components/select';
 import Radio from '../../../components/radio';
+import RoundedButton from '../../../components/button/RoundedButton';
 // Removed ProgressBar in favor of a dropdown for leverage selection
 import { 
   PositionCard, 
@@ -23,7 +24,7 @@ import {
   ModifyPositionModal,
   ClosePositionModal
 } from './components';
-import ImportPositionsModal from './components/ImportPositionsModal';
+import ImportPositionsModal from './components/importPositionsModal';
 import { positionsApi } from '../../../services/positionsApi';
 
 interface OnlineUser {
@@ -298,26 +299,27 @@ const Positions = memo(function Positions() {
           <h1 className={`text-2xl font-bold ${isDarkMode ? 'text-white' : 'text-gray-900'}`}>Positions</h1>
           <div className="flex space-x-3">
             {/* Import File Button */}
-            <button
+            <RoundedButton
               onClick={() => setShowImport(true)}
-              className={`px-6 py-3 rounded-lg font-medium transition-colors ${isDarkMode ? 'bg-purple-600 hover:bg-purple-700 text-white' : 'bg-purple-600 hover:bg-purple-700 text-white'}`}
+              variant="purple"
+              isDarkMode={isDarkMode}
             >
               Import File
-            </button>
+            </RoundedButton>
             {/* Add Position Button */}
-            <button
+            <RoundedButton
               onClick={() => setShowAddForm(!showAddForm)}
-              className={`px-6 py-3 rounded-lg font-medium transition-colors ${
-                showAddForm ? (isDarkMode ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-700') : 'bg-blue-600 text-white hover:bg-blue-700'
-              }`}
-            >
-              <div className="flex items-center space-x-2">
+              variant="primary"
+              isDarkMode={isDarkMode}
+              isActive={showAddForm}
+              icon={
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
-                <span>{showAddForm ? 'Cancel' : 'Add Position'}</span>
-              </div>
-            </button>
+              }
+            >
+              {showAddForm ? 'Cancel' : 'Add Position'}
+            </RoundedButton>
           </div>
         </div>
       </div>
@@ -860,7 +862,7 @@ const Positions = memo(function Positions() {
         <div className="flex-1 overflow-hidden" style={{ height: '100vh' }}>
           {content}
         </div>
-        <FloatingNav activeTab={activeTab} onTabChange={handleTabChange} />
+        <FloatingButton activeTab={activeTab} onTabChange={handleTabChange} />
       </div>
     );
   }

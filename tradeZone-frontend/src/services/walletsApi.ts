@@ -1,4 +1,4 @@
-import api from './api';
+import getAxios from '../utils/interceptor/axiosInterceptor';
 
 export interface WalletDto {
   id: string;
@@ -23,24 +23,24 @@ export interface WalletHistoryItem {
 
 export const walletsApi = {
   list: async (): Promise<WalletDto[]> => {
-    const res = await api.get('/wallets');
+    const res = await getAxios.get('/wallets');
     return res.data;
   },
   create: async (data: Partial<WalletDto> & { name: string }): Promise<WalletDto> => {
-    const res = await api.post('/wallets', data);
+    const res = await getAxios.post('/wallets', data);
     return res.data;
   },
   async update(id: string, payload: Partial<WalletDto>) {
-    const res = await api.patch<{ success: boolean }>(`/wallets/${id}`, payload);
+    const res = await getAxios.patch<{ success: boolean }>(`/wallets/${id}`, payload);
     return res.data;
   },
   async remove(id: string) {
-    const res = await api.delete<{ success: boolean }>(`/wallets/${id}`);
+    const res = await getAxios.delete<{ success: boolean }>(`/wallets/${id}`);
     return res.data;
   },
   async history(limit?: number) {
     const qs = typeof limit === 'number' ? `?limit=${limit}` : '';
-    const res = await api.get<WalletHistoryItem[]>(`/wallets/history/all${qs}`);
+    const res = await getAxios.get<WalletHistoryItem[]>(`/wallets/history/all${qs}`);
     return res.data;
   }
 };

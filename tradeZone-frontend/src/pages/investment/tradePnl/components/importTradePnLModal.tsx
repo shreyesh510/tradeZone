@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
-import ImportTradePnLConfirmationModal from './ImportTradePnLConfirmationModal';
+import ImportTradePnLConfirmationModal from './importTradePnLConfirmationModal';
 
 interface Props {
   open: boolean;

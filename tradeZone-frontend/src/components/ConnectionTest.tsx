@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import api from '../services/api';
+import getAxios from '../utils/interceptor/axiosInterceptor';
 
 const ConnectionTest: React.FC = () => {
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
@@ -12,7 +12,7 @@ const ConnectionTest: React.FC = () => {
     
     try {
       console.log('🧪 Testing backend connection...');
-      const response = await api.get('/health');
+      const response = await getAxios.get('/health');
       setData(response.data);
       setStatus('success');
       console.log('✅ Backend connection successful:', response.data);

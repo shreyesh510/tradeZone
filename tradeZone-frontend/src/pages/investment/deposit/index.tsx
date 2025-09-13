@@ -1,16 +1,16 @@
 import { memo, useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
-import Header from '../../../layouts/Header';
-import Sidebar from '../../../components/Sidebar';
-import FloatingNav, { type MobileTab } from '../../../layouts/FloatingNav';
-import { useSettings } from '../../../contexts/SettingsContext';
+import Header from '../../../layouts/header';
+import Sidebar from '../../../layouts/sidebar';
+import FloatingButton, { type MobileTab } from '../../../components/button/floatingButton';
+import { useSettings } from '../../../contexts/settingsContext';
 import { usePermissions } from '../../../hooks/usePermissions';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import type { AppDispatch, RootState } from '../../../redux/store';
 import { fetchDeposits, createDeposit, updateDeposit, deleteDeposit } from '../../../redux/thunks/deposits/depositsThunks';
-import ConfirmModal from '../../../components/ConfirmModal';
-import EditDepositModal from '../../../components/EditDepositModal';
+import ConfirmModal from '../../../components/modal/confirmModal';
+import EditDepositModal from '../../../components/modal/editDepositModal';
 
 interface OnlineUser {
   userId: string;

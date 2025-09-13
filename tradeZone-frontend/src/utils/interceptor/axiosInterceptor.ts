@@ -1,9 +1,9 @@
 import axios from 'axios';
-import config from '../config/env';
+import config from '../../config/env';
 
 const API_BASE_URL = config.API_BASE_URL;
 
-const api = axios.create({
+const getAxios = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
@@ -12,7 +12,7 @@ const api = axios.create({
 });
 
 // Request interceptor to add auth token
-api.interceptors.request.use(
+getAxios.interceptors.request.use(
   (config) => {
     // Try to get JWT token first, fallback to testToken
     const jwtToken = localStorage.getItem('token');
@@ -31,7 +31,7 @@ api.interceptors.request.use(
 );
 
 // Response interceptor to handle errors
-api.interceptors.response.use(
+getAxios.interceptors.response.use(
   (response) => {
     return response;
   },
@@ -62,4 +62,4 @@ api.interceptors.response.use(
   }
 );
 
-export default api;
+export default getAxios;

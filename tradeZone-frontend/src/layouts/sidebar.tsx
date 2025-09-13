@@ -1,6 +1,6 @@
 import { useState, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useSettings } from '../contexts/SettingsContext';
+import { useSettings } from '../contexts/settingsContext';
 import { usePermissions } from '../hooks/usePermissions';
 
 interface SidebarProps {
@@ -64,7 +64,7 @@ const Sidebar = memo(function Sidebar({ isOpen, onToggle }: SidebarProps) {
   };
 
   const goToTradePnL = () => {
-    navigate('/investment/trade-pnl');
+    navigate('/investment/tradePnl');
     onToggle(); // Close sidebar after navigation
   };
 

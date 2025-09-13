@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../redux/hooks';
 import { logoutUser } from '../redux/slices/authSlice';
-import { useSettings } from '../contexts/SettingsContext';
+import { useSettings } from '../contexts/settingsContext';
 
 interface OnlineUser {
   userId: string;

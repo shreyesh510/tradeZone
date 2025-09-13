@@ -1,8 +1,8 @@
 import { memo, useState } from 'react';
-import LiveChart from '../../components/LiveChart';
-import Header from '../../layouts/Header';
-import Chat from './components/Chat';
-import Sidebar from '../../components/Sidebar';
+import LiveChart from '../../components/chart/liveChart';
+import Header from '../../layouts/header';
+import Chat from './components/chat';
+import Sidebar from '../../layouts/sidebar';
 
 interface OnlineUser {
   userId: string;

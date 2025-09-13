@@ -1,4 +1,4 @@
-import api from './api';
+import getAxios from '../utils/interceptor/axiosInterceptor';
 
 export interface WithdrawalDto {
   id: string;
@@ -12,19 +12,19 @@ export interface WithdrawalDto {
 
 export const withdrawalsApi = {
   list: async (): Promise<WithdrawalDto[]> => {
-    const res = await api.get('/withdrawals');
+    const res = await getAxios.get('/withdrawals');
     return res.data;
   },
   create: async (data: { amount: number; method?: string; description?: string }): Promise<WithdrawalDto> => {
-    const res = await api.post('/withdrawals', data);
+    const res = await getAxios.post('/withdrawals', data);
     return res.data;
   },
   async update(id: string, payload: Partial<{ amount: number; description?: string; method?: string }>) {
-    const res = await api.patch<{ success: boolean }>(`/withdrawals/${id}`, payload);
+    const res = await getAxios.patch<{ success: boolean }>(`/withdrawals/${id}`, payload);
     return res.data;
   },
   async remove(id: string) {
-    const res = await api.delete<{ success: boolean }>(`/withdrawals/${id}`);
+    const res = await getAxios.delete<{ success: boolean }>(`/withdrawals/${id}`);
     return res.data;
   }
 };

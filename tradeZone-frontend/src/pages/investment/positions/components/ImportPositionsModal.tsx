@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
-import ImportConfirmationModal from './ImportConfirmationModal';
+import ImportConfirmationModal from './importConfirmationModal';
 
 interface Props {
   open: boolean;

@@ -1,16 +1,16 @@
 import { memo, useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
-import Header from '../../layouts/Header';
-import Sidebar from '../../components/Sidebar';
-import { useSettings } from '../../contexts/SettingsContext';
-import { usePermissions } from '../../hooks/usePermissions';
+import Header from '../../../layouts/header';
+import Sidebar from '../../../layouts/sidebar';
+import { useSettings } from '../../../contexts/settingsContext';
+import { usePermissions } from '../../../hooks/usePermissions';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import type { AppDispatch, RootState } from '../../redux/store';
-import { fetchWallets, createWallet, updateWallet, deleteWallet, fetchWalletHistory } from '../../redux/thunks/wallets/walletsThunks';
-import ConfirmModal from '../../components/ConfirmModal';
-import EditWalletModal from '../../components/EditWalletModal';
-import AddWalletModal from '../../components/AddWalletModal';
+import type { AppDispatch, RootState } from '../../../redux/store';
+import { fetchWallets, createWallet, updateWallet, deleteWallet, fetchWalletHistory } from '../../../redux/thunks/wallets/walletsThunks';
+import ConfirmModal from '../../../components/modal/confirmModal';
+import EditWalletModal from '../../../components/modal/editWalletModal';
+import AddWalletModal from '../../../components/modal/addWalletModal';
 
 interface WalletCardProps {
   wallet: any;

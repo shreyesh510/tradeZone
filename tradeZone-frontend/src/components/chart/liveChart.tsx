@@ -1,10 +1,9 @@
 import { useState, memo } from 'react';
 import { AdvancedChart } from 'react-tradingview-embed';
-import { useSettings } from '../contexts/SettingsContext';
+import { useSettings } from '../../contexts/settingsContext';
 
 const LiveChart = memo(function LiveChart() {
   const { settings } = useSettings();
-  const [showSettings, setShowSettings] = useState(false);
   
   // Use settings for theme and chart configuration
   const isDarkMode = settings.theme === 'dark';

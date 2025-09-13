@@ -20,6 +20,7 @@ import AddTradePnLModal from './components/addTradePnLModal';
 import EditTradePnLModal from './components/editTradePnLModal';
 import ImportTradePnLModal from './components/importTradePnLModal';
 import ConfirmModal from '../../../components/modal/confirmModal';
+import RoundedButton from '../../../components/button/RoundedButton';
 
 interface OnlineUser {
   userId: string;
@@ -154,25 +155,27 @@ const TradePnL = memo(function TradePnL() {
           </h1>
           <div className="flex space-x-3">
             {/* Import Excel Button */}
-            <button
+            <RoundedButton
               onClick={() => setShowImportModal(true)}
-              className={`px-6 py-3 rounded-lg font-medium transition-colors ${isDarkMode ? 'bg-purple-600 hover:bg-purple-700 text-white' : 'bg-purple-600 hover:bg-purple-700 text-white'}`}
+              variant="purple"
+              isDarkMode={isDarkMode}
             >
               Import Excel
-            </button>
+            </RoundedButton>
             {/* Add Today's P&L Button */}
-            <button
+            <RoundedButton
               onClick={handleAddNew}
               disabled={creating}
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
-            >
-              <div className="flex items-center space-x-2">
+              variant="primary"
+              isDarkMode={isDarkMode}
+              icon={
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
-                <span>Add Today's P&L</span>
-              </div>
-            </button>
+              }
+            >
+              {creating ? 'Adding...' : "Add Today's P&L"}
+            </RoundedButton>
           </div>
         </div>
       </div>

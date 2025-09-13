@@ -1,4 +1,4 @@
-import api from './api';
+import getAxios from '../utils/interceptor/axiosInterceptor';
 import type { Position, AggregatedPosition, PositionLike, CreatePositionData, UpdatePositionData, PositionFilters } from '../types/position';
 
 export const positionsApi = {
@@ -11,7 +11,7 @@ export const positionsApi = {
       // Prefer open aggregated with representative=latest to include ids for per-card actions
       const url = '/positions?status=open&aggregated=true&representative=latest';
   // removed debug log
-      const response = await api.get(url);
+      const response = await getAxios.get(url);
   // removed debug logs
       return response.data as AggregatedPosition[];
     }
@@ -38,44 +38,44 @@ export const positionsApi = {
     }
     const url = `/positions?${params.toString()}`;
   // removed debug log
-    const response = await api.get(url);
+    const response = await getAxios.get(url);
   // removed debug logs
   return response.data as Position[];
   },
 
   // Get a specific position by ID
   getPosition: async (id: string): Promise<Position> => {
-    const response = await api.get(`/positions/${id}`);
+    const response = await getAxios.get(`/positions/${id}`);
     return response.data;
   },
 
   // Create a new position
   createPosition: async (data: CreatePositionData): Promise<Position> => {
-    const response = await api.post('/positions', data);
+    const response = await getAxios.post('/positions', data);
     return response.data;
   },
 
   // Update an existing position
   updatePosition: async (id: string, data: UpdatePositionData): Promise<Position> => {
-    const response = await api.patch(`/positions/${id}`, data);
+    const response = await getAxios.patch(`/positions/${id}`, data);
     return response.data;
   },
 
   // Delete a position
   deletePosition: async (id: string): Promise<{ message: string }> => {
-    const response = await api.delete(`/positions/${id}`);
+    const response = await getAxios.delete(`/positions/${id}`);
     return response.data;
   },
 
   // Get only open positions
   getOpenPositions: async (): Promise<Position[]> => {
-    const response = await api.get('/positions/open/list');
+    const response = await getAxios.get('/positions/open/list');
     return response.data;
   },
 
   // Get only closed positions
   getClosedPositions: async (): Promise<Position[]> => {
-    const response = await api.get('/positions/closed/list');
+    const response = await getAxios.get('/positions/closed/list');
     return response.data;
   },
 
@@ -83,13 +83,13 @@ export const positionsApi = {
 
   // Get recent position history activities
   getHistory: async (limit = 20): Promise<any[]> => {
-    const response = await api.get(`/positions/history?limit=${limit}`);
+    const response = await getAxios.get(`/positions/history?limit=${limit}`);
     return response.data as any[];
   },
 
   // Bulk import positions
   importPositions: async (items: any[], account?: 'main' | 'longterm') => {
-    const response = await api.post('/positions/multi', { items, account });
+    const response = await getAxios.post('/positions/multi', { items, account });
     return response.data as { created: number; skipped: number; ids: string[] };
   },
 };

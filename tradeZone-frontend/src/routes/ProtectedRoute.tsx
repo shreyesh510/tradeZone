@@ -1,36 +1,20 @@
+import React from 'react';
 import { Navigate } from 'react-router-dom';
-import { useAppSelector } from '../redux/hooks';
+import { useSelector } from 'react-redux';
+import type { RootState } from '../redux/store';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
 }
 
-export default function ProtectedRoute({ children }: ProtectedRouteProps) {
-  const isAuthenticated = useAppSelector((state: any) => state.auth.isAuthenticated);
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
+  const { isAuthenticated } = useSelector((state: RootState) => state.auth);
   
-  // Check localStorage for auth info
-  const checkLocalStorageAuth = () => {
-    if (typeof window !== 'undefined') {
-      const savedAuth = localStorage.getItem('tradezone_auth');
-      if (savedAuth) {
-        try {
-          const authData = JSON.parse(savedAuth);
-          return authData.isAuthenticated && authData.user && authData.token;
-        } catch (error) {
-          console.error('Error parsing auth data from localStorage:', error);
-          return false;
-        }
-      }
-    }
-    return false;
-  };
-
-  const hasAuth = isAuthenticated || checkLocalStorageAuth();
-
-  // If not authenticated in Redux state, check localStorage
-  if (!hasAuth) {
-    return <Navigate to="/" replace />;
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
   }
   
   return <>{children}</>;
-}
+};
+
+export default ProtectedRoute;
