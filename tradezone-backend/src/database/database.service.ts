@@ -36,19 +36,19 @@ export class DatabaseService {
     console.log('🔍 DatabaseService: Looking for user with email:', email);
     const users = await this.getUsers();
     console.log('📄 DatabaseService: All users:', users);
-    const user = users.find(user => user.email === email) || null;
+    const user = users.find((user) => user.email === email) || null;
     console.log('👤 DatabaseService: Found user:', user);
     return user;
   }
 
   async findUserById(id: string): Promise<any | null> {
     const users = await this.getUsers();
-    return users.find(user => user.id === id) || null;
+    return users.find((user) => user.id === id) || null;
   }
 
   async updateUser(id: string, updates: any): Promise<void> {
     const users = await this.getUsers();
-    const userIndex = users.findIndex(user => user.id === id);
+    const userIndex = users.findIndex((user) => user.id === id);
     if (userIndex !== -1) {
       users[userIndex] = { ...users[userIndex], ...updates };
       await this.saveUsers(users);

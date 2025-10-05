@@ -1,9 +1,9 @@
 import { useCallback, useState, useEffect, useRef } from 'react';
 import { useAppSelector, useAppDispatch } from '../../../redux/hooks';
 import { generateOpenAIResponse } from '../../../redux/thunks/openai/openAI';
-import { useSettings, cryptoOptions, timeframeOptions } from '../../../contexts/SettingsContext';
-import { useToast } from '../../../contexts/ToastContext';
-import { useSocket } from '../../../contexts/SocketContext';
+import { useSettings, cryptoOptions, timeframeOptions } from '../../../contexts/settingsContext';
+import { useToast } from '../../../contexts/toastContext';
+import { useSocket } from '../../../contexts/socketContext';
 import { messageStorage } from '../../../services/messageStorage';
 import { type Message } from '../../../types/message';
 import { marketContextService } from '../../../services/marketContext';

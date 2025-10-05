@@ -1,11 +1,18 @@
-import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  ConflictException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { User } from './entities/user.entity';
 import { DatabaseService } from '../database/database.service';
-import { FirebaseDatabaseService, User as FirebaseUser } from '../database/firebase-database.service';
+import {
+  FirebaseDatabaseService,
+  User as FirebaseUser,
+} from '../database/firebase-database.service';
 
 @Injectable()
 export class AuthService {
@@ -19,7 +26,8 @@ export class AuthService {
     const { name, email, password } = registerDto;
 
     // Check if user already exists
-    const existingUser = await this.firebaseDatabaseService.findUserByEmail(email);
+    const existingUser =
+      await this.firebaseDatabaseService.findUserByEmail(email);
     if (existingUser) {
       throw new ConflictException('User with this email already exists');
     }
@@ -28,14 +36,16 @@ export class AuthService {
     // const hashedPassword = await bcrypt.hash(password, 10);
 
     // Create new user in Firebase
-    const newUser: FirebaseUser = await this.firebaseDatabaseService.createUser({
-      name,
-      email,
-      password: password, // Store plain text password for now
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      isAiFeatureEnabled: true, // Default to true for new users
-    });
+    const newUser: FirebaseUser = await this.firebaseDatabaseService.createUser(
+      {
+        name,
+        email,
+        password: password, // Store plain text password for now
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        isAiFeatureEnabled: true, // Default to true for new users
+      },
+    );
 
     // Generate JWT token
     const payload = { sub: newUser.id, email: newUser.email };
@@ -44,9 +54,13 @@ export class AuthService {
     // Create default permissions for new user
     let userPermissions = { AiChat: false, investment: false };
     try {
-      const permissions = await this.firebaseDatabaseService.createUserPermissions(newUser.id);
+      const permissions =
+        await this.firebaseDatabaseService.createUserPermissions(newUser.id);
       userPermissions = permissions.permissions;
-      console.log('📋 Default permissions created for new user:', userPermissions);
+      console.log(
+        '📋 Default permissions created for new user:',
+        userPermissions,
+      );
     } catch (error) {
       console.warn('⚠️ Could not create permissions for new user:', error);
     }
@@ -63,17 +77,17 @@ export class AuthService {
       permissions: userPermissions, // Add permissions to test token
     });
 
-          return {
-        message: 'User registered successfully',
-        user: {
-          id: newUser.id,
-          name: newUser.name,
-          email: newUser.email,
-          permissions: userPermissions, // Use permissions instead of isAiFeatureEnabled
-        },
-        token,
-        testToken, // For localStorage storage
-      };
+    return {
+      message: 'User registered successfully',
+      user: {
+        id: newUser.id,
+        name: newUser.name,
+        email: newUser.email,
+        permissions: userPermissions, // Use permissions instead of isAiFeatureEnabled
+      },
+      token,
+      testToken, // For localStorage storage
+    };
   }
 
   async login(loginDto: LoginDto) {
@@ -85,13 +99,18 @@ export class AuthService {
       // Find user by email with timeout
       const user: FirebaseUser | null = await Promise.race([
         this.firebaseDatabaseService.findUserByEmail(email),
-        new Promise<FirebaseUser | null>((_, reject) => 
-          setTimeout(() => reject(new Error('Database timeout')), 5000)
-        )
+        new Promise<FirebaseUser | null>((_, reject) =>
+          setTimeout(() => reject(new Error('Database timeout')), 5000),
+        ),
       ]);
-      
-      console.log('👤 Found user:', user ? { id: user.id, name: user.name, email: user.email } : 'Not found');
-      
+
+      console.log(
+        '👤 Found user:',
+        user
+          ? { id: user.id, name: user.name, email: user.email }
+          : 'Not found',
+      );
+
       if (!user) {
         console.log('❌ User not found');
         throw new UnauthorizedException('Invalid credentials');
@@ -100,12 +119,12 @@ export class AuthService {
       // Verify password - COMMENTED OUT BCRYPT FOR NOW
       // const isPasswordValid = await bcrypt.compare(password, user.password);
       const isPasswordValid = password === user.password; // Direct password comparison
-      console.log('🔐 Password check:', { 
-        providedPassword: password, 
-        storedPassword: user.password, 
-        isMatch: isPasswordValid 
+      console.log('🔐 Password check:', {
+        providedPassword: password,
+        storedPassword: user.password,
+        isMatch: isPasswordValid,
       });
-      
+
       if (!isPasswordValid) {
         console.log('❌ Password mismatch');
         throw new UnauthorizedException('Invalid credentials');
@@ -116,10 +135,16 @@ export class AuthService {
       const token = this.jwtService.sign(payload);
 
       // Fetch user permissions
-      let userPermissions: { AiChat: boolean; investment: boolean } = { AiChat: false, investment: false };
+      let userPermissions: { AiChat: boolean; investment: boolean } = {
+        AiChat: false,
+        investment: false,
+      };
       try {
-        const permissions = await this.firebaseDatabaseService.getUserPermissions(user.id);
-        userPermissions = permissions ? permissions.permissions : { AiChat: false, investment: false };
+        const permissions =
+          await this.firebaseDatabaseService.getUserPermissions(user.id);
+        userPermissions = permissions
+          ? permissions.permissions
+          : { AiChat: false, investment: false };
         console.log('📋 User permissions fetched:', userPermissions);
       } catch (error) {
         console.warn('⚠️ Could not fetch permissions, using defaults:', error);
@@ -174,7 +199,7 @@ export class AuthService {
       createdAt: new Date().toISOString(),
       isAiFeatureEnabled: user.isAiFeatureEnabled,
     };
-    
+
     // Encode as base64 for localStorage storage
     return Buffer.from(JSON.stringify(testTokenData)).toString('base64');
   }
@@ -182,7 +207,7 @@ export class AuthService {
   async toggleUserAiFeature(email: string, enabled: boolean) {
     try {
       console.log(`🤖 Toggling AI feature for ${email} to ${enabled}`);
-      
+
       const user = await this.firebaseDatabaseService.findUserByEmail(email);
       if (!user) {
         throw new Error('User not found');

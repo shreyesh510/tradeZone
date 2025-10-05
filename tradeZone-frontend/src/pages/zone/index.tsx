@@ -1,12 +1,12 @@
 import { memo, useState, useEffect } from 'react';
-import LiveChart from '../../components/LiveChart';
-import Header from '../../layouts/Header';
-import Chat from '../dashboard/components/Chat';
-import Sidebar from '../../components/Sidebar';
-import FloatingNav, { type MobileTab } from '../../layouts/FloatingNav';
-import ResizablePane from '../../components/ResizablePane';
+import LiveChart from '../../components/chart/liveChart';
+import Header from '../../layouts/header';
+import Chat from '../dashboard/components/chat';
+import Sidebar from '../../layouts/sidebar';
+import FloatingButton, { type MobileTab } from '../../components/button/floatingButton';
+import ResizablePane from '../../layouts/resizablePane';
 import Settings from '../settings';
-import { useSettings } from '../../contexts/SettingsContext';
+import { useSettings } from '../../contexts/settingsContext';
 
 interface OnlineUser {
   userId: string;
@@ -62,17 +62,15 @@ const Zone = memo(function Zone() {
             margin: '0px'
           }}
         >
-          {/* Content - full screen minus nav */}
-          <div className="flex-1 overflow-hidden" style={{ height: 'calc(100vh - 80px)' }}>
+          {/* Content - full screen */}
+          <div className="flex-1 overflow-hidden" style={{ height: '100vh' }}>
             {activeTab === 'chart' && <LiveChart key="live-chart" />}
             {activeTab === 'chat' && <Chat onlineUsers={onlineUsers} setOnlineUsers={setOnlineUsers} />}
             {activeTab === 'settings' && <Settings />}
           </div>
 
-          {/* Floating Navigation - Fixed at bottom */}
-          <div className="flex-shrink-0" style={{ height: '80px' }}>
-            <FloatingNav activeTab={activeTab} onTabChange={handleTabChange} />
-          </div>
+          {/* Floating Navigation */}
+          <FloatingButton activeTab={activeTab} onTabChange={handleTabChange} />
         </div>
       );
     }

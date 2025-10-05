@@ -7,7 +7,7 @@ export class ChatController {
 
   // Chat controller simplified - all chat operations handled via WebSocket Gateway
   // Database-based REST endpoints removed since chat is in-memory via WebSocket
-  
+
   @Get('status')
   async getChatStatus() {
     return this.chatService.getServiceStatus();

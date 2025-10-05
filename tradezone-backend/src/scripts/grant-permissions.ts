@@ -34,8 +34,11 @@ class PermissionGrantService {
   private initializeFirebase() {
     try {
       // Try to initialize Firebase Admin SDK
-      const serviceAccountPath = path.join(__dirname, '../../tradeinzone-1a8b1-firebase-adminsdk-fbsvc-ad8db35560.json');
-      
+      const serviceAccountPath = path.join(
+        __dirname,
+        '../../tradeinzone-1a8b1-firebase-adminsdk-fbsvc-ad8db35560.json',
+      );
+
       const serviceAccount = require(serviceAccountPath);
 
       if (!admin.apps.length) {
@@ -68,7 +71,7 @@ class PermissionGrantService {
       const doc = snapshot.docs[0];
       return {
         id: doc.id,
-        ...doc.data()
+        ...doc.data(),
       };
     } catch (error) {
       console.error('Error finding user:', error);
@@ -91,7 +94,7 @@ class PermissionGrantService {
       const doc = snapshot.docs[0];
       return {
         _id: doc.id,
-        ...doc.data()
+        ...doc.data(),
       } as Permission;
     } catch (error) {
       console.error('Error getting user permissions:', error);
@@ -99,15 +102,20 @@ class PermissionGrantService {
     }
   }
 
-  async createUserPermissions(userId: string, permissions: UserPermissions): Promise<Permission> {
+  async createUserPermissions(
+    userId: string,
+    permissions: UserPermissions,
+  ): Promise<Permission> {
     try {
       const permissionData = {
         userId,
         permissions,
       };
 
-      const docRef = await this.firestore.collection(this.permissionsCollection).add(permissionData);
-      
+      const docRef = await this.firestore
+        .collection(this.permissionsCollection)
+        .add(permissionData);
+
       const permission: Permission = {
         _id: docRef.id,
         ...permissionData,
@@ -121,10 +129,13 @@ class PermissionGrantService {
     }
   }
 
-  async updateUserPermissions(userId: string, permissions: UserPermissions): Promise<Permission> {
+  async updateUserPermissions(
+    userId: string,
+    permissions: UserPermissions,
+  ): Promise<Permission> {
     try {
       const existingPermission = await this.getUserPermissions(userId);
-      
+
       if (!existingPermission) {
         // Create new permissions if they don't exist
         return await this.createUserPermissions(userId, permissions);
@@ -144,7 +155,7 @@ class PermissionGrantService {
         .update(updateData);
 
       console.log(`✅ Updated permissions for user ${userId}`);
-      
+
       return {
         ...existingPermission,
         ...updateData,
@@ -157,7 +168,7 @@ class PermissionGrantService {
 
   async grantAllPermissions(email: string): Promise<void> {
     console.log(`🔍 Looking for user with email: ${email}`);
-    
+
     // Find user by email
     const user = await this.findUserByEmail(email);
     if (!user) {
@@ -168,14 +179,17 @@ class PermissionGrantService {
     console.log(`👤 Found user: ${user.name} (ID: ${user.id})`);
 
     // Grant all permissions
-    const updatedPermissions = await this.updateUserPermissions(user.id, ALL_PERMISSIONS);
-    
+    const updatedPermissions = await this.updateUserPermissions(
+      user.id,
+      ALL_PERMISSIONS,
+    );
+
     console.log(`🎉 Successfully granted all permissions to ${user.name}:`);
     console.log('📋 Permissions granted:');
     Object.entries(ALL_PERMISSIONS).forEach(([key, value]) => {
       console.log(`   ${key}: ${value ? '✅' : '❌'}`);
     });
-    
+
     console.log('\n🚀 User can now access:');
     if (ALL_PERMISSIONS.AiChat) console.log('   🤖 AI Chat');
     if (ALL_PERMISSIONS.investment) console.log('   💰 Investment Features');
@@ -185,9 +199,11 @@ class PermissionGrantService {
     try {
       console.log('📋 Listing all users in the database:');
       console.log('----------------------------------------');
-      
-      const snapshot = await this.firestore.collection(this.usersCollection).get();
-      
+
+      const snapshot = await this.firestore
+        .collection(this.usersCollection)
+        .get();
+
       if (snapshot.empty) {
         console.log('No users found in the database.');
         return;
@@ -195,9 +211,11 @@ class PermissionGrantService {
 
       snapshot.docs.forEach((doc, index) => {
         const userData = doc.data();
-        console.log(`${index + 1}. ${userData.name} (${userData.email}) - ID: ${doc.id}`);
+        console.log(
+          `${index + 1}. ${userData.name} (${userData.email}) - ID: ${doc.id}`,
+        );
       });
-      
+
       console.log('----------------------------------------');
     } catch (error) {
       console.error('Error listing users:', error);
@@ -208,17 +226,19 @@ class PermissionGrantService {
 // Main execution function
 async function main() {
   const service = new PermissionGrantService();
-  
+
   // Get command line arguments
   const args = process.argv.slice(2);
-  
+
   if (args.length === 0) {
     console.log('📋 Usage Examples:');
     console.log('');
     console.log('Grant all permissions to a user:');
     console.log('  npm run grant-permissions user@example.com');
     console.log('  or');
-    console.log('  npx ts-node src/scripts/grant-permissions.ts user@example.com');
+    console.log(
+      '  npx ts-node src/scripts/grant-permissions.ts user@example.com',
+    );
     console.log('');
     console.log('List all users:');
     console.log('  npm run grant-permissions --list');
@@ -234,10 +254,12 @@ async function main() {
   }
 
   const email = args[0];
-  
+
   if (!email || !email.includes('@')) {
     console.error('❌ Please provide a valid email address');
-    console.log('Example: npx ts-node src/scripts/grant-permissions.ts user@example.com');
+    console.log(
+      'Example: npx ts-node src/scripts/grant-permissions.ts user@example.com',
+    );
     return;
   }
 

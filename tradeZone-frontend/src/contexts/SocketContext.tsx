@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useAppSelector } from '../redux/hooks';
-import { useToast } from './ToastContext';
+import { useToast } from './toastContext';
 import { messageStorage } from '../services/messageStorage';
 import { type Message } from '../types/message';
 import config from '../config/env';
